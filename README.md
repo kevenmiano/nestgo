@@ -1,7 +1,7 @@
 # NestGo 🚀
 
 <div align="center">
-  <img src="NESGO.png" alt="NestGo Logo" width="200"/>
+  <img src="docs/NESGO.png" alt="NestGo Logo" width="200"/>
 
   **Um framework Go inspirado no NestJS para desenvolvimento de APIs escaláveis e modulares**
 
@@ -31,13 +31,7 @@ NestGo é um framework Go moderno e poderoso inspirado no NestJS, projetado para
 
 **Este é um Proof of Concept (POC) em desenvolvimento ativo.**
 
-### 🚧 Limitações Atuais
-- ❌ Não testado em produção
-- ❌ Falta de testes automatizados
-- ❌ Documentação em desenvolvimento
-- ❌ Middleware limitado
-- ❌ Sem suporte a WebSockets
-- ❌ Sem sistema de autenticação integrado
+
 
 ### 🎯 Objetivos do POC
 - ✅ Demonstrar conceitos de DI em Go
@@ -62,121 +56,127 @@ go mod init meu-projeto
 go get github.com/kevenmiano/nestgo
 ```
 
-### Exemplo Simples
+### Exemplo Completo
 
-Para entender rapidamente como o framework funciona, execute o exemplo simples:
+Para entender como o framework funciona, execute o exemplo completo:
 
 ```bash
-# Execute o exemplo básico
+# Execute o exemplo completo
 go run examples/main.go
 
 # Teste as rotas
-curl http://localhost:3001/products/
-curl http://localhost:3001/products/1
+curl http://localhost:3000/users/
+curl http://localhost:3000/users/1
 ```
 
-### Exemplo Básico
+### Exemplo Real - API REST Completa
 
+O exemplo em `examples/main.go` demonstra uma API REST completa com:
+
+#### 🎮 **Controller com Rotas HTTP**
 ```go
-package main
-
-import (
-    "github.com/kevenmiano/nestgo/pkg/application"
-    "github.com/kevenmiano/nestgo/pkg/controller"
-    "github.com/kevenmiano/nestgo/pkg/service"
-    "github.com/kevenmiano/nestgo/pkg/module"
-)
-
-// UserService - Service para lógica de negócio
-type UserService struct {
-    service.BaseService
-}
-
-func (s *UserService) GetAllUsers() []string {
-    return []string{"user1", "user2", "user3"}
-}
-
-func (s *UserService) CreateUser(name string) string {
-    return "Created user: " + name
-}
-
-// UserController - Controller para rotas HTTP
 type UserController struct {
     controller.BaseController `baseUrl:"/users"`
-
-    // Injeção de dependência
     UserService *UserService `inject:"UserService"`
-}
 
-// @route GET /
-func (c *UserController) GetUsers() {
-    users := c.UserService.GetAllUsers()
-    // Lógica do controller
-}
-
-// @route POST /
-func (c *UserController) CreateUser() {
-    result := c.UserService.CreateUser("newuser")
-    // Lógica do controller
-}
-
-// UserModule - Módulo principal
-type UserModule struct{}
-
-// Configuração do módulo
-var _ = module.ModuleDecorator(module.ModuleConfig{
-    Controllers: []interface{}{&UserController{}},
-    Providers: []interface{}{
-        &UserService{},
-    },
-})(&UserModule{})
-
-func main() {
-    // Inicia a aplicação
-    application.StartApplication(":3000")
-}
-```
-
-## 🎯 Conceitos Principais
-
-### 🔧 **Injeção de Dependência**
-```go
-type ProductController struct {
-    controller.BaseController `baseUrl:"/products"`
-
-    // Injeção automática por tag
-    ProductService *ProductService `inject:"ProductService"`
-}
-```
-
-### 🛣️ **Rotas com Tags**
-```go
-type ProductController struct {
     // Rotas definidas com tags
-    GetProducts   func() `route:"GET /"`
-    GetProduct    func() `route:"GET /:id"`
-    CreateProduct func() `route:"POST /"`
+    GetUsers     func() `route:"GET /"`
+    CreateUser   func() `route:"POST /"`
+    GetUser      func() `route:"GET /:id"`
+    UpdateUser   func() `route:"PUT /:id"`
+    DeleteUser   func() `route:"DELETE /:id"`
+    PatchUser    func() `route:"PATCH /:id"`
+    HeadUsers    func() `route:"HEAD /"`
+    OptionsUsers func() `route:"OPTIONS /"`
 }
 ```
 
-### 📦 **Módulos**
+#### 🔧 **Injeção de Dependência**
+```go
+type UserService struct {
+    service.BaseService
+    Database *FakeDatabase `inject:"FakeDatabase"`
+}
+```
+
+#### 📦 **Módulo Configurado**
 ```go
 var _ = module.New(module.ModuleConfig{
-    Controllers: []interface{}{NewProductController()},
-    Providers: []interface{}{NewProductService()},
-})(&ProductModule{})
+    Controllers: []interface{}{NewUserController()},
+    Providers: []interface{}{
+        NewFakeDatabase(),
+        NewUserService(),
+    },
+})(&UserModule{})
 ```
 
-### 🎯 **BaseController**
+## 🔗 Binding de Métodos Privados x Rotas
+
+### Como Funciona o Sistema de Rotas
+
+O framework NestGo usa um sistema inteligente que conecta **métodos privados** (handlers) com **rotas públicas** (tags):
+
+#### 1️⃣ **Definição das Rotas**
 ```go
-func (c *ProductController) getProductHandler() {
-    // Acesso fácil ao request e response
-    vars := mux.Vars(c.Request)
-    c.JSON(map[string]interface{}{
-        "data": product,
-    })
+type UserController struct {
+    // Campos de função com tags de rota
+    GetUsers     func() `route:"GET /"`
+    CreateUser   func() `route:"POST /"`
+    GetUser      func() `route:"GET /:id"`
+    UpdateUser   func() `route:"PUT /:id"`
+    DeleteUser   func() `route:"DELETE /:id"`
+    PatchUser    func() `route:"PATCH /:id"`
+    HeadUsers    func() `route:"HEAD /"`
+    OptionsUsers func() `route:"OPTIONS /"`
 }
 ```
+
+#### 2️⃣ **Implementação dos Handlers (Privados)**
+```go
+// Métodos privados que contêm a lógica real
+func (c *UserController) getUsersHandler() {
+    users := c.UserService.GetAllUsers()
+    c.JSON(map[string]interface{}{
+        "data":  users,
+        "count": len(users),
+    })
+}
+
+func (c *UserController) createUserHandler() {
+    // Lógica para criar usuário
+}
+
+func (c *UserController) getUserHandler() {
+    // Lógica para buscar usuário por ID
+}
+```
+
+#### 3️⃣ **Binding Manual no Factory**
+```go
+func NewUserController() *UserController {
+    controller := &UserController{}
+
+    // Conecta rotas públicas com handlers privados
+    controller.GetUsers = func() { controller.getUsersHandler() }
+    controller.CreateUser = func() { controller.createUserHandler() }
+    controller.GetUser = func() { controller.getUserHandler() }
+    controller.UpdateUser = func() { controller.updateUserHandler() }
+    controller.DeleteUser = func() { controller.deleteUserHandler() }
+    controller.PatchUser = func() { controller.patchUserHandler() }
+    controller.HeadUsers = func() { controller.headUsersHandler() }
+    controller.OptionsUsers = func() { controller.optionsUsersHandler() }
+
+    return controller
+}
+```
+
+### 🎯 **Vantagens desta Abordagem**
+
+- ✅ **Separação Clara**: Rotas públicas vs lógica privada
+- ✅ **Flexibilidade**: Pode mudar implementação sem afetar rotas
+- ✅ **Testabilidade**: Handlers privados são fáceis de testar
+- ✅ **Convenção**: Nome da rota + "Handler" = método privado
+- ✅ **Type Safety**: Go garante que as funções existem
 
 ## 🏗️ Arquitetura
 
@@ -293,77 +293,18 @@ O framework gera automaticamente uma visualização hierárquica da estrutura da
 ================================================================================
 ```
 
-## 📚 Exemplos de Uso
+## 📚 Funcionalidades Demonstradas
 
-### API REST Completa
+### ✅ **O que o Exemplo Mostra**
 
-```go
-package main
-
-import (
-    "github.com/kevenmiano/nestgo/pkg/application"
-    "github.com/kevenmiano/nestgo/pkg/controller"
-    "github.com/kevenmiano/nestgo/pkg/service"
-    "github.com/kevenmiano/nestgo/pkg/module"
-)
-
-// User model
-type User struct {
-    ID    int    `json:"id"`
-    Name  string `json:"name"`
-    Email string `json:"email"`
-}
-
-// UserService
-type UserService struct {
-    service.BaseService
-    users []User
-}
-
-func (s *UserService) GetAllUsers() []User {
-    return s.users
-}
-
-func (s *UserService) CreateUser(name, email string) User {
-    user := User{
-        ID:    len(s.users) + 1,
-        Name:  name,
-        Email: email,
-    }
-    s.users = append(s.users, user)
-    return user
-}
-
-// UserController
-type UserController struct {
-    controller.BaseController `baseUrl:"/users"`
-    UserService *UserService `inject:"UserService"`
-}
-
-// @route GET /
-func (c *UserController) GetUsers() {
-    users := c.UserService.GetAllUsers()
-    // Retorna lista de usuários
-}
-
-// @route POST /
-func (c *UserController) CreateUser() {
-    user := c.UserService.CreateUser("New User", "user@example.com")
-    // Retorna usuário criado
-}
-
-// UserModule
-type UserModule struct{}
-
-var _ = module.ModuleDecorator(module.ModuleConfig{
-    Controllers: []interface{}{&UserController{}},
-    Providers: []interface{}{&UserService{}},
-})(&UserModule{})
-
-func main() {
-    application.StartApplication(":3000")
-}
-```
+- **CRUD Completo**: Create, Read, Update, Delete
+- **Parâmetros de Rota**: Extração de `:id` da URL
+- **Parsing de JSON**: Request/Response automático
+- **Injeção de Dependência**: Service → Database
+- **Thread Safety**: Mutex para operações concorrentes
+- **Logging Estruturado**: Logs detalhados de todas as operações
+- **Tratamento de Erros**: Respostas de erro padronizadas
+- **Métodos HTTP**: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
 
 ## ✨ Vantagens do NestGo
 
@@ -377,21 +318,32 @@ func main() {
 
 ## 🧪 Testando a API
 
-Use os arquivos de exemplo incluídos para testar suas rotas:
+Use o arquivo de exemplo incluído para testar todas as rotas:
 
 ```bash
-# Exemplo simples (porta 3001)
+# Execute o exemplo
 go run examples/main.go
-curl http://localhost:3001/products/
 
-# Exemplo completo (porta 3000)
-go run main.go
+# Teste as rotas principais
 curl http://localhost:3000/users/
+curl http://localhost:3000/users/1
+curl -X POST http://localhost:3000/users/ \
+  -H "Content-Type: application/json" \
+  -d '{"name":"João Silva","email":"joao@example.com","age":30}'
 ```
 
-### Arquivos de Teste
-- `examples.http` - Testes do exemplo completo
-- `examples_simple.http` - Testes do exemplo simples
+### Arquivo de Teste Completo
+- `examples/examples.http` - Testes completos de todas as rotas (17 testes diferentes)
+
+### Rotas Disponíveis
+- `GET /users/` - Listar todos os usuários
+- `POST /users/` - Criar novo usuário
+- `GET /users/:id` - Buscar usuário por ID
+- `PUT /users/:id` - Atualizar usuário completo
+- `PATCH /users/:id` - Atualização parcial
+- `DELETE /users/:id` - Deletar usuário
+- `HEAD /users/` - Headers de resposta
+- `OPTIONS /users/` - Métodos permitidos
 
 ## 🔧 Configuração Avançada
 
@@ -419,23 +371,21 @@ logger.Error("Database error", "error", err)
 
 ```
 nestgo/
-├── main.go                    # Exemplo completo
-├── examples/
-│   └── main.go               # Exemplo simples
-├── NESGO.png                 # Logo do framework
-├── examples.http             # Testes do exemplo completo
-├── examples_simple.http      # Testes do exemplo simples
-├── README.md                 # Documentação principal
-├── README_SIMPLE.md          # Documentação do exemplo simples
-├── pkg/                      # Código do framework
-│   ├── application/          # Aplicação principal
-│   ├── controller/           # BaseController
-│   ├── service/              # BaseService
-│   ├── module/               # Sistema de módulos
-│   ├── decorators/           # Decorators
-│   ├── server/               # Servidor HTTP
-│   └── logger/               # Sistema de logs
-└── go.mod                    # Dependências Go
+├── examples/                 # Exemplos de uso
+│   ├── main.go              # Exemplo completo com API REST
+│   └── examples.http        # Testes completos (17 testes)
+├── docs/
+│   └── NESGO.png            # Logo do framework
+├── README.md                # Documentação principal
+├── pkg/                     # Código do framework
+│   ├── application/         # Aplicação principal
+│   ├── controller/          # BaseController
+│   ├── service/             # BaseService
+│   ├── module/              # Sistema de módulos
+│   ├── decorators/          # Decorators
+│   ├── server/              # Servidor HTTP
+│   └── logger/              # Sistema de logs
+└── go.mod                   # Dependências Go
 ```
 
 ## 🤝 Contribuindo
