@@ -1,0 +1,27 @@
+### Exemplo Simples do NestGo Framework
+
+# 1. Listar todos os produtos
+GET http://localhost:3001/products/
+
+###
+
+# 2. Buscar produto por ID
+GET http://localhost:3001/products/1
+
+###
+
+# 3. Criar novo produto
+POST http://localhost:3001/products/
+Content-Type: application/json
+
+{
+  "name": "Teclado",
+  "price": 89.90
+}
+
+###
+
+# 4. Buscar produto inexistente (erro)
+GET http://localhost:3001/products/999
+
+###

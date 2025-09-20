@@ -1,0 +1,137 @@
+### NestGo Route Testing com Fake Database
+### Testando as rotas com database em memória
+
+### 1. Testar rota GET /users/ (GetUsers)
+### Resposta esperada: Lista de usuários com dados completos
+GET http://localhost:3000/users/
+Accept: application/json
+
+### 2. Testar rota POST /users/ (CreateUser)
+### Resposta esperada: Usuário criado com ID gerado
+POST http://localhost:3000/users/
+Content-Type: application/json
+Accept: application/json
+
+{
+  "name": "João Silva",
+  "email": "joao.silva@example.com",
+  "age": 30
+}
+
+### 3. Testar com dados diferentes
+POST http://localhost:3000/users/
+Content-Type: application/json
+
+{
+  "name": "Ana Maria",
+  "email": "ana.maria@example.com",
+  "age": 28
+}
+
+### 4. Testar GET /users/1 (GetUser by ID)
+### Resposta esperada: Dados do usuário com ID 1
+GET http://localhost:3000/users/1
+Accept: application/json
+
+### 5. Testar PUT /users/1 (UpdateUser)
+### Resposta esperada: Usuário atualizado
+PUT http://localhost:3000/users/1
+Content-Type: application/json
+
+{
+  "name": "João Silva Atualizado",
+  "email": "joao.atualizado@example.com",
+  "age": 31
+}
+
+### 6. Testar DELETE /users/2 (DeleteUser)
+### Resposta esperada: Confirmação de exclusão
+DELETE http://localhost:3000/users/2
+Accept: application/json
+
+### 4. Testar rota GET novamente para ver se os dados foram persistidos
+GET http://localhost:3000/users/
+Accept: application/json
+
+### 5. Testar com método não suportado (deve retornar 405)
+PUT http://localhost:3000/users/
+Content-Type: application/json
+
+{
+  "name": "Update Test"
+}
+
+### 6. Testar com método não suportado (deve retornar 405)
+DELETE http://localhost:3000/users/
+Accept: application/json
+
+### 7. Testar rota inexistente (deve retornar 404)
+GET http://localhost:3000/nonexistent/
+Accept: application/json
+
+### 8. Testar com headers customizados
+GET http://localhost:3000/users/
+Accept: application/json
+X-Request-ID: test-123
+X-Client-Version: 1.0.0
+
+### 9. Testar POST com dados vazios
+POST http://localhost:3000/users/
+Content-Type: application/json
+
+{}
+
+### 10. Testar POST sem Content-Type
+POST http://localhost:3000/users/
+
+{
+  "name": "Teste sem Content-Type"
+}
+
+### 11. Testar PATCH /users/1 (PatchUser - atualização parcial)
+PATCH http://localhost:3000/users/1
+Content-Type: application/json
+
+{
+  "name": "João Silva Parcial"
+}
+
+### 12. Testar PATCH com apenas email
+PATCH http://localhost:3000/users/1
+Content-Type: application/json
+
+{
+  "email": "joao.patch@example.com"
+}
+
+### 13. Testar PATCH com apenas age
+PATCH http://localhost:3000/users/1
+Content-Type: application/json
+
+{
+  "age": 32
+}
+
+### 14. Testar HEAD /users/ (HeadUsers)
+HEAD http://localhost:3000/users/
+Accept: application/json
+
+### 15. Testar OPTIONS /users/ (OptionsUsers)
+OPTIONS http://localhost:3000/users/
+Accept: application/json
+
+### 16. Testar PATCH com usuário inexistente
+PATCH http://localhost:3000/users/999
+Content-Type: application/json
+
+{
+  "name": "Usuário Inexistente"
+}
+
+### 17. Testar PATCH com dados inválidos
+PATCH http://localhost:3000/users/1
+Content-Type: application/json
+
+{
+  "invalid": "data"
+}
