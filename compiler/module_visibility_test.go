@@ -7,9 +7,7 @@ import (
 
 func TestModuleProviderVisibility(t *testing.T) {
 	cases := []struct {
-		name string
-		src  string
-		want string
+		name, src, want string
 	}{
 		{
 			name: "imported and exported",
