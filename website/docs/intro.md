@@ -12,6 +12,10 @@ slug: /intro
 - Go 1.23+
 - No external Go runtime dependencies
 
+## Install NestGo
+
+Install the command with `go install github.com/kevenmiano/nestgo/cmd/nestgo@latest`; in a separate Go application, use `go get github.com/kevenmiano/nestgo@latest` to add the runtime dependency. See the [installation guide](./installation.md).
+
 ## Quick start
 
 ```bash
