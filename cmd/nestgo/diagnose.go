@@ -21,7 +21,8 @@ func (*sampleController) Ping() string { return "ok" }
 
 func diagnose(args []string) error {
 	flags := flag.NewFlagSet("diagnose", flag.ContinueOnError)
-	example := flags.Bool("example", false, "run a built-in example fixture (not the user's application)")
+	example := flags.Bool("example", false, "run a built-in example fixture")
+	app := flags.String("app", "", "an importable Go application package to diagnose")
 	out := flags.String("out", "nestgo-diagnostics", "output directory for self-contained report")
 	samples := flags.Int("samples", 15, "independent measurement batches")
 	iterations := flags.Int("iterations", 100, "runtime.New calls per batch")
@@ -39,8 +40,14 @@ func diagnose(args []string) error {
 	if *coldSamples < 0 || *coldSamples > 50 {
 		return errors.New("cold-samples must be 0..50")
 	}
+	if *app != "" {
+		if *example || *withScale {
+			return errors.New("-app cannot be combined with -example or -scale")
+		}
+		return diagnoseApplication(*app, *out, *samples, *iterations, *coldSamples, *strict)
+	}
 	if !*example {
-		return errors.New("diagnose currently requires -example; real applications use diagnostics.Analyze and diagnostics.MeasureStartup programmatically with their metadata.Package values")
+		return errors.New("use -app <importable Go package> or -example")
 	}
 	pkg := samplePackage()
 	graph := diagnostics.Analyze(pkg)

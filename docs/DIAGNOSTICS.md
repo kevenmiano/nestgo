@@ -22,7 +22,15 @@ go build -o ./nestgo-local ./cmd/nestgo
 # Open diagnostics-output/report.html locally, without internet access.
 ```
 
-The CLI's `-example` runs a transparent demo fixture containing three providers and one HTTP route. **It does not automatically inspect an arbitrary user application**, because the compiled CLI binary cannot load Go types from an unrelated process without linking or a metadata export contract.
+The CLI's `-example` runs a transparent demo fixture containing three providers and one HTTP route. To analyze **real application metadata**, use `-app` with an importable Go package whose generated code calls `metadata.Register`:
+
+```bash
+go run ./cmd/nestgo diagnose -app ./examples/shop -out diagnostics-real -samples 10 -iterations 50 -cold-samples 3 -strict
+```
+
+The CLI resolves the package using `go list`, creates an ephemeral Go runner that blank-imports the package, compiles it once, then executes the runner to inspect `metadata.All()`. It does not modify application source files or embed fixture providers in the results. It measures warm `runtime.New` and process cold launch-to-exit from the linked executable. `-scale` is only supported with `-example`. **Importing and initializing application packages executes their Go `init()` functions and their dependencies.** Only diagnose code you trust.
+
+Current limitations: `-app` requires an importable non-`main` package with compiled/generated NestGo registration. It does not automatically resolve the entire application startup, nor infer module imports/exports, which are not represented in the current `metadata.Module` contract. Package-local unregistered controllers/providers are invisible. Direct use of `diagnostics.Analyze` and `MeasureStartup` remains supported for programmatic use.
 
 ### Inspect your own application
 
