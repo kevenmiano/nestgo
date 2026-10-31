@@ -102,3 +102,27 @@ func BenchmarkHTTPRequestNetHTTP(b *testing.B) {
 		}
 	}
 }
+
+
+func BenchmarkHTTPRequestStatic(b *testing.B) {
+ pkg := metadata.Package{Controllers: []metadata.Controller{{
+  Type: reflect.TypeOf((*benchmarkController)(nil)),
+  Prefix: "/benchmark",
+  Routes: []metadata.Route{{
+   Method: "GET", Path: "/ping", Handler: "Ping",
+   StaticInvoke: func(instance any) (any, error) {
+    return instance.(*benchmarkController).Ping(), nil
+   },
+  }},
+ }}}
+ h, err := New(pkg)
+ if err != nil { b.Fatal(err) }
+ req := httptest.NewRequest(http.MethodGet, "/benchmark/ping", nil)
+ b.ReportAllocs()
+ b.ResetTimer()
+ for i := 0; i < b.N; i++ {
+  rec := httptest.NewRecorder()
+  h.ServeHTTP(rec, req)
+  if rec.Code != http.StatusOK { b.Fatalf("status=%d", rec.Code) }
+ }
+}
