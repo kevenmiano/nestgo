@@ -30,6 +30,7 @@ type Declaration struct {
 	Annotations    []Annotation
 	Kind           string
 	Params         []Parameter
+ StaticEligible bool
 }
 type Parameter struct {
 	Index      int
@@ -90,6 +91,9 @@ func Parse(path string, src []byte) (*File, error) {
 			result.Declarations = append(result.Declarations, d)
 		case *ast.FuncDecl:
 			d := Declaration{Name: n.Name.Name, Kind: "func", Annotations: ann}
+            // Only zero-argument methods with exactly one return value are
+            // statically invoked. Every other signature uses reflection.
+            d.StaticEligible = (n.Type.Params == nil || len(n.Type.Params.List) == 0) && n.Type.Results != nil && len(n.Type.Results.List) == 1 && len(n.Type.Results.List[0].Names) <= 1
 			if n.Recv != nil && len(n.Recv.List) == 1 {
 				switch r := n.Recv.List[0].Type.(type) {
 				case *ast.StarExpr:
@@ -238,7 +242,11 @@ func Generate(files []*File) ([]byte, error) {
 				for _, p := range d.Params {
 					params = append(params, fmt.Sprintf(`{Index:%d,Kind:%q,Name:%q}`, p.Index, p.Kind, p.Name))
 				}
-				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Parameters:[]metadata.Parameter{%s}}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(params, ",")))
+				staticInvoke := ""
+                if d.StaticEligible {
+                    staticInvoke = fmt.Sprintf(",StaticInvoke:func(receiver any)(any,error){return receiver.(*%s).%s(),nil}", d.Receiver, d.Name)
+                }
+                routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Parameters:[]metadata.Parameter{%s}%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(params, ","), staticInvoke))
 			}
 			if routeCount > 1 {
 				return nil, fmt.Errorf("%s: multiple HTTP method decorators on %s", f.Path, d.Name)
