@@ -31,23 +31,29 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	ctx := context.Background()
 	boot := time.Now()
 	logger.Info(ctx, "NestFactory", "Starting NestGo application...")
+	fail := func(err error) (http.Handler, error) {
+		logger.Error(ctx, "NestFactory", "Bootstrap failed", slog.String("error", err.Error()))
+		return nil, err
+	}
 	logDebug := func(component, message string, attrs ...slog.Attr) {
 		if options.Debug {
 			logger.Debug(ctx, component, message, attrs...)
 		}
 	}
 	providers := map[reflect.Type]reflect.Value{}
+	orderedProviders := make([]reflect.Type, 0)
 	controllers := []metadata.Controller{}
 	for _, pkg := range packages {
 		moduleStart := time.Now()
 		for _, p := range pkg.Providers {
 			if p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
-				return nil, fmt.Errorf("provider must be pointer to struct: %v", p.Type)
+				return fail(fmt.Errorf("provider must be pointer to struct: %v", p.Type))
 			}
 			if _, exists := providers[p.Type]; exists {
-				return nil, fmt.Errorf("duplicate provider: %v", p.Type)
+				return fail(fmt.Errorf("duplicate provider: %v", p.Type))
 			}
 			providers[p.Type] = reflect.New(p.Type.Elem())
+			orderedProviders = append(orderedProviders, p.Type)
 			logDebug("InstanceLoader", "Provider instantiated", slog.String("provider", p.Type.String()))
 		}
 		controllers = append(controllers, pkg.Controllers...)
@@ -62,7 +68,8 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 			}
 			dep, ok := providers[f.Type()]
 			if !ok && f.Kind() == reflect.Interface {
-				for _, candidate := range providers {
+				for _, candidateType := range orderedProviders {
+					candidate := providers[candidateType]
 					if candidate.Type().Implements(f.Type()) {
 						if ok {
 							return fmt.Errorf("ambiguous dependency %s", sf.Name)
@@ -79,32 +86,34 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 		return nil
 	}
 	diStart := time.Now()
-	for _, v := range providers {
+	for _, providerType := range orderedProviders {
+		v := providers[providerType]
 		if err := inject(v); err != nil {
 			logger.Error(ctx, "InstanceLoader", "Provider injection failed", slog.String("error", err.Error()))
-			return nil, err
+			return fail(err)
 		}
 	}
 	logger.Startup(ctx, "InstanceLoader", "Provider dependencies resolved", diStart)
+	routeStart := time.Now()
 	mux := http.NewServeMux()
 	seen := map[string]bool{}
 	for _, c := range controllers {
 		if c.Type.Kind() != reflect.Ptr || c.Type.Elem().Kind() != reflect.Struct {
-			return nil, fmt.Errorf("invalid controller %v", c.Type)
+			return fail(fmt.Errorf("invalid controller %v", c.Type))
 		}
 		instance := reflect.New(c.Type.Elem())
 		if err := inject(instance); err != nil {
-			return nil, err
+			return fail(err)
 		}
 		logger.Info(ctx, "RoutesResolver", "Controller registered", slog.String("controller", c.Type.String()), slog.String("prefix", c.Prefix))
 		for _, route := range c.Routes {
 			method := instance.MethodByName(route.Handler)
 			if !method.IsValid() {
-				return nil, fmt.Errorf("missing handler %s.%s", c.Type, route.Handler)
+				return fail(fmt.Errorf("missing handler %s.%s", c.Type, route.Handler))
 			}
 			typ := method.Type()
 			if typ.NumOut() < 1 || typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem())) {
-				return nil, fmt.Errorf("unsupported signature %s", route.Handler)
+				return fail(fmt.Errorf("unsupported signature %s", route.Handler))
 			}
 			path := strings.TrimSuffix(c.Prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
 			if path == "" {
@@ -112,19 +121,19 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 			}
 			key := route.Method + " " + path
 			if seen[key] {
-				return nil, fmt.Errorf("duplicate route %s", key)
+				return fail(fmt.Errorf("duplicate route %s", key))
 			}
 			seen[key] = true
 			bindings := map[int]metadata.Parameter{}
 			for _, p := range route.Parameters {
 				if p.Index < 0 || p.Index >= typ.NumIn() {
-					return nil, fmt.Errorf("invalid parameter index %d", p.Index)
+					return fail(fmt.Errorf("invalid parameter index %d", p.Index))
 				}
 				bindings[p.Index] = p
 			}
 			for i := 0; i < typ.NumIn(); i++ {
 				if _, ok := bindings[i]; !ok && typ.In(i).Kind() != reflect.String {
-					return nil, fmt.Errorf("missing decorator for argument %d of %s", i, route.Handler)
+					return fail(fmt.Errorf("missing decorator for argument %d of %s", i, route.Handler))
 				}
 			}
 			handler := method
@@ -187,6 +196,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 			logger.Info(ctx, "RouterExplorer", "Mapped route", slog.String("method", route.Method), slog.String("path", path))
 		}
 	}
+	logger.Startup(ctx, "RouterExplorer", "Routes mapped", routeStart)
 	logger.Startup(ctx, "NestApplication", "Application handler initialized", boot)
 	return mux, nil
 }
