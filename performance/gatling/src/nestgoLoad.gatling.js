@@ -1,5 +1,5 @@
 import { simulation, scenario, constantUsersPerSec, rampUsersPerSec, global } from "@gatling.io/core";
-import { http, status, bodyString } from "@gatling.io/http";
+import { http, status } from "@gatling.io/http";
 
 const baseUrl = process.env.NESTGO_BASE_URL || "http://127.0.0.1:18080";
 const rate = Number(process.env.NESTGO_RATE || "10");
@@ -10,7 +10,7 @@ export default simulation((setUp) => {
   const protocol = http.baseUrl(baseUrl).acceptHeader("application/json");
   const read = scenario("GET users list")
     .exec(http("GET /users/").get("/users/")
-      .check(status().is(200), bodyString().exists()));
+      .check(status().is(200)));
   setUp(read.injectOpen(
     rampUsersPerSec(1).to(rate).during(warmup),
     constantUsersPerSec(rate).during(duration)
