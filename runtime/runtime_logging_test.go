@@ -98,7 +98,9 @@ func TestMissingRequiredDependencyBlocksBootstrap(t *testing.T) {
 }
 func TestOptionalDependencyAllowed(t *testing.T) {
 	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*optionalRequired)(nil))}}}
-	if _, err := NewWithOptions(Options{}, p); err != nil { t.Fatal(err) }
+	if _, err := NewWithOptions(Options{}, p); err != nil {
+		t.Fatal(err)
+	}
 }
 func TestMissingInterfaceBlocksBootstrap(t *testing.T) {
 	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*missingInterfaceProvider)(nil))}}}
@@ -112,6 +114,8 @@ func TestNilMetadataDoesNotPanic(t *testing.T) {
 		{Controllers: []metadata.Controller{{Type: nil}}},
 	}
 	for _, p := range cases {
-		if _, err := NewWithOptions(Options{}, p); err == nil {t.Fatal("expected nil metadata error")}
+		if _, err := NewWithOptions(Options{}, p); err == nil {
+			t.Fatal("expected nil metadata error")
+		}
 	}
 }
