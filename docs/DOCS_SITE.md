@@ -4,7 +4,7 @@
 Model the documentation navigation after NestJS's developer journey (introduction → fundamentals → recipes → reference), but use original NestGo text and Go-native examples. Avoid copying NestJS assets or suggesting API parity.
 
 ## Plan
-The Docusaurus source lives in `website/` and is separate from the Go compiler/runtime. The original logo mark is an angular **N + G** monogram inside a hexagonal frame, combining Go-inspired teal/cyan and structured-application geometry. It does not reuse the official NestJS owl or the Go gopher. Treat the mark as a **proposed identity**, not a final brand approval.
+The Docusaurus source lives in `website/` and is separate from the Go compiler/runtime. The visual identity uses the **approved red gopher-cat mascot with speed trails** from the supplied artwork. `website/static/img/nestgo-mascot.svg` is a clean transparent vector trace of the approved image for scalable rendering across the homepage, navbar, favicon, and README. The prior N+G monogram and side-by-side upstream project logos are superseded. The mark and project are independent from NestJS and the Go team.
 
 ## Execute
 ```bash
@@ -24,7 +24,7 @@ The site is configured for GitHub Pages at `https://kevenmiano.github.io/nestgo/
 - The Go runtime remains dependency-free.
 
 ## Review
-Check navigation, branding contrast, mobile layout, accessibility, documentation accuracy and issue references.
+Check navigation, mascot fidelity, transparent rendering, dark/light contrast, mobile layout, accessibility, documentation accuracy and issue references.
 
 ## Ship
 Merge after green CI. Later configure Pages deployment, domain, search and versioned documentation. Do not claim the docs URL is live before deployment.
