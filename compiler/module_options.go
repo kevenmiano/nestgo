@@ -132,7 +132,9 @@ func parseModuleOptions(path string, a Annotation, defaultName string) (moduleOp
 	if err := p.expect(token.RBRACE); err != nil {
 		return opts, err
 	}
-	if p.tok == token.SEMICOLON { p.next() }
+	if p.tok == token.SEMICOLON {
+		p.next()
+	}
 	if p.tok != token.EOF {
 		return opts, p.fail("unexpected tokens after module options")
 	}
