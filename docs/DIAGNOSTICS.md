@@ -109,3 +109,26 @@ The validator detects directed module import cycles (Tarjan SCC), missing import
 **Important compatibility boundary:** the current `@Module("name")` compiler output only generates `Type` and `Name`. It does not infer `Imports` or `Exports` from existing `.mgo` source code. Therefore, existing generated applications report registered modules but no module edges until explicit import/export metadata is supplied. The current runtime does not yet enforce module visibility; this is a **diagnostic contract**, not a completed scoped DI container. Full compiler-declared ownership and import/export enforcement remain follow-ups on #10, #11 and #36.
 
 **Verify:** golden-order test covers shuffled modules and two-node cycle; additional tests validate missing modules, self-cycles, legacy metadata, duplicate registration and invalid exports/imports. The app CI verifies `UsersModule` occurs in `modules.json`.
+
+## Compiler-generated module relationships (GSD iteration)
+
+The compiler now supports explicit, **static local type names** on a module, without needing to handwrite `metadata.Module`:
+
+```go
+@Injectable()
+type UsersService struct{}
+
+@Module("database")
+type DatabaseModule struct{}
+
+@Module("users")
+@Imports("DatabaseModule")
+@Exports("UsersService")
+type UsersModule struct{}
+```
+
+The `@Imports` and `@Exports` decorators accept quoted, comma-separated **local type names** from any `.mgo` file in the same package directory. They are validated against `@Module` and `@Injectable` declarations, deduplicated by source validation and sorted before code generation. Unresolved, duplicate, non-identifier, or non-literal references cause a source-local compiler diagnostic. The legacy `@Module("users")` syntax remains valid.
+
+`nestgo compile ./myapp` emits the typed `Imports []reflect.Type` and `Exports []reflect.Type` metadata. Then `nestgo diagnose -app ./myapp -strict` uses the generated relationships to detect module import cycles, alongside the existing provider graph and measured startup timings.
+
+**Intentional limitation:** this first implementation supports module and provider references in the **same Go package**, not qualified cross-package imports or a NestJS-style module ownership/resolution container. The compiler validates declared references and the diagnostic checks runtime-registered types; the runtime still does not enforce exports or module visibility. Cross-package ownership and runtime enforcement remain under #10 and #11. The compiler also does not infer module edges from arbitrary Go field types; relationships must be declared explicitly.
