@@ -15,12 +15,32 @@ func New(packages ...metadata.Package)(http.Handler,error){
  providers[p.Type]=reflect.New(p.Type.Elem())
  };controllers=append(controllers,pkg.Controllers...)
  }
+ // Cache interface resolution once per handler construction. Exact pointer
+ // lookups remain O(1); unknown interfaces still use dynamic reflect.Implements.
+ type interfaceMatch struct { value reflect.Value; found, ambiguous bool }
+ interfaces:=make(map[reflect.Type]interfaceMatch)
+ resolveInterface:=func(t reflect.Type)interfaceMatch{
+  if cached,ok:=interfaces[t];ok{return cached}
+  var match interfaceMatch
+  for _,candidate:=range providers{
+   if candidate.Type().Implements(t){
+    if match.found {match.ambiguous=true;break}
+    match.value=candidate;match.found=true
+   }
+  }
+  interfaces[t]=match
+  return match
+ }
  inject:=func(v reflect.Value)error{
  for i:=0;i<v.Elem().NumField();i++{
  f:=v.Elem().Field(i);sf:=v.Elem().Type().Field(i)
  if sf.Anonymous||!f.CanSet()||(f.Kind()!=reflect.Ptr&&f.Kind()!=reflect.Interface){continue}
  dep,ok:=providers[f.Type()]
- if !ok&&f.Kind()==reflect.Interface{for _,candidate:=range providers{if candidate.Type().Implements(f.Type()){if ok{return fmt.Errorf("ambiguous dependency %s",sf.Name)};dep=candidate;ok=true}}}
+ if !ok&&f.Kind()==reflect.Interface{
+  match:=resolveInterface(f.Type())
+  if match.ambiguous{return fmt.Errorf("ambiguous dependency %s",sf.Name)}
+  if match.found{dep=match.value;ok=true}
+ }
  if ok{f.Set(dep)}
  };return nil
  }
