@@ -22,8 +22,9 @@ test('an open issue referenced by a merged PR is not marked Done', () => {
   assert.equal(prStatus({ issueState: 'open', prState: 'closed', merged: true, closes: false, hasInProgress: false }), null);
 });
 
-test('closing keyword and actually closed issues set Done', () => {
-  assert.equal(prStatus({ issueState: 'open', prState: 'closed', merged: true, closes: true, hasInProgress: true }), 'Done');
+test('only actually closed issues set Done, even with closing keywords', () => {
+  assert.equal(prStatus({ issueState: 'open', prState: 'closed', merged: true, closes: true, hasInProgress: true }), 'In Progress');
+  assert.equal(prStatus({ issueState: 'open', prState: 'closed', merged: true, closes: true, hasInProgress: false }), null);
   assert.equal(prStatus({ issueState: 'closed', prState: 'open', merged: false, closes: false, hasInProgress: true }), 'Done');
   assert.equal(prStatus({ issueState: 'open', prState: 'open', merged: false, closes: true, hasInProgress: true }), 'In Review');
 });
