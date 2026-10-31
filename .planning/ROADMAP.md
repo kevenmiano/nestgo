@@ -44,6 +44,14 @@ M004 and M006 can run in parallel after their relevant interfaces stabilize; M00
 - GSD checkpoints: tests for package imports and CLI installation, release-tag ancestry verification, docs build, versioned binaries and SHA256 checks, verified Actions logs after first real release.
 - Details: [distribution guide](../docs/DISTRIBUTION.md). This is an incremental M006 release delivery and does not complete issue #25.
 
+## Dependency diagnostics and performance measurements (GSD)
+
+- [#36](https://github.com/kevenmiano/nestgo/issues/36): deterministic provider graph, cycles and missing/ambiguous resolution diagnostics (M002).
+- [#37](https://github.com/kevenmiano/nestgo/issues/37): reproducible cold/warm startup and allocation profiling baselines (M006).
+- [#38](https://github.com/kevenmiano/nestgo/issues/38): offline SVG/HTML graph and startup report (M006).
+- Initial deliverable: `nestgo diagnose -example` produces graph.json, graph.dot, report.json and report.html, using real warm `runtime.New` measurements. See [diagnostics guide](../docs/DIAGNOSTICS.md).
+- Remaining: full module import/export graph, scale benchmarks, cold process startup measurement and diagnosis of arbitrary linked applications.
+
 ## Current iteration
 
 M001 Phase 1: PR #8 (CI) and PR #9 (compiler coverage) were merged after green checks; issue #4 still requires the full acceptance criteria to be reviewed. Issues #2–#7 remain the stabilization baseline. Newly created #10–#25 are future work, not implemented features.
