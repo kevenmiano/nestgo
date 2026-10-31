@@ -44,7 +44,7 @@ jobs:
         with:
           github-token: ${{ secrets.PROJECTS_TOKEN }}
           script: |
-            const { parseMetadata, parsePrReferences, issueStatus, prStatus } =
+            const { parseMetadata, parsePrReferences, issueStatus, prStatus, resolveStatusOption } =
               require('./.github/scripts/project-sync-logic.cjs');
             const owner = process.env.PROJECT_OWNER;
             const number = Number(process.env.PROJECT_NUMBER);
@@ -71,6 +71,7 @@ jobs:
             if (!project) throw new Error("Project not found or token lacks project permission");
             const fields = new Map(project.fields.nodes.filter(Boolean).map(f => [f.name, f]));
             if (!fields.get("Status")?.options) throw new Error("Project requires a single-select Status field");
+            core.info("Available Project Status options: " + fields.get("Status").options.map(o => o.name).join(", "));
             
             for (const [name, values] of Object.entries(definitions)) {
               if (fields.has(name)) {
@@ -98,13 +99,23 @@ jobs:
               });
               fields.set(name, created.createProjectV2Field.projectV2Field);
             }
-            const getOption = (fieldName, value) =>
-              fields.get(fieldName)?.options?.find(o => o.name.toLowerCase() === value.toLowerCase())?.id;
             const updateSelect = async (item, fieldName, value) => {
               if (!value) return;
               const field = fields.get(fieldName);
-              const option = getOption(fieldName, value);
-              if (!option) throw new Error("Missing " + fieldName + " option " + value);
+              const resolved = fieldName === "Status"
+                ? resolveStatusOption(value, field.options)
+                : field.options?.find(o => o.name.toLowerCase() === value.toLowerCase());
+              if (!resolved) {
+                if (fieldName === "Status") {
+                  core.warning("Status " + value + " unavailable; preserving existing status.");
+                  return;
+                }
+                throw new Error("Missing " + fieldName + " option " + value);
+              }
+              if (fieldName === "Status" && resolved.name !== value) {
+                core.info("Mapping Status " + value + " to existing option " + resolved.name);
+              }
+              const option = resolved.id;
               await github.graphql(`
                 mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
                   updateProjectV2ItemFieldValue(input: {
@@ -143,7 +154,7 @@ jobs:
             } else {
               const pr = context.payload.pull_request;
               const references = parsePrReferences(pr.body);
-              const hasInProgress = Boolean(getOption("Status", "In Progress"));
+              const hasInProgress = Boolean(resolveStatusOption("In Progress", fields.get("Status").options));
               for (const [issue_number, closes] of references) {
                 const {data: issue} = await github.rest.issues.get({...repo, issue_number});
                 const status = prStatus({

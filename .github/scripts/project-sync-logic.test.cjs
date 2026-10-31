@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseMetadata, parsePrReferences, issueStatus, prStatus } = require('./project-sync-logic.cjs');
+const { parseMetadata, parsePrReferences, issueStatus, prStatus, resolveStatusOption } = require('./project-sync-logic.cjs');
 
 test('parses Roadmap and Priority metadata without relying on GitHub Milestone field', () => {
   assert.deepEqual(parseMetadata('**Roadmap:** M002 — Core architecture\n**Priority:** P0\n'), { milestone: 'M002', priority: 'P0' });
@@ -35,4 +35,19 @@ test('draft, closed-unmerged, and reopened lifecycle transitions', () => {
   assert.equal(issueStatus('reopened', 'open'), 'Backlog');
   assert.equal(issueStatus('edited', 'open'), null);
   assert.equal(issueStatus('closed', 'closed'), 'Done');
+});
+
+test('uses an existing In Progress status when In Review is missing', () => {
+  const options = [{id: 'todo', name: 'Todo'}, {id: 'active', name: 'In Progress'}, {id: 'done', name: 'Done'}];
+  assert.deepEqual(resolveStatusOption('In Review', options), {id: 'active', name: 'In Progress'});
+  assert.deepEqual(resolveStatusOption('Backlog', options), {id: 'todo', name: 'Todo'});
+  assert.deepEqual(resolveStatusOption('Done', options), {id: 'done', name: 'Done'});
+  assert.deepEqual(resolveStatusOption('In Progress', options), {id: 'active', name: 'In Progress'});
+});
+
+test('never substitutes a completed or backlog status for In Review', () => {
+  assert.equal(resolveStatusOption('In Review', [{id: 'todo', name: 'Todo'}, {id: 'done', name: 'Done'}]), null);
+  assert.equal(resolveStatusOption('In Progress', [{id: 'done', name: 'Done'}]), null);
+  assert.equal(resolveStatusOption('Done', [{id: 'todo', name: 'Todo'}]), null);
+  assert.deepEqual(resolveStatusOption('In Review', [{id: 'review', name: 'review'}, {id: 'progress', name: 'In Progress'}]), {id: 'review', name: 'review'});
 });

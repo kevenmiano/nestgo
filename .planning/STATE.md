@@ -50,3 +50,9 @@
 - **Plan/Execute:** PR #28 renamed the custom destination to `Roadmap`, added metadata/reference policy tests, and prohibited `Refs #N` from completing open issues.
 - **Verify:** PR checks `Project sync policy tests` (41238733802) and Go quality gates (41238733739) passed; post-merge push backfill (41238808688) and PR-target issue status sync (41238809091) passed.
 - **Review/Ship:** Squash merged PR #28 as `4cb788e40d1e52e0d2535ae2caff67ce7c441bc4`. Confirmed the workflow log for #10–#25 and `#2 status=In Progress`. UI view configuration remains manual.
+
+## Follow-up — existing Project Status options
+
+- A PR opened after the Roadmap repair (run 41238977312) exposed a separate incompatible assumption: the board has no `In Review` status option.
+- Correction: reuse safe existing statuses instead of requiring `In Review`. The status mapping is tested against `Todo`, `In Progress` and `Done`, and logs missing options without mutating the Project field configuration.
+- Verify that both opening and merging a PR now complete the synchronization workflow; never mark `Refs #N` as Done.
