@@ -34,8 +34,8 @@ M004 and M006 can run in parallel after their relevant interfaces stabilize; M00
 5. **Review:** reconcile implementation with acceptance criteria.
 6. **Ship:** merge, close the issue and update `.planning/STATE.md`.
 
-**Project automation:** `.github/workflows/project-sync.yml` adds newly opened issues to Project #2 **only if** the `PROJECTS_TOKEN` secret and workflow are operational. The connector cannot directly confirm or set GitHub Projects v2 fields. To import older issues, manually dispatch project-sync with backfill; note that it resets open items to Backlog. Priority and Milestone remain in issue bodies until Project field synchronization is implemented.
+**Project automation:** [project-sync.yml](../.github/workflows/project-sync.yml) reconciles issue-body Priority and Roadmap metadata into custom single-select Project fields. The destination is **Roadmap** (M001–M006), not GitHub's native Milestone field. A merged PR with `Refs #N` does **not** complete an issue; `Closes #N` / `Fixes #N` / `Resolves #N` explicitly indicate completion. The corrected workflow backfills after its merge; verify the Action and actual Project field values before claiming synchronization is operational. See [sync guide](../docs/PROJECT_SYNC.md).
 
 ## Current iteration
 
-M001 Phase 1: PR #8 was merged; PR #9 adds compiler tests, pending verification and review. Issues #2–#7 remain the stabilization baseline. Newly created #10–#25 are future work, not implemented features.
+M001 Phase 1: PR #8 (CI) and PR #9 (compiler coverage) were merged after green checks; issue #4 still requires the full acceptance criteria to be reviewed. Issues #2–#7 remain the stabilization baseline. Newly created #10–#25 are future work, not implemented features.

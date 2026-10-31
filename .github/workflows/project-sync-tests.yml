@@ -1,0 +1,34 @@
+name: Project sync policy tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/project-sync.yml'
+      - '.github/workflows/project-sync-tests.yml'
+      - '.github/scripts/project-sync-logic.cjs'
+      - '.github/scripts/project-sync-logic.test.cjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/project-sync.yml'
+      - '.github/workflows/project-sync-tests.yml'
+      - '.github/scripts/project-sync-logic.cjs'
+      - '.github/scripts/project-sync-logic.test.cjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check helper syntax
+        run: node --check .github/scripts/project-sync-logic.cjs
+      - name: Verify project metadata and PR status rules
+        run: node --test .github/scripts/project-sync-logic.test.cjs

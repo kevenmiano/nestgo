@@ -1,14 +1,27 @@
-# GitHub Project #2 — automated metadata synchronization
+# GitHub Project #2 — issue metadata synchronization
 
-[Project #2](https://github.com/users/kevenmiano/projects/2) is synchronized from NestGo repository issues by [project-sync.yml](../.github/workflows/project-sync.yml).
+[Project #2](https://github.com/users/kevenmiano/projects/2) is synchronized from issues by [project-sync.yml](../.github/workflows/project-sync.yml).
 
-## Authentication
+## Authentication and security
 
-Configure the repository Actions secret `PROJECTS_TOKEN` using a GitHub classic PAT owned by a user with access to Project #2 and the `project` scope. Do not commit the token. The workflow uses metadata only and does not check out PR code.
+Configure `PROJECTS_TOKEN` as a repository Actions secret with the `project` scope and access to Project #2. Never commit the token. The workflow uses `pull_request_target`, but checks out **only the default branch**, never the PR head. The [policy tests](../.github/workflows/project-sync-tests.yml) require no credentials.
+
+## Project fields
+
+GitHub's native **Milestone** field is not necessarily a single-select. Do not overwrite or delete it.
+
+| Project field | Type | Options |
+| --- | --- | --- |
+| Status | Existing single-select | Backlog, In Review, Done; In Progress recommended |
+| Priority | Custom single-select | P0, P1, P2 |
+| **Roadmap** | **Custom single-select** | M001, M002, M003, M004, M005, M006 |
+| Milestone | GitHub native | Not modified by this workflow |
+
+Missing Priority and Roadmap fields are created automatically. If an existing field has an incompatible type or lacks an expected option, the workflow stops with an actionable error.
 
 ## Source of truth
 
-Issue descriptions contain these exact metadata lines:
+The workflow reads issue bodies such as:
 
 ```md
 **Roadmap:** M002 — Core architecture
@@ -16,35 +29,39 @@ Issue descriptions contain these exact metadata lines:
 **GSD status:** Backlog
 ```
 
-The workflow extracts the milestone identifier `M001`–`M006` from `**Roadmap:**` or `**Milestone:**`, and priority `P0`–`P2` from `**Priority:**`. It creates missing **Milestone** and **Priority** single-select fields and options when possible. Existing fields must be single-select with the matching options; an incompatible field fails loudly instead of silently corrupting the board. The existing **Status** field must offer `Backlog`, `In Review` and `Done`.
+For backward compatibility, `**Milestone:** M002` is also accepted as an **issue-body** source. The identifier is always written into the custom Project **Roadmap** field, never the native Milestone field.
 
-| Event | Action |
+## Status lifecycle
+
+| Event | Project Status |
 | --- | --- |
-| Issue opened | Add to project, set Backlog and sync metadata |
-| Issue edited, labeled, unlabeled or milestone changed | Sync metadata without resetting status |
-| Issue reopened | Sync metadata, preserve status |
-| Issue closed | Set Done and sync metadata |
-| PR opened/reopened/edited/ready for review | Set referenced issues In Review |
-| PR merged | Set referenced issues Done |
-| PR closed without merge | Set referenced issues Backlog |
-| Manual dispatch with backfill enabled | Import all repository issues and reconcile metadata, preserving existing Status |
+| Issue opened or reopened | Backlog |
+| Issue closed | Done |
+| Issue edited / backfill | Preserve existing Status |
+| PR opened / ready for review referencing an open issue | In Review |
+| Draft PR | In Progress, if available |
+| Merged PR with `Refs #N` | In Progress, if available; **never Done** |
+| Merged PR with `Closes #N`, `Fixes #N`, or `Resolves #N` | Done |
+| PR closed without merge | In Progress, if available |
+| PR references an already closed issue | Done |
 
-PR references in the description must use `Refs #N`, `Closes #N`, `Fixes #N`, or `Resolves #N`. References only in the GitHub sidebar are not detected.
+If In Progress does not exist, the workflow preserves the existing Status rather than forcing Backlog. Explicit closing keywords take precedence over a plain reference. Use `Refs #N` for partial work and closing keywords only when the complete issue is delivered.
 
-## One-time setup
+## Reconciliation
 
-1. Ensure `PROJECTS_TOKEN` is configured and Project #2 is accessible to its owner.
-2. Merge the workflow PR.
-3. Open **Actions → Sync NestGo issues to GitHub Project → Run workflow**, with `backfill=true`.
-4. Verify that issues #10–#25 have **Priority** and **Milestone** values. Check the workflow logs if not.
-5. In Project #2, create a **Kanban** view grouped by Status and a **Roadmap** or table view grouped/filtered by Milestone, showing Priority. Project views themselves are not created by this workflow.
+1. Merge the fix after the **Project sync policy tests** check passes.
+2. A push to main modifying the workflow or its logic **automatically triggers a backfill**. To retry, open **Actions → Sync NestGo issues to GitHub Project → Run workflow** with `backfill=true`.
+3. Verify that issues #10–#25 show the expected Roadmap and Priority selections, and existing statuses were preserved.
+4. Configure Kanban grouped by Status and a Roadmap/table view that displays the custom Roadmap field. Project views are not created by the workflow.
 
-The milestone values are release groups, **not dates**. A true GitHub Projects Roadmap timeline requires start/target date fields and scheduling decisions. Do not invent dates.
+The M001–M006 values represent **groups, not dates**. A timeline requires explicit dates; do not invent them.
 
-## Troubleshooting and limitations
+## Troubleshooting
 
-- Missing or insufficient token: GraphQL authentication/authorization fails; rotate or fix `PROJECTS_TOKEN`.
-- Existing Priority/Milestone field has the wrong type or missing options: adjust it in Project settings.
-- A manually edited Project field can be overwritten on the next issue edit or backfill; **issue metadata is authoritative**.
-- The sync updates field values only when metadata is present; removing a metadata line does not clear the prior Project value.
-- GitHub Actions execution and board population must be verified after merging. No passing run or board configuration is claimed in this document.
+- `Milestone must be a single-select field`: old workflow incorrectly collided with the native GitHub Milestone field. This fix uses Roadmap.
+- `Roadmap must be a single-select field`: inspect the existing Roadmap field in Project settings.
+- Project not found or permission denied: check `PROJECTS_TOKEN` and Project access.
+- Missing field option: add the expected option in Project settings.
+- A successful CI build does not prove the Project was populated. Check the synchronization Action logs after merging.
+
+The sync changes custom field values only when matching metadata is present; removing an issue-body line does not clear the old Project value.
