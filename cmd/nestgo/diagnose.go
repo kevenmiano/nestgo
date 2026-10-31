@@ -41,7 +41,9 @@ func diagnose(args []string) error {
 		return errors.New("cold-samples must be 0..50")
 	}
 	if *app != "" {
-		if *example || *withScale { return errors.New("-app cannot be combined with -example or -scale") }
+		if *example || *withScale {
+			return errors.New("-app cannot be combined with -example or -scale")
+		}
 		return diagnoseApplication(*app, *out, *samples, *iterations, *coldSamples, *strict)
 	}
 	if !*example {

@@ -56,7 +56,7 @@ func RunRegistered(output string, samples, iterations, coldSamples int, strict, 
 		return err
 	}
 	for _, artifact := range []struct {
-		name string
+		name  string
 		write func() ([]byte, error)
 	}{
 		{"graph.json", graph.JSON},
