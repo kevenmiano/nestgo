@@ -36,6 +36,14 @@ M004 and M006 can run in parallel after their relevant interfaces stabilize; M00
 
 **Project automation:** [project-sync.yml](../.github/workflows/project-sync.yml) reconciles issue-body Priority and Roadmap metadata into custom single-select Project fields. The destination is **Roadmap** (M001–M006), not GitHub's native Milestone field. A merged PR with `Refs #N` does **not** complete an issue; `Closes #N` / `Fixes #N` / `Resolves #N` explicitly indicate completion. PR #28 was merged; automatic backfill run [41238808688](https://github.com/kevenmiano/nestgo/actions/runs/41238808688) succeeded, processing issues #10–#25 with Roadmap and Priority. Kanban/Roadmap view layout and field visibility should still be reviewed in the Project UI. See [sync guide](../docs/PROJECT_SYNC.md).
 
+## Go distribution and release tracks (GSD)
+
+- Go module layout: the public packages `compiler`, `runtime`, `metadata` remain under one root module and share a single semver tag. No nested `go.mod` migration is being introduced.
+- CLI distribution: `cmd/nestgo` is installed by `go install .../cmd/nestgo@version`; legacy `modforge` remains supported. The application installs the library with `go get github.com/kevenmiano/nestgo@version`.
+- Separate CI/CD jobs: docs Pages publishing, Go library conformance and CLI binary publishing, all triggered by release tags reachable from main.
+- GSD checkpoints: tests for package imports and CLI installation, release-tag ancestry verification, docs build, versioned binaries and SHA256 checks, verified Actions logs after first real release.
+- Details: [distribution guide](../docs/DISTRIBUTION.md). This is an incremental M006 release delivery and does not complete issue #25.
+
 ## Current iteration
 
 M001 Phase 1: PR #8 (CI) and PR #9 (compiler coverage) were merged after green checks; issue #4 still requires the full acceptance criteria to be reviewed. Issues #2–#7 remain the stabilization baseline. Newly created #10–#25 are future work, not implemented features.
