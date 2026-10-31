@@ -39,7 +39,7 @@ func TestNestJSStyleModuleConfigRejectsStrings(t *testing.T) {
 		{"unknown-module", "@Module({imports:[Unknown]})", "unknown local module"},
 		{"duplicate-module", "@Module({imports:[DatabaseModule,DatabaseModule]})", "duplicate type"},
 		{"export-not-in-providers", "@Module({providers:[],exports:[UsersService]})", "must also appear in providers"},
-		{"qualified-type", "@Module({imports:[other.DatabaseModule]})", "qualified types"},
+		{"qualified-type", "@Module({imports:[other.DatabaseModule]})", "not declared by a Go import"},
 		{"unknown-property", "@Module({foo:[]})", "unknown property"},
 	}
 	for _, tc := range cases {
