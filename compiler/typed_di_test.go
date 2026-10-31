@@ -33,3 +33,26 @@ func TestTypedDIInterfaceResolution(t *testing.T) {
 		})
 	}
 }
+
+func TestTypedDIVisibilityAcrossThreeModules(t *testing.T) {
+	source := "package demo\ntype Reader interface { Read() string }\n@Injectable()\ntype Repo struct{}\nfunc (*Repo) Read() string { return \"ok\" }\n@Injectable()\ntype Service struct { Dep Reader }\n@Module({providers:[Repo],exports:[Repo]})\ntype DatabaseModule struct{}\n@Module({imports:[DatabaseModule],exports:[]})\ntype MiddleModule struct{}\n@Module({imports:[MiddleModule],providers:[Service]})\ntype AppModule struct{}\n"
+	f, err := Parse("three.mgo", []byte(source))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Generate([]*File{f})
+	if err == nil || !strings.Contains(err.Error(), "missing interface dependency") {
+		t.Fatalf("transitive provider not re-exported should be unavailable: %v", err)
+	}
+}
+
+func TestTypedDIOptionalInterface(t *testing.T) {
+	source := "package demo\ntype Reader interface { Read() string }\n@Injectable()\ntype Service struct { Dep Reader `nestgo:\"optional\"` }\n@Module({providers:[Service]})\ntype AppModule struct{}\n"
+	f, err := Parse("optional.mgo", []byte(source))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Generate([]*File{f}); err != nil {
+		t.Fatal(err)
+	}
+}
