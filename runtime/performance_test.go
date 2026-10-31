@@ -72,7 +72,7 @@ func BenchmarkHTTPRequestReflection(b *testing.B) {
 func BenchmarkHTTPRequestNetHTTP(b *testing.B) {
  h:=http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
   w.Header().Set("Content-Type","application/json")
-  _,_ = w.Write([]byte("\\"pong\\"\\n"))
+  _,_ = w.Write([]byte{34, 112, 111, 110, 103, 34, 10})
  })
  req:=httptest.NewRequest(http.MethodGet,"/benchmark/ping",nil)
  b.ReportAllocs()
