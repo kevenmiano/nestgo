@@ -1,27 +1,29 @@
 # NestGo
 
-**NestGo Compiler v3** is an experimental Go framework that explores NestJS-style decorators through `.mgo` source files. It transpiles annotated code into ordinary Go and generates metadata consumed by a lightweight HTTP runtime.
+**NestGo Compiler v3** is an experimental Go source-to-source compiler and HTTP runtime inspired by NestJS decorators. Write annotated `.mgo` files, generate standard Go source and route metadata, and serve requests with Go's `net/http`.
 
-> **Status:** Experimental proof of concept. Not production-ready. The project does not yet implement all NestJS features.
+> **Status:** Experimental proof of concept, not production-ready. NestGo is not a drop-in replacement for NestJS.
 
 ## Requirements
 
-- Go 1.23 or later
-- No third-party runtime dependencies
+- Go 1.23 or newer
+- No external runtime dependencies
 
-## Quick start
-
-Clone the repository, then run:
+## Getting started
 
 ```bash
+git clone https://github.com/kevenmiano/nestgo.git
+cd nestgo
 go run ./cmd/modforge compile ./examples/shop
 go test ./...
 go vet ./...
 ```
 
-The compiler reads `.mgo` files and writes generated Go files alongside them. Do not edit generated files manually.
+The compiler accepts a directory or `.mgo` path (compiling its containing directory). It writes `*_generated.go` files and `zz_modforge_metadata.go`. Generated Go code is checked into the example so the tests can run with normal Go tooling.
 
-## Decorator syntax
+## Example
+
+From [`examples/shop/users.mgo`](examples/shop/users.mgo):
 
 ```go
 package shop
@@ -34,6 +36,11 @@ type UsersController struct {
 @Get("/")
 func (c *UsersController) FindAll() []string {
     return []string{"Ada", "Grace"}
+}
+
+@Get("/{id}")
+func (c *UsersController) FindOne(id string) string {
+    return id
 }
 
 @Post("/")
@@ -53,46 +60,84 @@ type UsersService struct{}
 type UsersModule struct{}
 ```
 
-The supported syntax includes:
+To serve registered routes, import the generated package into your application and create the HTTP handler:
 
-| Category | Decorators |
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+
+    _ "github.com/kevenmiano/nestgo/examples/shop"
+    "github.com/kevenmiano/nestgo/runtime"
+)
+
+func main() {
+    handler, err := runtime.FromRegistry("shop")
+    if err != nil {
+        log.Fatal(err)
+    }
+    log.Fatal(http.ListenAndServe(":8080", handler))
+}
+```
+
+The example includes tests for `GET /users/`, `GET /users/{id}`, and `POST /users/`.
+
+## Supported decorators
+
+| Area | Decorators |
 | --- | --- |
 | Types | `@Controller`, `@Injectable`, `@Module` |
-| Routes | `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete`, `@HttpCode` |
-| Parameters | `@Body`, `@Param`, `@Query`, `@Headers` |
+| HTTP methods | `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete`, `@HttpCode` |
+| Parameters | `@Body`, `@Param`, `@Query` |
+| Compiler-only recognition | `@Headers` (**runtime binding not implemented**) |
 
-**Important:** Recognizing a decorator in the compiler does not guarantee full runtime support. For example, the runtime does not currently implement `@Headers` binding.
+## Architecture
 
-## Project structure
+```text
+.mgo files
+    |
+    v
+Decorator lexer + Go AST parser
+    |
+    v
+Compiler validation + metadata generation
+    |
+    +--> *_generated.go
+    +--> zz_modforge_metadata.go
+                |
+                v
+        metadata.Register
+                |
+                v
+        runtime.FromRegistry
+                |
+                v
+          net/http ServeMux
+```
 
-| Path | Responsibility |
+| Directory | Responsibility |
 | --- | --- |
-| `cmd/modforge/` | Command-line compiler entry point |
-| `compiler/` | Decorator lexing, parsing, validation, Go code and metadata generation |
-| `metadata/` | Runtime metadata types and registry |
-| `runtime/` | HTTP routing, parameter binding and basic dependency injection |
-| `examples/shop/` | Example `.mgo` source, generated files and HTTP tests |
-| `docs/` | Architecture, development workflow and contribution conventions |
+| `cmd/modforge/` | Compiler command-line entry point |
+| `compiler/` | Lexer, AST validation, source and metadata generation |
+| `metadata/` | Process-wide metadata registry and descriptors |
+| `runtime/` | Routing, request binding, reflection-based handler calls, field injection |
+| `examples/shop/` | Sample annotated source, generated Go and HTTP tests |
+| `docs/` | Detailed compiler, runtime, architecture and development references |
 
-## How it works
+## Documentation
 
-1. Write Go-like code with decorators in a `.mgo` file.
-2. Run the compiler to remove decorators and produce a standard `_generated.go` file.
-3. The compiler generates `zz_modforge_metadata.go` with controller and route metadata.
-4. Register the generated package and construct an HTTP handler through `runtime.FromRegistry`.
-5. Run and test the resulting application using normal Go tooling.
+- [Architecture and design](docs/ARCHITECTURE.md)
+- [Compiler reference](docs/COMPILER.md)
+- [HTTP runtime and dependency injection](docs/RUNTIME.md)
+- [Development guide](docs/DEVELOPMENT.md)
+- [Contributing](CONTRIBUTING.md)
 
-See [Architecture](docs/ARCHITECTURE.md) for the compilation pipeline and [Development](docs/DEVELOPMENT.md) for contributor workflows.
+## Limitations
 
-## Current limitations
-
-- Basic field injection only; no constructor injection or request-scoped providers.
-- No guards, pipes, interceptors, middleware abstraction or dynamic modules.
-- No Language Server Protocol (LSP) implementation.
-- Only a subset of decorator argument forms is supported.
-- Parameter and response handling is intentionally minimal.
-- The generated code and metadata format are not yet stable APIs.
+NestGo currently provides basic reflection-based field injection, JSON body binding and method routing. It does **not** implement constructor injection, request-scoped providers, guards, pipes, interceptors, dynamic modules, a language server, or full NestJS compatibility. Generated metadata and public APIs may change.
 
 ## License
 
-No license has been declared in this repository. All rights remain with the copyright holder until a license is added.
+No license has been declared. All rights remain with the copyright holder until a license is added.
