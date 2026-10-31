@@ -52,4 +52,24 @@ function prStatus({ issueState, prState, merged, draft, closes, hasInProgress })
   return 'In Review';
 }
 
-module.exports = { parseMetadata, parsePrReferences, issueStatus, prStatus };
+// Existing GitHub Projects often ship with Todo / In Progress / Done instead
+// of a custom In Review option. Select the nearest safe existing status;
+// never replace an in-progress state with Done or a backlog state.
+function resolveStatusOption(desired, options) {
+  const aliases = {
+    Backlog: ['Backlog', 'Todo', 'To Do', 'To-do', 'Not Started'],
+    'In Progress': ['In Progress', 'Doing', 'Working', 'Active'],
+    'In Review': ['In Review', 'Review', 'In Progress', 'Doing', 'Working', 'Active'],
+    Done: ['Done', 'Complete', 'Completed', 'Finished']
+  };
+  const values = aliases[desired] || [desired];
+  for (const candidate of values) {
+    const selected = (options || []).find(
+      option => option.name.trim().toLowerCase() === candidate.toLowerCase()
+    );
+    if (selected) return selected;
+  }
+  return null;
+}
+
+module.exports = { parseMetadata, parsePrReferences, issueStatus, prStatus, resolveStatusOption };
