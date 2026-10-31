@@ -51,17 +51,25 @@ func diagnose(args []string) error {
 	report := diagnostics.Report{Graph: graph, Startup: startup}
 	if *coldSamples > 0 {
 		binary, err := os.Executable()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		cold, err := diagnostics.MeasureProcessStartup(binary, []string{"diagnose", "-cold-child"}, *coldSamples, os.Getenv("GITHUB_SHA"))
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		report.Cold = &cold
 	}
 	if *withScale {
 		for _, count := range []int{1, 10, 100} {
 			scaled, err := diagnostics.SyntheticProviders(count)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			measured, err := diagnostics.MeasureStartup(fmt.Sprintf("synthetic %d providers, no routes", count), []metadata.Package{scaled}, *samples, *iterations, os.Getenv("GITHUB_SHA"))
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			report.Scale = append(report.Scale, diagnostics.ScaleStartup{Providers: count, Startup: measured})
 		}
 	}

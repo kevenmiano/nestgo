@@ -16,15 +16,15 @@ import (
 // Includes process boot, package initialization and runtime.New, but not build,
 // socket listen or network readiness.
 type ProcessStartup struct {
-	Scenario string `json:"scenario"`
-	GoVersion string `json:"goVersion"`
-	GOOS string `json:"goos"`
-	GOARCH string `json:"goarch"`
-	CPUCount int `json:"cpuCount"`
-	Commit string `json:"commit,omitempty"`
+	Scenario  string    `json:"scenario"`
+	GoVersion string    `json:"goVersion"`
+	GOOS      string    `json:"goos"`
+	GOARCH    string    `json:"goarch"`
+	CPUCount  int       `json:"cpuCount"`
+	Commit    string    `json:"commit,omitempty"`
 	SamplesNS []float64 `json:"samplesNs"`
-	MedianNS float64 `json:"medianNs"`
-	P95NS float64 `json:"p95Ns"`
+	MedianNS  float64   `json:"medianNs"`
+	P95NS     float64   `json:"p95Ns"`
 }
 
 // MeasureProcessStartup runs a trusted executable directly (never via a shell)
@@ -53,8 +53,8 @@ func MeasureProcessStartup(binary string, args []string, samples int, commit str
 
 // ScaleStartup stores a real, separately measured warm startup fixture.
 type ScaleStartup struct {
-	Providers int `json:"providers"`
-	Startup Startup `json:"startup"`
+	Providers int     `json:"providers"`
+	Startup   Startup `json:"startup"`
 }
 
 // SyntheticProviders creates a reproducible set of distinct pointer-to-struct

@@ -11,10 +11,10 @@ import (
 )
 
 type Report struct {
-	Graph   Graph   `json:"graph"`
-	Startup Startup `json:"startup"`
-	Cold *ProcessStartup `json:"coldStartup,omitempty"`
-	Scale []ScaleStartup `json:"scale,omitempty"`
+	Graph   Graph           `json:"graph"`
+	Startup Startup         `json:"startup"`
+	Cold    *ProcessStartup `json:"coldStartup,omitempty"`
+	Scale   []ScaleStartup  `json:"scale,omitempty"`
 }
 
 func (r Report) JSON() ([]byte, error) { return json.MarshalIndent(r, "", "  ") }
@@ -120,16 +120,16 @@ footer{margin-top:22px;color:#94a3b8;font-size:13px}
 
 func (r Report) HTML() ([]byte, error) {
 	data := struct {
-		Graph      Graph
-		Startup    Startup
-		MedianUS   float64
-		P95US      float64
-		GraphSVG   template.HTML
-		StartupSVG template.HTML
-		Cold *ProcessStartup
-		Scale []ScaleStartup
+		Graph        Graph
+		Startup      Startup
+		MedianUS     float64
+		P95US        float64
+		GraphSVG     template.HTML
+		StartupSVG   template.HTML
+		Cold         *ProcessStartup
+		Scale        []ScaleStartup
 		ColdMedianMS float64
-		ColdP95MS float64
+		ColdP95MS    float64
 	}{r.Graph, r.Startup, r.Startup.MedianNS / 1000, r.Startup.P95NS / 1000, graphSVG(r.Graph), startupSVG(r.Startup), r.Cold, r.Scale, 0, 0}
 	if r.Cold != nil {
 		data.ColdMedianMS = r.Cold.MedianNS / 1e6
