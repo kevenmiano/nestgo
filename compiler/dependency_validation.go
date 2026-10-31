@@ -49,7 +49,7 @@ func validateRequiredConcreteDependencies(files []*File, providers map[string]bo
 			}
 			for _, spec := range gen.Specs {
 				typ, ok := spec.(*ast.TypeSpec)
-				if !ok || (!providers[typ.Name.Name] && controllers[typ.Name.Name] == "") {
+				if !ok || (!providers[typ.Name.Name] && !isController(controllers, typ.Name.Name)) {
 					continue
 				}
 				strct, ok := typ.Type.(*ast.StructType)
@@ -84,4 +84,9 @@ func validateRequiredConcreteDependencies(files []*File, providers map[string]bo
 		}
 	}
 	return nil
+}
+
+func isController(controllers map[string]string, name string) bool {
+	_, ok := controllers[name]
+	return ok
 }
