@@ -1,1 +1,2 @@
 .actions{display:flex;justify-content:center;gap:1rem;flex-wrap:wrap}.notice{opacity:.8;font-size:.875rem;margin-top:2rem}.features{padding:4rem 0}.features h2{letter-spacing:-.025em}
+.originalBrands{display:flex;align-items:center;justify-content:center;gap:1.5rem;margin-bottom:1.5rem}.originalBrands img{object-fit:contain;max-width:32vw}.originalBrands span{font-size:1.8rem;opacity:.6}
