@@ -50,7 +50,9 @@ func validateModuleCycles(edges map[string][]string, locations map[string]Diagno
 
 func sortedModuleNames(edges map[string][]string) []string {
 	result := make([]string, 0, len(edges))
-	for name := range edges { result = append(result, name) }
+	for name := range edges {
+		result = append(result, name)
+	}
 	sort.Strings(result)
 	return result
 }
