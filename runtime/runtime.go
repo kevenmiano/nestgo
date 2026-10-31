@@ -59,7 +59,12 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 		controllers = append(controllers, pkg.Controllers...)
 		logger.Startup(ctx, "InstanceLoader", "Package providers registered", moduleStart)
 	}
+	visibility, err := moduleVisibility(packages)
+	if err != nil {
+		return fail(err)
+	}
 	inject := func(v reflect.Value) error {
+		allowed, scoped := visibility[v.Type()]
 		for i := 0; i < v.Elem().NumField(); i++ {
 			f := v.Elem().Field(i)
 			sf := v.Elem().Type().Field(i)
@@ -67,8 +72,14 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				continue
 			}
 			dep, ok := providers[f.Type()]
+			if scoped && !allowed[f.Type()] {
+				ok = false
+			}
 			if !ok && f.Kind() == reflect.Interface {
 				for _, candidateType := range orderedProviders {
+					if scoped && !allowed[candidateType] {
+						continue
+					}
 					candidate := providers[candidateType]
 					if candidate.Type().Implements(f.Type()) {
 						if ok {
