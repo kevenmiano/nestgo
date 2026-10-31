@@ -41,12 +41,23 @@ func Parse(path string,src []byte)(*File,error){
  for _,a:=range ann{if !isRoute(a.Name)&&a.Name!="HttpCode"{return nil,Diagnostic{path,a.Line,"@"+a.Name+" cannot decorate a function"}}}
  if d.Receiver==""||!typeNames[d.Receiver]{return nil,Diagnostic{path,line,"route decorator requires local controller method"}}
  index:=0
- if n.Type.Params!=nil{for _,field:=range n.Type.Params.List{
+ if n.Type.Params!=nil{
+ lowerBound:=fset.Position(n.Type.Params.Opening).Offset
+ for _,field:=range n.Type.Params.List{
  count:=len(field.Names);if count==0{count=1}
- for j:=0;j<count;j++{pos:=fset.Position(field.Pos()).Offset;end:=fset.Position(field.End()).Offset
- for _,mark:=range paramMarkers{if mark.Offset<=pos&&mark.Offset>=fset.Position(n.Type.Params.Opening).Offset&&mark.Offset<end{d.Params=append(d.Params,Parameter{Index:index+j,Kind:mark.Name,Name:mark.Argument});break}}
- };index+=count
- }}
+ fieldStart:=fset.Position(field.Pos()).Offset
+ // Parameter decorators are stripped from the source before Go parsing.
+ // Match only markers between the previous field and this field, rather
+ // than repeatedly matching the first marker for every later field.
+ for _,mark:=range paramMarkers{
+ if mark.Offset>lowerBound&&mark.Offset<fieldStart{
+ for j:=0;j<count;j++{d.Params=append(d.Params,Parameter{Index:index+j,Kind:mark.Name,Name:mark.Argument})}
+ }
+ }
+ index+=count
+ lowerBound=fset.Position(field.End()).Offset
+ }
+ }
  result.Declarations=append(result.Declarations,d)
  default:return nil,Diagnostic{path,line,"decorator not attached to supported declaration"}
  }
