@@ -127,6 +127,7 @@ footer{margin-top:22px;color:#94a3b8;font-size:13px}
 func (r Report) HTML() ([]byte, error) {
 	data := struct {
 		Graph        Graph
+		Modules      ModuleGraph
 		Startup      Startup
 		MedianUS     float64
 		P95US        float64
