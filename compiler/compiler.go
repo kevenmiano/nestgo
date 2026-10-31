@@ -309,6 +309,9 @@ func Generate(files []*File) ([]byte, error) {
 	if err := validateModuleProviderVisibility(files, moduleContracts); err != nil {
 		return nil, err
 	}
+	if err := validateTypedInterfaceDependencies(files, moduleContracts, providerNames, controllers); err != nil {
+		return nil, err
+	}
 	// Module metadata order must not depend on source-file enumeration.
 	sortStrings(modules)
 	for _, f := range files {
