@@ -34,6 +34,17 @@ The current measurement covers warm `runtime.New` construction, including reflec
 
 For real applications, embed the Go `diagnostics.Analyze` / `diagnostics.MeasureStartup` API with application-owned `metadata.Package` values. See the [technical and GSD guide](https://github.com/kevenmiano/nestgo/blob/main/docs/DIAGNOSTICS.md) for the Go integration example.
 
+## Cold-process and provider-size comparisons
+
+Build once and measure separately:
+
+```bash
+go build -o ./nestgo-local ./cmd/nestgo
+./nestgo-local diagnose -example -cold-samples 5 -scale -out diagnostics-output
+```
+
+The HTML includes real **cold subprocess** median/p95 times measured from process launch through Go initialization, CLI execution and `runtime.New`. These are not full HTTP server readiness metrics. The optional scale table benchmarks **1, 10 and 100 synthetic providers with no dependencies or routes**, reporting warm-start latency and allocations. Fixture sizes and graph structure are deterministic; wall-clock samples are not.
+
 ## Planned improvements
 
 Full module imports/exports validation, cold-process startup, large provider/route benchmark matrices and expanded CLI discovery are tracked in [#36](https://github.com/kevenmiano/nestgo/issues/36), [#37](https://github.com/kevenmiano/nestgo/issues/37) and [#38](https://github.com/kevenmiano/nestgo/issues/38).
