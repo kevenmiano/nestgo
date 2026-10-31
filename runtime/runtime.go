@@ -73,10 +73,18 @@ func New(packages ...metadata.Package)(http.Handler,error){
  }else{for _,part:=range strings.Split(spec.Path,"/"){if strings.HasPrefix(part,"{")&&strings.HasSuffix(part,"}"){v.Elem().SetString(r.PathValue(strings.Trim(part,"{}")));break}}}
  args[i]=v.Elem()
  }
- results:=handler.Call(args)
- if len(results)==2&&!results[1].IsNil(){http.Error(w,results[1].Interface().(error).Error(),500);return}
+ var result any
+ if spec.StaticInvoke!=nil && typ.NumIn()==0 {
+  value,err:=spec.StaticInvoke(instance.Interface())
+  if err!=nil {http.Error(w,err.Error(),500);return}
+  result=value
+ }else{
+  results:=handler.Call(args)
+  if len(results)==2&&!results[1].IsNil(){http.Error(w,results[1].Interface().(error).Error(),500);return}
+  result=results[0].Interface()
+ }
  status:=spec.Status;if status==0{if spec.Method=="POST"{status=201}else{status=200}}
- w.Header().Set("Content-Type","application/json");w.WriteHeader(status);_ = json.NewEncoder(w).Encode(results[0].Interface())
+ w.Header().Set("Content-Type","application/json");w.WriteHeader(status);_ = json.NewEncoder(w).Encode(result)
  })
  }
  }
