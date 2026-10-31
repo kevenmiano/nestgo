@@ -40,7 +40,7 @@ type File struct {
 	Declarations          []Declaration
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true}
 
 func Parse(path string, src []byte) (*File, error) {
 	source, annotations, paramMarkers, err := lexDecorators(path, src)
@@ -83,7 +83,7 @@ func Parse(path string, src []byte) (*File, error) {
 			}
 			d := Declaration{Name: spec.Name.Name, Kind: "type", Annotations: ann}
 			for _, a := range ann {
-				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" {
+				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" && a.Name != "Imports" && a.Name != "Exports" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a type"}
 				}
 			}
@@ -180,6 +180,8 @@ func Generate(files []*File) ([]byte, error) {
 	controllers := map[string]string{}
 	providers := []string{}
 	modules := []string{}
+	moduleNames := map[string]bool{}
+	providerNames := map[string]bool{}
 	routes := map[string][]string{}
 	for _, f := range files {
 		for _, d := range f.Declarations {
@@ -195,17 +197,61 @@ func Generate(files []*File) ([]byte, error) {
 					}
 					controllers[d.Name] = p
 				case "Injectable":
+					providerNames[d.Name] = true
 					providers = append(providers, fmt.Sprintf(`{Type: reflect.TypeOf((*%s)(nil)), Scope: "singleton"}`, d.Name))
 				case "Module":
+					moduleNames[d.Name] = true
 					name, err := arg(a, d.Name)
 					if err != nil {
 						return nil, err
 					}
-					modules = append(modules, fmt.Sprintf(`{Type: reflect.TypeOf((*%s)(nil)), Name: %q}`, d.Name, name))
+					_ = name // metadata generation is deferred until all declarations are collected
 				}
 			}
 		}
 	}
+	// Resolve module references after collecting all decorated types across files.
+	for _, f := range files {
+		for _, d := range f.Declarations {
+			if d.Kind != "type" { continue }
+			var moduleAnnotation *Annotation
+			var imports, exports []Annotation
+			for i := range d.Annotations {
+				a := d.Annotations[i]
+				switch a.Name {
+				case "Module":
+					if moduleAnnotation != nil { return nil, Diagnostic{f.Path, a.Line, "duplicate @Module decorator"} }
+					moduleAnnotation = &d.Annotations[i]
+				case "Imports": imports = append(imports, a)
+				case "Exports": exports = append(exports, a)
+				}
+			}
+			if len(imports)+len(exports) == 0 && moduleAnnotation == nil { continue }
+			if moduleAnnotation == nil {
+				a := append(imports, exports...)[0]
+				return nil, Diagnostic{f.Path, a.Line, "@Imports and @Exports require @Module on the same type"}
+			}
+			if len(imports) > 1 || len(exports) > 1 { return nil, Diagnostic{f.Path, moduleAnnotation.Line, "only one @Imports and @Exports decorator allowed per module"} }
+			name, err := arg(*moduleAnnotation, d.Name)
+			if err != nil { return nil, Diagnostic{f.Path, moduleAnnotation.Line, err.Error()} }
+			var importNames, exportNames []string
+			if len(imports) > 0 {
+				importNames, err = moduleReferences(f.Path, imports[0], moduleNames, "module")
+				if err != nil { return nil, err }
+			}
+			if len(exports) > 0 {
+				exportNames, err = moduleReferences(f.Path, exports[0], providerNames, "provider")
+				if err != nil { return nil, err }
+			}
+			importsCode := []string{}
+			for _, n := range importNames { importsCode = append(importsCode, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n)) }
+			exportsCode := []string{}
+			for _, n := range exportNames { exportsCode = append(exportsCode, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n)) }
+			modules = append(modules, fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)), Name:%q, Imports:[]reflect.Type{%s}, Exports:[]reflect.Type{%s}}`, d.Name, name, strings.Join(importsCode, ","), strings.Join(exportsCode, ",")))
+		}
+	}
+	// Module metadata order must not depend on source-file enumeration.
+	sortStrings(modules)
 	for _, f := range files {
 		for _, d := range f.Declarations {
 			if d.Kind != "func" {
@@ -269,6 +315,28 @@ func Generate(files []*File) ([]byte, error) {
 	}
 	return formatted, nil
 }
+// moduleReferences accepts only quoted comma-separated local Go identifiers.
+// This deliberately excludes dynamic expressions and imported package aliases:
+// cross-package modules need a future typed metadata/ownership contract.
+func moduleReferences(path string, annotation Annotation, allowed map[string]bool, kind string) ([]string, error) {
+	value, err := strconv.Unquote(annotation.Argument)
+	if err != nil { return nil, Diagnostic{path, annotation.Line, "@" + annotation.Name + " expects a quoted comma-separated list of local type names"} }
+	if strings.TrimSpace(value) == "" { return []string{}, nil }
+	seen := map[string]bool{}
+	names := []string{}
+	for _, raw := range strings.Split(value, ",") {
+		name := strings.TrimSpace(raw)
+		if name == "" || !token.IsIdentifier(name) || !allowed[name] {
+			return nil, Diagnostic{path, annotation.Line, "unknown local " + kind + " " + strconv.Quote(name) + " in @" + annotation.Name}
+		}
+		if seen[name] { return nil, Diagnostic{path, annotation.Line, "duplicate " + kind + " " + name + " in @" + annotation.Name} }
+		seen[name] = true
+		names = append(names, name)
+	}
+	sortStrings(names)
+	return names, nil
+}
+
 func sortStrings(a []string) {
 	for i := 1; i < len(a); i++ {
 		for j := i; j > 0 && a[j] < a[j-1]; j-- {
