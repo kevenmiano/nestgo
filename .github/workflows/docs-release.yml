@@ -1,0 +1,106 @@
+name: Publish Docusaurus on release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to deploy (for example v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nestgo-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Verify release and build documentation
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release tag belongs to main
+        id: version
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Expected a semantic release tag like v1.2.3"
+            exit 1
+          fi
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git fetch --no-tags origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          TAG_COMMIT="$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
+          if ! git merge-base --is-ancestor "$TAG_COMMIT" refs/remotes/origin/main; then
+            echo "::error::Tag $RELEASE_TAG does not point to a commit on main"
+            exit 1
+          fi
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "commit=$TAG_COMMIT" >> "$GITHUB_OUTPUT"
+          echo "Validated $RELEASE_TAG at $TAG_COMMIT on main"
+
+      - name: Check out the exact released commit
+        env:
+          TAG_COMMIT: ${{ steps.version.outputs.commit }}
+        run: git checkout --detach "$TAG_COMMIT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install website dependencies
+        working-directory: website
+        run: npm install --no-audit --no-fund
+
+      - name: Build versioned Docusaurus
+        working-directory: website
+        env:
+          NESTGO_RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: npm run build
+
+      - name: Verify generated site
+        run: |
+          test -s website/build/index.html
+          test -s website/build/img/nestgo-mascot.svg
+          grep -q 'NestGo' website/build/index.html
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: website/build
+
+  deploy:
+    name: Deploy documentation to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish static website
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Deployment summary
+        env:
+          TAG: ${{ needs.build.outputs.release_tag }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          echo "### NestGo documentation published" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release: `$TAG`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Website: $PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
