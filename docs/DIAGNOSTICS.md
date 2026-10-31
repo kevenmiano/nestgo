@@ -88,3 +88,24 @@ Graph cycles are reported as strongly connected provider sets, **not necessarily
 PR correctness checks are required before merge. Link the relevant issues but do **not** close #36–#38 until their complete acceptance criteria are met. The initial implementation supplies a deterministic provider graph and warm startup reporting. This iteration adds a **bounded cold subprocess** and synthetic provider scale benchmarks; full application cold readiness, package-level imports/exports, full route scale sweeps and strict compiler integration remain incremental work.
 
 **GSD:** Discuss → Plan → Execute → Verify → Review → Ship.
+
+## Module import/export graph (GSD iteration)
+
+The module graph is now exported as `modules.json` and `modules.dot`, included in `report.json` and displayed in the standalone HTML. This graph has its own deterministic schema and is separate from provider field injection.
+
+For modules registered programmatically, use the backwards-compatible metadata contract:
+
+```go
+metadata.Module{
+    Type: reflect.TypeOf((*UsersModule)(nil)),
+    Name: "users",
+    Imports: []reflect.Type{reflect.TypeOf((*DatabaseModule)(nil))},
+    Exports: []reflect.Type{reflect.TypeOf((*UsersService)(nil))},
+}
+```
+
+The validator detects directed module import cycles (Tarjan SCC), missing imports, invalid module identifiers, duplicate module types and exported providers absent from the registered provider inventory. `-strict` returns nonzero when any module or provider graph errors are present. All nodes and edges are ordered canonically; timing is still measured and nondeterministic.
+
+**Important compatibility boundary:** the current `@Module("name")` compiler output only generates `Type` and `Name`. It does not infer `Imports` or `Exports` from existing `.mgo` source code. Therefore, existing generated applications report registered modules but no module edges until explicit import/export metadata is supplied. The current runtime does not yet enforce module visibility; this is a **diagnostic contract**, not a completed scoped DI container. Full compiler-declared ownership and import/export enforcement remain follow-ups on #10, #11 and #36.
+
+**Verify:** golden-order test covers shuffled modules and two-node cycle; additional tests validate missing modules, self-cycles, legacy metadata, duplicate registration and invalid exports/imports. The app CI verifies `UsersModule` occurs in `modules.json`.
