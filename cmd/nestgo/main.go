@@ -19,7 +19,7 @@ func main() {
 		return
 	}
 	if len(os.Args) != 3 || os.Args[1] != "compile" {
-		fmt.Fprintln(os.Stderr, "usage: nestgo compile <directory|file.mgo> | nestgo diagnose -example [-out directory]")
+		fmt.Fprintln(os.Stderr, "usage: nestgo compile <directory|file.mgo> | nestgo diagnose (-example | -app <go-package>) [-out directory]")
 		os.Exit(2)
 	}
 	path := os.Args[2]
