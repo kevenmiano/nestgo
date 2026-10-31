@@ -1,0 +1,47 @@
+name: Diagnostics — dependency graph and startup
+
+on:
+  pull_request:
+    paths:
+      - 'diagnostics/**'
+      - 'cmd/nestgo/**'
+      - '.github/workflows/diagnostics.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'diagnostics/**'
+      - 'cmd/nestgo/**'
+      - '.github/workflows/diagnostics.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  graph-and-startup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test deterministic graphs and startup measurement
+        run: |
+          go test ./diagnostics ./cmd/nestgo
+          go vet ./diagnostics ./cmd/nestgo
+      - name: Generate self-contained diagnostics report
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          go run ./cmd/nestgo diagnose -example -out diagnostics-output -samples 12 -iterations 100 -strict
+          test -s diagnostics-output/report.html
+          test -s diagnostics-output/graph.dot
+          test -s diagnostics-output/graph.json
+          test -s diagnostics-output/report.json
+      - name: Upload diagnostic report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nestgo-diagnostics-${{ github.run_id }}
+          path: diagnostics-output/
+          retention-days: 30
