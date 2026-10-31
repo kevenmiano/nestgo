@@ -64,3 +64,11 @@
 - **Execute/Review:** PR #30 added safe Status aliases and regression coverage without changing the Project's field options.
 - **Verify:** Project policy tests [41239221015](https://github.com/kevenmiano/nestgo/actions/runs/41239221015) and Go quality gates [41239220984](https://github.com/kevenmiano/nestgo/actions/runs/41239220984) passed. Post-merge backfill [41239288817](https://github.com/kevenmiano/nestgo/actions/runs/41239288817) and merged-PR status reconciliation [41239289370](https://github.com/kevenmiano/nestgo/actions/runs/41239289370) passed. The PR merge reconciled issue #2 to In Progress, not Done.
 - **Ship:** PR #30 squash-merged as `bcc27ad7e7c9017467816e2c13545e333408b37b`. Kanban/Roadmap view configuration remains a manual review item.
+
+## Go distribution and release automation — GSD workstream
+
+- **Discuss:** Current root module exposes `compiler`, `runtime`, `metadata` as public packages; Go `internal/` would prevent consumer imports. `go install` of a command does not add module requirements to applications.
+- **Plan:** Preserve one versioned root module, add an official `nestgo` command, and separate release workflows for docs, Go packages and framework binaries.
+- **Execute:** Add `cmd/nestgo`, package and framework release workflows, tag verification, installation guides and CI verification.
+- **Verify:** PR checks must pass before merging. No successful tagged CLI installation, release artifact upload or GitHub Pages deployment is claimed until a real GitHub Release triggers the corresponding workflows.
+- **Review/Ship:** Pending PR review, CI and first official release. GSD issue #25 remains open.

@@ -31,6 +31,8 @@ Merge after green CI. Publish Docusaurus using [docs-release.yml](../.github/wor
 
 ### Release-tag publishing pipeline
 
+Documentation is one of **three independent** release workflows. The others are [Go package verification](../.github/workflows/go-packages.yml) and [CLI/framework publication](../.github/workflows/framework-release.yml). All three are triggered by the same published GitHub Release, but have independent tests and status. See [distribution architecture](DISTRIBUTION.md).
+
 1. In repository **Settings → Pages → Build and deployment**, select **GitHub Actions** as the source. The repository owner must perform this configuration; it is not changed by committing a workflow.
 2. Ensure repository Actions permit GitHub Pages deployments. The workflow uses `pages: write` and `id-token: write`, and deploys to the `github-pages` environment. Environment restrictions must allow the release event/tag (for example `v*`), otherwise GitHub can block the deployment.
 3. Merge all desired website updates into `main`, and verify the `Documentation site` CI job.
