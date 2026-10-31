@@ -112,3 +112,11 @@
 - **Execute:** `diagnostics/modules.go`, `modules.json`/`modules.dot`, unified HTML and CI fixtures. Keep legacy compiler generated metadata compiling.
 - **Verify:** Require shuffled-order stable JSON/DOT, cyclic and self imports, missing modules, unknown exports and real `UsersModule` generated metadata in Actions.
 - **Review/Ship:** The compiler still emits `@Module` Type/Name only; module visibility and export enforcement in runtime are deferred to #10/#11/#36. PR merge requires green CI.
+
+## Compiler-emitted module imports/exports — GSD iteration
+
+- **Discuss:** The diagnostic graph accepts explicit typed module imports/exports, but the compiler's `@Module` previously emitted only Type and Name.
+- **Plan:** Add separate opt-in `@Imports("LocalModule,...")` and `@Exports("LocalProvider,...")` decorators alongside unchanged `@Module("name")`.
+- **Execute:** Resolve declared type names across `.mgo` files, generate `[]reflect.Type` edges, preserve stable serialization, reject unknown/ambiguous/duplicate references with source-local errors.
+- **Verify:** Deterministic metadata regardless of file ordering, negative and legacy compatibility tests, Go quality gates, generated fixtures and docs CI.
+- **Review/Ship:** Scope remains same-package declarations. Cross-package module linking, enforceable runtime DI visibility and ownership contracts remain #10/#11/#36 work.
