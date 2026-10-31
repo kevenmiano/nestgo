@@ -238,10 +238,14 @@ func Generate(files []*File) ([]byte, error) {
 				return nil, Diagnostic{f.Path, moduleAnnotation.Line, "only one @Imports and @Exports decorator allowed per module"}
 			}
 			options, err := parseModuleOptions(f.Path, *moduleAnnotation, d.Name)
-			if err != nil {return nil,err}
-			if err := validateModuleOptions(f.Path, moduleAnnotation.Line, options, moduleNames, providerNames, controllerTypeNames(controllers)); err != nil {return nil,err}
-			if strings.HasPrefix(strings.TrimSpace(moduleAnnotation.Argument), "{") && (len(imports)>0 || len(exports)>0) {
-				return nil,Diagnostic{f.Path,moduleAnnotation.Line,"do not mix @Module({...}) with legacy @Imports/@Exports decorators"}
+			if err != nil {
+				return nil, err
+			}
+			if err := validateModuleOptions(f.Path, moduleAnnotation.Line, options, moduleNames, providerNames, controllerTypeNames(controllers)); err != nil {
+				return nil, err
+			}
+			if strings.HasPrefix(strings.TrimSpace(moduleAnnotation.Argument), "{") && (len(imports) > 0 || len(exports) > 0) {
+				return nil, Diagnostic{f.Path, moduleAnnotation.Line, "do not mix @Module({...}) with legacy @Imports/@Exports decorators"}
 			}
 			name := options.Name
 			var importNames, exportNames []string
@@ -257,8 +261,12 @@ func Generate(files []*File) ([]byte, error) {
 					return nil, err
 				}
 			}
-			if options.Defined["imports"] {importNames=options.Imports}
-			if options.Defined["exports"] {exportNames=options.Exports}
+			if options.Defined["imports"] {
+				importNames = options.Imports
+			}
+			if options.Defined["exports"] {
+				exportNames = options.Exports
+			}
 			importsCode := []string{}
 			for _, n := range importNames {
 				importsCode = append(importsCode, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n))
@@ -272,11 +280,15 @@ func Generate(files []*File) ([]byte, error) {
 				modules = append(modules, fmt.Sprintf(`{Type: reflect.TypeOf((*%s)(nil)), Name: %q}`, d.Name, name))
 			} else {
 				providerCodes := []string{}
-				for _, n := range options.Providers { providerCodes=append(providerCodes,fmt.Sprintf("reflect.TypeOf((*%s)(nil))",n)) }
+				for _, n := range options.Providers {
+					providerCodes = append(providerCodes, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n))
+				}
 				controllerCodes := []string{}
-				for _, n := range options.Controllers {controllerCodes=append(controllerCodes,fmt.Sprintf("reflect.TypeOf((*%s)(nil))",n))}
+				for _, n := range options.Controllers {
+					controllerCodes = append(controllerCodes, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n))
+				}
 				modules = append(modules, fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)), Name:%q, Imports:[]reflect.Type{%s}, Providers:[]reflect.Type{%s}, Controllers:[]reflect.Type{%s}, Exports:[]reflect.Type{%s}}`,
-					d.Name,name,strings.Join(importsCode,","),strings.Join(providerCodes,","),strings.Join(controllerCodes,","),strings.Join(exportsCode,",")))
+					d.Name, name, strings.Join(importsCode, ","), strings.Join(providerCodes, ","), strings.Join(controllerCodes, ","), strings.Join(exportsCode, ",")))
 			}
 		}
 	}
@@ -375,8 +387,10 @@ func moduleReferences(path string, annotation Annotation, allowed map[string]boo
 }
 
 func controllerTypeNames(controllers map[string]string) map[string]bool {
-	result:=map[string]bool{}
-	for name:=range controllers {result[name]=true}
+	result := map[string]bool{}
+	for name := range controllers {
+		result[name] = true
+	}
 	return result
 }
 func sortStrings(a []string) {
