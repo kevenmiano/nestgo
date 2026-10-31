@@ -156,7 +156,15 @@ func (p *moduleOptionParser) parseTypeList(field string) ([]string, error) {
 		value := p.lit
 		p.next()
 		if p.tok == token.PERIOD {
-			return nil, p.fail("qualified types are not yet supported in " + field + "; use local Go type references")
+			if field != "imports" {
+				return nil, p.fail("qualified types are only supported in imports")
+			}
+			p.next()
+			if p.tok != token.IDENT {
+				return nil, p.fail("expected exported module type after package qualifier")
+			}
+			value += "." + p.lit
+			p.next()
 		}
 		if seen[value] {
 			return nil, p.fail("duplicate type " + value + " in " + field)
@@ -193,6 +201,9 @@ func validateModuleOptions(path string, line int, opts moduleOptions, modules, p
 		{opts.Exports, "provider", providers},
 	} {
 		for _, name := range group.names {
+			if group.kind == "module" && strings.Contains(name, ".") {
+				continue // qualified imports are resolved against source imports and Go types
+			}
 			if !group.allowed[name] {
 				return Diagnostic{path, line, fmt.Sprintf("@Module: unknown local %s %q", group.kind, name)}
 			}
