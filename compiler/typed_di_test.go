@@ -1,10 +1,10 @@
 package compiler
 
 import (
-	"strings"
-	"testing"
 	"os"
 	"path/filepath"
+	"strings"
+	"testing"
 )
 
 func TestTypedDIInterfaceResolution(t *testing.T) {
