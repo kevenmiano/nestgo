@@ -11,56 +11,76 @@ import (
 )
 
 type Report struct {
-	Graph Graph `json:"graph"`
+	Graph   Graph   `json:"graph"`
 	Startup Startup `json:"startup"`
 }
-func (r Report) JSON() ([]byte,error) { return json.MarshalIndent(r,"","  ") }
+
+func (r Report) JSON() ([]byte, error) { return json.MarshalIndent(r, "", "  ") }
 func graphSVG(g Graph) template.HTML {
 	var b strings.Builder
-	n:=len(g.Nodes)
-	fmt.Fprintf(&b,"<svg viewBox=\"0 0 1000 650\" role=\"img\" aria-label=\"%d providers, %d directed dependency edges\"><defs><marker id=\"arrow\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0 0 L8 4 L0 8 Z\" fill=\"#94a3b8\"/></marker></defs>",n,len(g.Edges))
-	pos:=map[string][2]float64{}
-	for i,node:=range g.Nodes {
-		angle:=2*math.Pi*float64(i)/float64(max(n,1))-math.Pi/2
-		pos[node.ID]=[2]float64{500+300*math.Cos(angle),325+205*math.Sin(angle)}
+	n := len(g.Nodes)
+	fmt.Fprintf(&b, "<svg viewBox=\"0 0 1000 650\" role=\"img\" aria-label=\"%d providers, %d directed dependency edges\"><defs><marker id=\"arrow\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0 0 L8 4 L0 8 Z\" fill=\"#94a3b8\"/></marker></defs>", n, len(g.Edges))
+	pos := map[string][2]float64{}
+	for i, node := range g.Nodes {
+		angle := 2*math.Pi*float64(i)/float64(max(n, 1)) - math.Pi/2
+		pos[node.ID] = [2]float64{500 + 300*math.Cos(angle), 325 + 205*math.Sin(angle)}
 	}
-	for _,edge:=range g.Edges {
-		a,bp:=pos[edge.From],pos[edge.To]
-		fmt.Fprintf(&b,"<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#64748b\" stroke-width=\"1.8\" marker-end=\"url(#arrow)\"/>",a[0],a[1],bp[0],bp[1])
+	for _, edge := range g.Edges {
+		a, bp := pos[edge.From], pos[edge.To]
+		fmt.Fprintf(&b, "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"#64748b\" stroke-width=\"1.8\" marker-end=\"url(#arrow)\"/>", a[0], a[1], bp[0], bp[1])
 	}
-	cyclic:=map[string]bool{}
-	for _,group:=range g.Cycles { for _,name:=range group {cyclic[name]=true} }
-	for _,node:=range g.Nodes {
-		p:=pos[node.ID]
-		stroke:="#52677e"
-		if cyclic[node.ID] {stroke="#fb7185"}
-		label:=[]rune(node.ID)
-		if len(label)>36 {label=append([]rune("…"),label[len(label)-35:]...)}
-		fmt.Fprintf(&b,"<rect x=\"%.1f\" y=\"%.1f\" width=\"250\" height=\"44\" rx=\"10\" fill=\"#202d40\" stroke=\"%s\"/><text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" font-size=\"12\" fill=\"white\" font-family=\"monospace\">%s</text>",p[0]-125,p[1]-22,stroke,p[0],p[1]+4,html.EscapeString(string(label)))
+	cyclic := map[string]bool{}
+	for _, group := range g.Cycles {
+		for _, name := range group {
+			cyclic[name] = true
+		}
 	}
-	if n==0 {b.WriteString("<text x=\"500\" y=\"325\" text-anchor=\"middle\" fill=\"#94a3b8\">No providers</text>")}
+	for _, node := range g.Nodes {
+		p := pos[node.ID]
+		stroke := "#52677e"
+		if cyclic[node.ID] {
+			stroke = "#fb7185"
+		}
+		label := []rune(node.ID)
+		if len(label) > 36 {
+			label = append([]rune("…"), label[len(label)-35:]...)
+		}
+		fmt.Fprintf(&b, "<rect x=\"%.1f\" y=\"%.1f\" width=\"250\" height=\"44\" rx=\"10\" fill=\"#202d40\" stroke=\"%s\"/><text x=\"%.1f\" y=\"%.1f\" text-anchor=\"middle\" font-size=\"12\" fill=\"white\" font-family=\"monospace\">%s</text>", p[0]-125, p[1]-22, stroke, p[0], p[1]+4, html.EscapeString(string(label)))
+	}
+	if n == 0 {
+		b.WriteString("<text x=\"500\" y=\"325\" text-anchor=\"middle\" fill=\"#94a3b8\">No providers</text>")
+	}
 	b.WriteString("</svg>")
 	return template.HTML(b.String())
 }
 func startupSVG(s Startup) template.HTML {
-	if len(s.SamplesNS)==0 {return template.HTML("<p>No measurements.</p>")}
+	if len(s.SamplesNS) == 0 {
+		return template.HTML("<p>No measurements.</p>")
+	}
 	var b strings.Builder
 	b.WriteString("<svg viewBox=\"0 0 1000 245\" role=\"img\" aria-label=\"Measured nanoseconds per runtime.New call by sample\">")
-	maxVal:=s.P95NS
-	for _,v:=range s.SamplesNS {if v>maxVal {maxVal=v}}
-	if maxVal==0 {maxVal=1}
-	for i,v:=range s.SamplesNS {
-		x:=65+float64(i)*860/float64(len(s.SamplesNS))
-		w:=math.Min(45,860/float64(len(s.SamplesNS))*.8)
-		h:=math.Max(1,150*v/maxVal)
-		fmt.Fprintf(&b,"<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"3\" fill=\"#e11d48\"><title>Sample %d: %.0f ns/op</title></rect>",x,192-h,w,h,i+1,v)
+	maxVal := s.P95NS
+	for _, v := range s.SamplesNS {
+		if v > maxVal {
+			maxVal = v
+		}
 	}
-	y:=192-150*s.P95NS/maxVal
-	fmt.Fprintf(&b,"<line x1=\"55\" y1=\"%.1f\" x2=\"950\" y2=\"%.1f\" stroke=\"#fbbf24\" stroke-width=\"2\" stroke-dasharray=\"6 4\"/><text x=\"65\" y=\"228\" fill=\"#fbbf24\" font-size=\"13\">p95: %.0f ns/op</text>",y,y,s.P95NS)
+	if maxVal == 0 {
+		maxVal = 1
+	}
+	for i, v := range s.SamplesNS {
+		x := 65 + float64(i)*860/float64(len(s.SamplesNS))
+		w := math.Min(45, 860/float64(len(s.SamplesNS))*.8)
+		h := math.Max(1, 150*v/maxVal)
+		fmt.Fprintf(&b, "<rect x=\"%.1f\" y=\"%.1f\" width=\"%.1f\" height=\"%.1f\" rx=\"3\" fill=\"#e11d48\"><title>Sample %d: %.0f ns/op</title></rect>", x, 192-h, w, h, i+1, v)
+	}
+	y := 192 - 150*s.P95NS/maxVal
+	fmt.Fprintf(&b, "<line x1=\"55\" y1=\"%.1f\" x2=\"950\" y2=\"%.1f\" stroke=\"#fbbf24\" stroke-width=\"2\" stroke-dasharray=\"6 4\"/><text x=\"65\" y=\"228\" fill=\"#fbbf24\" font-size=\"13\">p95: %.0f ns/op</text>", y, y, s.P95NS)
 	b.WriteString("</svg>")
 	return template.HTML(b.String())
 }
-var htmlTemplate=template.Must(template.New("diagnostics").Funcs(template.FuncMap{"join":strings.Join}).Parse(`<!doctype html>
+
+var htmlTemplate = template.Must(template.New("diagnostics").Funcs(template.FuncMap{"join": strings.Join}).Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NestGo diagnostic report</title>
 <style>
 :root{color-scheme:dark;background:#0b1220;color:#f8fafc;font:15px/1.5 system-ui,sans-serif}*{box-sizing:border-box}body{margin:0}main{max-width:1180px;padding:35px 22px 70px;margin:auto}
@@ -93,16 +113,17 @@ footer{margin-top:22px;color:#94a3b8;font-size:13px}
 <section class="panel"><h2>Dependency edges</h2><table><thead><tr><th>From</th><th>Injection field</th><th>To</th></tr></thead><tbody>{{range .Graph.Edges}}<tr><td><code>{{.From}}</code></td><td>{{.Field}}</td><td><code>{{.To}}</code></td></tr>{{end}}</tbody></table></section>
 <footer>Note: cycle components list participating providers, not an ordered exact cycle path. Time is nondeterministic and varies with environment and scheduler; only graph data has deterministic ordering.</footer>
 </main></body></html>`))
-func (r Report) HTML() ([]byte,error) {
-	data:=struct{
-		Graph Graph
-		Startup Startup
-		MedianUS float64
-		P95US float64
-		GraphSVG template.HTML
+
+func (r Report) HTML() ([]byte, error) {
+	data := struct {
+		Graph      Graph
+		Startup    Startup
+		MedianUS   float64
+		P95US      float64
+		GraphSVG   template.HTML
 		StartupSVG template.HTML
-	}{r.Graph,r.Startup,r.Startup.MedianNS/1000,r.Startup.P95NS/1000,graphSVG(r.Graph),startupSVG(r.Startup)}
+	}{r.Graph, r.Startup, r.Startup.MedianNS / 1000, r.Startup.P95NS / 1000, graphSVG(r.Graph), startupSVG(r.Startup)}
 	var out bytes.Buffer
-	err:=htmlTemplate.Execute(&out,data)
-	return out.Bytes(),err
+	err := htmlTemplate.Execute(&out, data)
+	return out.Bytes(), err
 }

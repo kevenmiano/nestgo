@@ -12,7 +12,10 @@ import (
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "diagnose" {
-		if err := diagnose(os.Args[2:]); err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+		if err := diagnose(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		return
 	}
 	if len(os.Args) != 3 || os.Args[1] != "compile" {
