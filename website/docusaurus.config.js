@@ -5,6 +5,8 @@ const config = {
   favicon: 'img/nestgo-mascot.svg',
   url: 'https://kevenmiano.github.io',
   baseUrl: '/nestgo/',
+  trailingSlash: false,
+  customFields: { releaseVersion: process.env.NESTGO_RELEASE_TAG || null },
   organizationName: 'kevenmiano',
   projectName: 'nestgo',
   onBrokenLinks: 'throw',
