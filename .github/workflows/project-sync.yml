@@ -99,8 +99,6 @@ jobs:
               });
               fields.set(name, created.createProjectV2Field.projectV2Field);
             }
-            const getOption = (fieldName, value) =>
-              fields.get(fieldName)?.options?.find(o => o.name.toLowerCase() === value.toLowerCase())?.id;
             const updateSelect = async (item, fieldName, value) => {
               if (!value) return;
               const field = fields.get(fieldName);
