@@ -5,7 +5,10 @@ type Parameter struct {Index int;Kind string;Name string}
 type Route struct {Method,Path,Handler string;Status int;Parameters []Parameter}
 type Controller struct {Type reflect.Type;Prefix string;Routes []Route}
 type Provider struct {Type reflect.Type;Scope string}
-type Module struct {Type reflect.Type;Name string}
+// Module declares an optional static module dependency contract.
+// Imports are pointer-to-struct module types. Exports are provider types.
+// Old generated Module{Type, Name} initializers remain valid.
+type Module struct {Type reflect.Type;Name string;Imports []reflect.Type;Exports []reflect.Type}
 type Package struct {Controllers []Controller;Providers []Provider;Modules []Module}
 var mu sync.RWMutex
 var packages=map[string]Package{}
