@@ -23,7 +23,7 @@ jobs:
           go-version-file: go.mod
       - name: Format only files changed by PR 42
         run: |
-          gofmt -w compiler/compiler.go compiler/performance_test.go metadata/registry.go runtime/runtime.go runtime/performance_test.go runtime/static_invocation_test.go
+          gofmt -w compiler/compiler.go compiler/performance_test.go metadata/registry.go runtime/runtime.go runtime/performance_test.go runtime/static_invocation_test.go cmd/perfserver/main.go
           go run ./cmd/modforge compile ./examples/shop
           go test ./...
           go vet ./...
@@ -32,7 +32,7 @@ jobs:
           if ! git diff --quiet; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add compiler/compiler.go compiler/performance_test.go metadata/registry.go runtime/runtime.go runtime/performance_test.go runtime/static_invocation_test.go examples/shop/zz_modforge_metadata.go
+            git add compiler/compiler.go compiler/performance_test.go metadata/registry.go runtime/runtime.go runtime/performance_test.go runtime/static_invocation_test.go cmd/perfserver/main.go examples/shop/zz_modforge_metadata.go
             git commit -m "style(go): format hybrid runtime and compiler changes"
             git push origin HEAD:perf/gsd-hybrid-static-dynamic-baseline
           fi
