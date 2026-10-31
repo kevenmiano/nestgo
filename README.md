@@ -10,11 +10,12 @@
 
 [![Go quality gates](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml)
 [![Documentation site](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml)
+[![Docs release deploy](https://github.com/kevenmiano/nestgo/actions/workflows/docs-release.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/docs-release.yml)
 [![Go version](https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Status](https://img.shields.io/badge/status-experimental-orange)](https://github.com/kevenmiano/nestgo/issues)
 [![GitHub Project](https://img.shields.io/badge/roadmap-Project%20%232-ce0038)](https://github.com/users/kevenmiano/projects/2)
 
-[Documentation](website/docs/intro.md) · [Project roadmap](.planning/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Documentation](website/docs/intro.md) · [Release publishing](docs/DOCS_SITE.md#release-tag-publishing-pipeline) · [Project roadmap](.planning/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -145,6 +146,9 @@ Compiler validation + metadata generation
 | `docs/` | Detailed compiler, runtime, architecture and development references |
 
 ## Documentation
+
+The Docusaurus portal is published to [GitHub Pages](https://kevenmiano.github.io/nestgo/) automatically **when a GitHub Release is published with a semantic version tag from `main`**, once GitHub Pages is configured to use GitHub Actions. The hosted URL is only available after a successful deployment. See [release publishing setup](docs/DOCS_SITE.md#release-tag-publishing-pipeline).
+
 
 - [Architecture and design](docs/ARCHITECTURE.md)
 - [Compiler reference](docs/COMPILER.md)
