@@ -1,0 +1,24 @@
+name: Format typed module parser (temporary)
+on:
+  push:
+    branches: [feat/nestjs-style-module-lists]
+    paths: ['.github/workflows/format-module-options-temporary.yml']
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/nestjs-style-module-lists
+      - run: |
+          set -euo pipefail
+          gofmt -w compiler/module_options.go compiler/module_options_test.go compiler/compiler.go metadata/registry.go
+          if [[ -n "$(git status --porcelain -- compiler metadata)" ]]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add compiler metadata
+            git commit -m 'style(compiler): format NestJS-style module parser'
+            git push origin HEAD:feat/nestjs-style-module-lists
+          fi
