@@ -12,6 +12,7 @@ import (
 
 type Report struct {
 	Graph   Graph           `json:"graph"`
+	Modules ModuleGraph `json:"modules"`
 	Startup Startup         `json:"startup"`
 	Cold    *ProcessStartup `json:"coldStartup,omitempty"`
 	Scale   []ScaleStartup  `json:"scale,omitempty"`
@@ -111,6 +112,11 @@ footer{margin-top:22px;color:#94a3b8;font-size:13px}
 <p class="muted">{{len .Startup.SamplesNS}} samples × {{.Startup.IterationsPerSample}} calls; {{.Startup.GoVersion}} · {{.Startup.GOOS}}/{{.Startup.GOARCH}} · {{.Startup.CPUCount}} CPUs · commit {{.Startup.Commit}}</p></section>
 {{if .Cold}}<section class="panel"><h2>Cold process startup</h2><p class="muted">Real launch-to-exit time from an already-built executable; includes OS process boot, Go package initialization and NestGo runtime.New. It excludes compilation and network listening.</p><div class="metrics"><div class="metric"><strong>{{printf "%.2f" .ColdMedianMS}} ms</strong><span>Cold median</span></div><div class="metric"><strong>{{printf "%.2f" .ColdP95MS}} ms</strong><span>Cold p95</span></div><div class="metric"><strong>{{len .Cold.SamplesNS}}</strong><span>Process launches</span></div></div><p class="muted">Commit {{.Cold.Commit}} · {{.Cold.GoVersion}} · {{.Cold.GOOS}}/{{.Cold.GOARCH}}</p></section>{{end}}
 {{if .Scale}}<section class="panel"><h2>Startup by provider count</h2><p class="muted">Synthetic fixture: distinct providers without injected fields or HTTP routes. Warm runtime.New; numbers are measured and not deterministic.</p><table><thead><tr><th>Providers</th><th>Median (µs)</th><th>p95 (µs)</th><th>Bytes/op</th><th>Allocs/op</th></tr></thead><tbody>{{range .Scale}}<tr><td>{{.Providers}}</td><td>{{printf "%.2f" (micro .Startup.MedianNS)}}</td><td>{{printf "%.2f" (micro .Startup.P95NS)}}</td><td>{{.Startup.BytesPerOp}}</td><td>{{.Startup.AllocsPerOp}}</td></tr>{{end}}</tbody></table></section>{{end}}
+<section class="panel"><h2>Module imports and exports</h2><p class="muted">Explicitly declared module metadata only. Imports point to known module types; exports refer to registered providers. Older generated modules have no import/export edges.</p>
+<div class="metrics"><div class="metric"><strong>{{len .Modules.Modules}}</strong><span>Modules</span></div><div class="metric"><strong>{{len .Modules.Imports}}</strong><span>Module imports</span></div><div class="metric"><strong>{{len .Modules.Cycles}}</strong><span>Module cycles</span></div><div class="metric"><strong>{{len .Modules.Findings}}</strong><span>Module findings</span></div></div>
+{{if .Modules.Imports}}<table><thead><tr><th>Module</th><th>Imports</th></tr></thead><tbody>{{range .Modules.Imports}}<tr><td><code>{{.From}}</code></td><td><code>{{.To}}</code></td></tr>{{end}}</tbody></table>{{end}}
+{{if .Modules.Cycles}}<h3>Cyclic module components</h3><ul>{{range .Modules.Cycles}}<li class="warning"><code>{{join . " · "}}</code></li>{{end}}</ul>{{end}}
+{{if .Modules.Findings}}<h3>Module diagnostics</h3><table><thead><tr><th>Kind</th><th>Module</th><th>Details</th></tr></thead><tbody>{{range .Modules.Findings}}<tr><td>{{.Kind}}</td><td><code>{{.Module}}</code></td><td>{{.Details}}</td></tr>{{end}}</tbody></table>{{end}}</section>
 <section class="panel"><h2>Circular and unresolved dependencies</h2>
 {{if .Graph.Cycles}}<ul>{{range .Graph.Cycles}}<li class="warning"><code>{{join . " · "}}</code></li>{{end}}</ul>{{else}}<p>No cycles found in the modeled provider graph.</p>{{end}}
 {{if .Graph.Findings}}<table><thead><tr><th>Type</th><th>Provider</th><th>Field</th><th>Details</th></tr></thead><tbody>{{range .Graph.Findings}}<tr><td>{{.Kind}}</td><td><code>{{.Provider}}</code></td><td>{{.Field}}</td><td>{{.Details}}</td></tr>{{end}}</tbody></table>{{else}}<p>No unresolved, duplicate or ambiguous dependency findings.</p>{{end}}</section>
@@ -130,7 +136,7 @@ func (r Report) HTML() ([]byte, error) {
 		Scale        []ScaleStartup
 		ColdMedianMS float64
 		ColdP95MS    float64
-	}{r.Graph, r.Startup, r.Startup.MedianNS / 1000, r.Startup.P95NS / 1000, graphSVG(r.Graph), startupSVG(r.Startup), r.Cold, r.Scale, 0, 0}
+	}{r.Graph, r.Modules, r.Startup, r.Startup.MedianNS / 1000, r.Startup.P95NS / 1000, graphSVG(r.Graph), startupSVG(r.Startup), r.Cold, r.Scale, 0, 0}
 	if r.Cold != nil {
 		data.ColdMedianMS = r.Cold.MedianNS / 1e6
 		data.ColdP95MS = r.Cold.P95NS / 1e6
