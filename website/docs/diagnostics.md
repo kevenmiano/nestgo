@@ -15,7 +15,15 @@ go run ./cmd/nestgo diagnose -example -out diagnostics-output -samples 15 -itera
 
 Open `diagnostics-output/report.html` locally. The report embeds the graph SVG, startup sample chart, median and p95 latency, per-startup memory and allocation statistics, missing or ambiguous provider findings and cycles.
 
-The sample uses a built-in Go fixture with three providers and one HTTP route. It **does not automatically inspect unrelated applications**.
+The example uses a built-in fixture. For an **actual compiled NestGo package**, run:
+
+```bash
+go run ./cmd/nestgo diagnose -app ./examples/shop -out diagnostics-real -samples 10 -iterations 50 -cold-samples 3
+```
+
+The CLI compiles a temporary, linked Go diagnostic runner and imports the application's generated metadata registration. It does not edit user files. The package must be importable (not `package main`), and its generated metadata must register with NestGo. **Importing that package executes its `init()` functions**; analyze trusted application code only.
+
+The current metadata only exposes provider/controller and module descriptors; module import/export edges are not yet defined. Thus the provider graph is real, but it is **not yet a complete NestJS-style module graph**.
 
 ## Files
 
