@@ -30,10 +30,12 @@ type Provider struct {
 // Imports are pointer-to-struct module types. Exports are provider types.
 // Old generated Module{Type, Name} initializers remain valid.
 type Module struct {
-	Type    reflect.Type
-	Name    string
-	Imports []reflect.Type
-	Exports []reflect.Type
+	Type        reflect.Type
+	Name        string
+	Imports     []reflect.Type
+	Providers   []reflect.Type
+	Controllers []reflect.Type
+	Exports     []reflect.Type
 }
 type Package struct {
 	Controllers []Controller

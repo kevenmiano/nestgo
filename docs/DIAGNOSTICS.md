@@ -132,3 +132,21 @@ The `@Imports` and `@Exports` decorators accept quoted, comma-separated **local 
 `nestgo compile ./myapp` emits the typed `Imports []reflect.Type` and `Exports []reflect.Type` metadata. Then `nestgo diagnose -app ./myapp -strict` uses the generated relationships to detect module import cycles, alongside the existing provider graph and measured startup timings.
 
 **Intentional limitation:** this first implementation supports module and provider references in the **same Go package**, not qualified cross-package imports or a NestJS-style module ownership/resolution container. The compiler validates declared references and the diagnostic checks runtime-registered types; the runtime still does not enforce exports or module visibility. Cross-package ownership and runtime enforcement remain under #10 and #11. The compiler also does not infer module edges from arbitrary Go field types; relationships must be declared explicitly.
+
+## NestJS-style module configuration with type-reference arrays
+
+The preferred syntax is a **single** declarative module decorator, with actual type references rather than comma-separated strings:
+
+```go
+@Module({
+    name: "users",
+    imports: [DatabaseModule, CacheModule],
+    controllers: [UsersController],
+    providers: [UsersService],
+    exports: [UsersService],
+})
+type UsersModule struct{}
+```
+
+The .mgo compiler parses these arrays statically, validates local @Module/@Injectable/@Controller declarations, rejects quoted items, unknown or duplicate entries, and emits ordered typed reflect metadata. A provider listed in exports must also be in providers when the providers property is present. `@Module("users")` and the earlier `@Imports/@Exports` forms remain available for compatibility, but the new object syntax is the preferred design. Type references currently must be declared in the same Go package; cross-package selectors and runtime ownership enforcement are not implemented. The object is compile-time .mgo syntax, not ordinary Go source.
+
