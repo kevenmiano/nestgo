@@ -1,0 +1,37 @@
+name: Format and synchronize PR 42
+on:
+  push:
+    branches:
+      - perf/gsd-hybrid-static-dynamic-baseline
+    paths:
+      - '.github/workflows/format-pr42.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.ref == 'refs/heads/perf/gsd-hybrid-static-dynamic-baseline'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Format only files changed by PR 42
+        run: |
+          gofmt -w compiler/compiler.go compiler/performance_test.go metadata/registry.go runtime/runtime.go runtime/performance_test.go runtime/static_invocation_test.go
+          go test ./...
+          go vet ./...
+      - name: Commit formatting onto feature branch
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add compiler/compiler.go compiler/performance_test.go metadata/registry.go runtime/runtime.go runtime/performance_test.go runtime/static_invocation_test.go
+            git commit -m "style(go): format hybrid runtime and compiler changes"
+            git push origin HEAD:perf/gsd-hybrid-static-dynamic-baseline
+          fi
