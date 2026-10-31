@@ -15,3 +15,23 @@ func TestMissingDependencyValidation(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestDeclaredDependencyPassesValidation(t *testing.T) {
+	f, err := Parse("registered.mgo", []byte("package demo\n@Injectable()\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Generate([]*File{f}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMissingControllerDependencyValidation(t *testing.T) {
+	f, err := Parse("controller.mgo", []byte("package demo\ntype Repo struct{}\n@Controller(\"/\")\ntype C struct { Repo *Repo }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Generate([]*File{f}); err == nil || !strings.Contains(err.Error(), "missing required provider") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
