@@ -14,7 +14,7 @@ npm run start
 npm run build
 ```
 
-The site is configured for GitHub Pages at `https://kevenmiano.github.io/nestgo/` but **is not published automatically**. A PR build workflow validates the static site. Deployment requires configuring Pages and a separate publish action.
+The site targets GitHub Pages at `https://kevenmiano.github.io/nestgo/`. Pull requests and changes on `main` run the documentation build; **publishing** is handled separately by the release deployment workflow, only when a release tag points to a commit reachable from `main`.
 
 ## Verify
 - `npm run build` succeeds in the documentation CI workflow.
@@ -27,7 +27,30 @@ The site is configured for GitHub Pages at `https://kevenmiano.github.io/nestgo/
 Check navigation, mascot fidelity, transparent rendering, dark/light contrast, mobile layout, accessibility, documentation accuracy and issue references.
 
 ## Ship
-Merge after green CI. Later configure Pages deployment, domain, search and versioned documentation. Do not claim the docs URL is live before deployment.
+Merge after green CI. Publish Docusaurus using [docs-release.yml](../.github/workflows/docs-release.yml) when a new semantic GitHub Release is published for a commit on `main`. The deployed homepage shows the release version and a changelog link. Do not claim the URL is live until the deployment job succeeds.
+
+### Release-tag publishing pipeline
+
+1. In repository **Settings → Pages → Build and deployment**, select **GitHub Actions** as the source. The repository owner must perform this configuration; it is not changed by committing a workflow.
+2. Ensure repository Actions permit GitHub Pages deployments. The workflow uses `pages: write` and `id-token: write`, and deploys to the `github-pages` environment. Environment restrictions must allow the release event/tag (for example `v*`), otherwise GitHub can block the deployment.
+3. Merge all desired website updates into `main`, and verify the `Documentation site` CI job.
+4. Create and publish a GitHub Release with a semantic tag such as `v0.1.0`, targeting `main` (not another branch). The workflow also checks that the tag's actual commit is an ancestor of `main`; if not, it fails without publishing.
+5. GitHub Actions checks out the exact tagged commit, installs the Node 22 dependencies, builds Docusaurus with `NESTGO_RELEASE_TAG`, validates the generated site and uploads it as a Pages artifact. Deployment happens only if the build passes.
+6. Confirm the `Publish Docusaurus on release` workflow succeeded and visit the deployed Pages URL. Future published releases update the site automatically.
+7. For a known existing release tag, use the workflow's `Run workflow` action with the `tag` input. This uses the same ancestry and build checks.
+
+```bash
+# Create the tag on the intended main commit.
+git switch main
+git pull --ff-only
+git tag -a v0.1.0 -m "NestGo v0.1.0"
+git push origin v0.1.0
+# Publish the Release for v0.1.0 on GitHub to trigger deployment.
+```
+
+Tag pushes alone do not publish the site; the trigger is **GitHub Release published**. PRs and ordinary main pushes validate the site without deploying. A GitHub Release that is only drafted does not deploy.
+
+The homepage exposes the release tag as a badge linked to the matching GitHub Release. This describes the most recently deployed version; it does not claim to implement versioned multi-release documentation or API stability.
 
 ## References
 - https://docs.nestjs.com/
