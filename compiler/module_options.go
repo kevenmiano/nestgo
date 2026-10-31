@@ -58,7 +58,7 @@ func parseModuleOptions(path string, a Annotation, defaultName string) (moduleOp
 		}
 		s, err := strconv.Unquote(a.Argument)
 		if err != nil {
-			return opts, Diagnostic{path, a.Line, "@Module expects a configuration object, e.g. @Module({imports: [DatabaseModule]})"}
+			return opts, Diagnostic{path, a.Line, "@Module expects quoted string (legacy) or configuration object, e.g. @Module({imports: [DatabaseModule]})"}
 		}
 		opts.Name = s
 		return opts, nil // old @Module("users") remains source compatible
@@ -132,6 +132,7 @@ func parseModuleOptions(path string, a Annotation, defaultName string) (moduleOp
 	if err := p.expect(token.RBRACE); err != nil {
 		return opts, err
 	}
+	if p.tok == token.SEMICOLON { p.next() }
 	if p.tok != token.EOF {
 		return opts, p.fail("unexpected tokens after module options")
 	}
