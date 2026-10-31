@@ -162,6 +162,16 @@ Compiler validation + metadata generation
 | `examples/shop/` | Sample annotated source, generated Go and HTTP tests |
 | `docs/` | Detailed compiler, runtime, architecture and development references |
 
+## Dependency diagnostics and measured startup
+
+Generate an offline SVG dependency graph and real warm-startup measurements:
+
+```bash
+go run ./cmd/nestgo diagnose -example -out diagnostics-output -samples 15 -iterations 100
+```
+
+Open `diagnostics-output/report.html` locally. The example is a labelled built-in fixture; real applications use the `diagnostics` Go API with their own `metadata.Package` definitions. The graph is deterministically ordered, while timing samples vary by environment. See [diagnostics and reproducibility](docs/DIAGNOSTICS.md).
+
 ## Documentation
 
 The Docusaurus portal is published to [GitHub Pages](https://kevenmiano.github.io/nestgo/) automatically **when a GitHub Release is published with a semantic version tag from `main`**, once GitHub Pages is configured to use GitHub Actions. The hosted URL is only available after a successful deployment. See [release publishing setup](docs/DOCS_SITE.md#release-tag-publishing-pipeline).
