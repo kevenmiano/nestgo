@@ -2,7 +2,7 @@
 const config = {
   title: 'NestGo',
   tagline: 'Structured applications. Native Go.',
-  favicon: 'img/favicon.svg',
+  favicon: 'img/nestgo-mascot.svg',
   url: 'https://kevenmiano.github.io',
   baseUrl: '/nestgo/',
   organizationName: 'kevenmiano',
@@ -16,10 +16,10 @@ const config = {
     theme: {customCss: require.resolve('./src/css/custom.css')}
   }]],
   themeConfig: {
-    image: 'img/favicon.svg',
+    image: 'img/nestgo-mascot.svg',
     navbar: {
       title: 'NestGo',
-      
+      logo: {alt: 'NestGo mascot', src: 'img/nestgo-mascot.svg'},
       items: [
         {to: '/docs/intro', label: 'Documentation', position: 'left'},
         {to: '/docs/roadmap', label: 'Roadmap', position: 'left'},
