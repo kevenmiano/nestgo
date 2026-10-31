@@ -1,0 +1,58 @@
+name: Release policy and CLI checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cmd/nestgo/**'
+      - '.github/scripts/verify-release-tag.sh'
+      - '.github/workflows/framework-release.yml'
+      - '.github/workflows/go-packages.yml'
+      - '.github/workflows/docs-release.yml'
+      - '.github/workflows/release-policy.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'cmd/nestgo/**'
+      - '.github/scripts/verify-release-tag.sh'
+      - '.github/workflows/framework-release.yml'
+      - '.github/workflows/go-packages.yml'
+      - '.github/workflows/docs-release.yml'
+      - '.github/workflows/release-policy.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Validate shell syntax and reject invalid release tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n .github/scripts/verify-release-tag.sh
+          for invalid in latest v2.0.0 v1.0 v0.1.0/evil; do
+            if bash .github/scripts/verify-release-tag.sh "$invalid"; then
+              echo "::error::Unexpectedly accepted $invalid"
+              exit 1
+            fi
+          done
+
+      - name: Verify NestGo CLI can be installed locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOBIN="$RUNNER_TEMP/bin"
+          mkdir -p "$GOBIN"
+          go install ./cmd/nestgo
+          test -x "$GOBIN/nestgo"
+          "$GOBIN/nestgo" compile ./examples/shop
+          git diff --exit-code -- examples/shop
+          test -z "$(git ls-files --others --exclude-standard -- examples/shop)"
