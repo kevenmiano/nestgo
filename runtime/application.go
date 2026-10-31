@@ -1,104 +1,51 @@
 package runtime
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "net"
-    "net/http"
-
-    "github.com/kevenmiano/nestgo/metadata"
-    "github.com/valyala/fasthttp"
-    "github.com/valyala/fasthttp/fasthttpadaptor"
-)
-
-// Engine selects the HTTP server at application bootstrap.
-// Controllers and generated metadata remain independent from the engine.
-type Engine string
-
-const (
-    EngineFastHTTP Engine = "fasthttp"
-    EngineNetHTTP  Engine = "net/http"
+ "context"
+ "errors"
+ "fmt"
+ "net"
+ "github.com/kevenmiano/nestgo/httpadapter"
+ "github.com/kevenmiano/nestgo/metadata"
+ fastadapter "github.com/kevenmiano/nestgo/platform/fasthttp"
 )
 
 type ApplicationOptions struct {
-    Engine Engine
+ // Adapter selects the HTTP platform. Nil defaults to native fasthttp.
+ Adapter httpadapter.Adapter
 }
 
 type Application struct {
-    engine Engine
-    handler http.Handler
-    server *fasthttp.Server
-    stdServer *http.Server
+ adapter httpadapter.Adapter
 }
 
-func NewApplication(options ApplicationOptions, packages ...metadata.Package) (*Application, error) {
-    engine := options.Engine
-    if engine == "" {
-        engine = EngineFastHTTP
-    }
-    if engine != EngineFastHTTP && engine != EngineNetHTTP {
-        return nil, fmt.Errorf("unsupported HTTP engine %q", engine)
-    }
-    handler, err := New(packages...)
-    if err != nil {
-        return nil, err
-    }
-    return &Application{engine: engine, handler: handler}, nil
+// NewApplication resolves modules and registers controller routes at bootstrap.
+func NewApplication(options ApplicationOptions, packages ...metadata.Package) (*Application,error) {
+ adapter:=options.Adapter
+ if adapter==nil {adapter=fastadapter.New()}
+ if err:=registerRoutes(adapter,packages);err!=nil{return nil,err}
+ return &Application{adapter:adapter},nil
 }
 
-func ApplicationFromRegistry(options ApplicationOptions, names ...string) (*Application, error) {
-    packages := make([]metadata.Package, 0, len(names))
-    for _, name := range names {
-        pkg, ok := metadata.Lookup(name)
-        if !ok {
-            return nil, fmt.Errorf("metadata package not found: %s", name)
-        }
-        packages = append(packages, pkg)
-    }
-    return NewApplication(options, packages...)
+func ApplicationFromRegistry(options ApplicationOptions,names ...string)(*Application,error){
+ packages:=make([]metadata.Package,0,len(names))
+ for _,name:=range names{
+  pkg,ok:=metadata.Lookup(name)
+  if !ok{return nil,fmt.Errorf("metadata package not found: %s",name)}
+  packages=append(packages,pkg)
+ }
+ return NewApplication(options,packages...)
 }
 
-func (a *Application) Engine() Engine { return a.engine }
-
-// Handler preserves interoperability with net/http middleware and existing callers.
-// For the fast engine this compatibility boundary introduces per-request conversions.
-func (a *Application) Handler() http.Handler { return a.handler }
-
-// Serve serves on an existing listener. Create a new application for each listener.
-func (a *Application) Serve(listener net.Listener) error {
-    if listener == nil {
-        return errors.New("nil listener")
-    }
-    switch a.engine {
-    case EngineFastHTTP:
-        server := &fasthttp.Server{Handler: fasthttpadaptor.NewFastHTTPHandler(a.handler)}
-        a.server = server
-        return server.Serve(listener)
-    case EngineNetHTTP:
-        server := &http.Server{Handler: a.handler}
-        a.stdServer = server
-        return server.Serve(listener)
-    default:
-        return fmt.Errorf("unsupported HTTP engine %q", a.engine)
-    }
+func (a *Application) HTTPAdapter() httpadapter.Adapter{return a.adapter}
+func (a *Application) Serve(listener net.Listener)error{return a.adapter.Serve(listener)}
+func (a *Application) Listen(addr string)error{
+ listener,err:=net.Listen("tcp",addr)
+ if err!=nil{return err}
+ defer listener.Close()
+ return a.Serve(listener)
 }
-
-// Listen starts the configured HTTP server. It blocks until the server stops.
-func (a *Application) Listen(address string) error {
-    listener, err := net.Listen("tcp", address)
-    if err != nil { return err }
-    defer listener.Close()
-    return a.Serve(listener)
-}
-
-func (a *Application) Shutdown(ctx context.Context) error {
-    if a.stdServer != nil {
-        return a.stdServer.Shutdown(ctx)
-    }
-    if a.server != nil {
-        // fasthttp's ShutdownWithContext supports graceful shutdown.
-        return a.server.ShutdownWithContext(ctx)
-    }
-    return nil
+func (a *Application) Shutdown(ctx context.Context)error{
+ if a==nil||a.adapter==nil{return errors.New("application is not initialized")}
+ return a.adapter.Shutdown(ctx)
 }
