@@ -8,7 +8,7 @@ export default function Home() {
     <main>
       <header className="hero hero--primary">
         <div className="container">
-          <img src="/nestgo/img/nestgo-mark.svg" alt="NestGo emblem" width="108" height="108"/>
+          <div className={styles.originalBrands}><img src="https://nestjs.com/img/logo-small.svg" alt="Official NestJS logo" width="76" height="76"/><span aria-hidden="true">+</span><img src="https://go.dev/images/go-logo-blue.svg" alt="Official Go language logo" width="130" height="76"/></div>
           <h1 className="hero__title">NestGo</h1>
           <p className="hero__subtitle">Structured applications. Native Go.</p>
           <p>Decorator-inspired development with generated Go code and a net/http runtime.</p>
@@ -16,7 +16,7 @@ export default function Home() {
             <Link className="button button--secondary button--lg" to="/docs/intro">Get started</Link>
             <Link className="button button--outline button--lg" style={{color:'white',borderColor:'white'}} to="/docs/roadmap">Explore roadmap</Link>
           </div>
-          <p className={styles.notice}>Experimental proof of concept · Not production-ready</p>
+          <p className={styles.notice}>Inspired by NestJS architecture, built with Go. Independent project; not affiliated with NestJS or the Go team. Experimental proof of concept.</p>
         </div>
       </header>
       <section className={styles.features}><div className="container"><div className="row">
