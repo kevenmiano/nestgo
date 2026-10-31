@@ -40,7 +40,7 @@ M004 and M006 can run in parallel after their relevant interfaces stabilize; M00
 
 - Go module layout: the public packages `compiler`, `runtime`, `metadata` remain under one root module and share a single semver tag. No nested `go.mod` migration is being introduced.
 - CLI distribution: `cmd/nestgo` is installed by `go install .../cmd/nestgo@version`; legacy `modforge` remains supported. The application installs the library with `go get github.com/kevenmiano/nestgo@version`.
-- Separate CI/CD jobs: docs Pages publishing, Go library conformance and CLI binary publishing, all triggered by release tags reachable from main.
+- Separate CI/CD jobs: docs Pages publishing, Go library conformance and GoReleaser-driven CLI archives, all triggered by published release tags reachable from main. The release packaging strategy is recorded in [ADR 0001](../docs/adr/0001-goreleaser-distribution.md).
 - GSD checkpoints: tests for package imports and CLI installation, release-tag ancestry verification, docs build, versioned binaries and SHA256 checks, verified Actions logs after first real release.
 - Details: [distribution guide](../docs/DISTRIBUTION.md). This is an incremental M006 release delivery and does not complete issue #25.
 
