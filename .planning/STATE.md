@@ -2,27 +2,37 @@
 
 **Project:** NestGo Compiler v3
 **Milestone:** M001 — Stabilization
-**Current phase:** 0 — Governance and GSD onboarding
-**Current status:** Initial repository-level GSD planning scaffold created.
+**Current phase:** 1 — CI and compiler coverage
+**Current status:** Phase 1 implementation proposed in PR; verification pending.
 
-## Known state
+## Verified repository facts
 
-- Compiler v3 has been merged into main.
-- README, architecture, compiler and runtime references exist.
-- GitHub issues #2–#7 track initial milestone work.
-- The GitHub Project board has **not** been created yet.
-- GSD Core has **not** been installed or executed in a coding agent environment.
+- Compiler v3 is on `main`.
+- GitHub Issues #2–#7 define the initial milestone backlog.
+- GitHub Project #2 exists: https://github.com/users/kevenmiano/projects/2.
+- Project synchronization workflow is on `main`; its first successful run and board import have **not been verified**.
+- A repository-level GSD-style planning scaffold exists; **GSD Core installation/onboarding has not been verified**.
+
+## Phase 1 execution log
+
+- **Discuss:** Scope from issue #3: Go 1.23 checks, formatting, deterministic compiler output.
+- **Plan:** Introduce a single PR quality workflow and document verification and limitations.
+- **Execute:** Add `.github/workflows/go-quality.yml` on branch `ci/phase-1-quality-gates`.
+- **Verify:** Await GitHub Actions execution on PR; no passing result is claimed.
+- **Review:** PR review and any necessary remediation are pending.
+- **Ship:** Pending approval and merge.
 
 ## Next actions
 
-1. Complete issue #2 by running `/gsd-onboard` in a GSD Core-enabled runtime and reconcile generated planning files.
-2. Create the GitHub Project board and add issues #2–#7.
-3. Start phase 1 with issues #3 and #4.
-4. Keep this file synchronized with issue and board state.
+1. Confirm `PROJECTS_TOKEN` and run the project-sync workflow with backfill once; inspect the Project #2 items.
+2. Review and merge the phase 1 CI PR only after its checks pass.
+3. Address issue #4 compiler tests; record test cases and results in the next PR.
+4. Complete issue #2 only after actual GSD Core onboarding is performed and verified.
+5. Keep GitHub Issues as the work-item source of truth; link PRs using `Closes #N` and update this file at each phase gate.
 
-## Decisions
+## Decisions and limitations
 
-- Use GitHub Issues as the source of truth for work items.
-- Use English for repository content.
-- Use Conventional Commits.
-- Keep the workflow interactive with verification gates enabled.
+- English for repository content and Conventional Commits.
+- CI checks `gofmt` for **changed Go files**, not all legacy Go files, to avoid blocking unrelated PRs on pre-existing formatting debt. Full-repository formatting remains outstanding.
+- A PR cannot be marked Done merely because code was pushed: tests, review, and merge are required.
+- GitHub Project fields and synchronization success cannot be inferred from workflow creation alone.

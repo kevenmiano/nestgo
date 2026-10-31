@@ -1,0 +1,61 @@
+name: Go quality gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Test, vet, format and generated-code checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Unit and integration tests
+        run: go test ./...
+      - name: Static analysis
+        run: go vet ./...
+      - name: Verify gofmt on changed Go files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+            if [[ "$base" == "0000000000000000000000000000000000000000" || -z "$base" ]]; then
+              base="$(git rev-list --max-parents=0 HEAD | head -n1)"
+            fi
+          fi
+          mapfile -d '' files < <(git diff --name-only -z --diff-filter=ACMR "$base" HEAD -- '*.go')
+          if (( ${#files[@]} == 0 )); then
+            echo "No changed Go files."
+            exit 0
+          fi
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [[ -n "$unformatted" ]]; then
+            echo "Go files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+      - name: Verify generated example output
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./cmd/modforge compile ./examples/shop
+          git diff --exit-code -- examples/shop
+          if [[ -n "$(git ls-files --others --exclude-standard -- examples/shop)" ]]; then
+            echo "Compiler created untracked generated files."
+            exit 1
+          fi
