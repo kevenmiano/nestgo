@@ -17,7 +17,8 @@ The graph structure can be deterministic. Wall-clock initialization time cannot:
 
 ```bash
 go test ./diagnostics ./cmd/nestgo
-go run ./cmd/nestgo diagnose -example -out diagnostics-output -samples 15 -iterations 100 -strict
+go build -o ./nestgo-local ./cmd/nestgo
+./nestgo-local diagnose -example -out diagnostics-output -samples 15 -iterations 100 -cold-samples 5 -scale -strict
 # Open diagnostics-output/report.html locally, without internet access.
 ```
 
@@ -55,9 +56,12 @@ For custom apps, ensure your provider graph passes validation and `runtime.New` 
 
 - `graph.json`: stable graph schema, sorted vertices/edges/findings and sorted SCC cycles; no wall-clock values.
 - `graph.dot`: byte-stable Graphviz-compatible dependency diagram. Arrow: consumer → dependency.
-- `report.json`: graph plus measured samples and runtime platform context.
-- `report.html`: self-contained SVG graph and startup sample bar chart, median, p95, B/op, allocs/op, findings and environment context. No external CDNs.
+- `report.json`: graph plus measured warm samples, optional **cold subprocess** samples, scale benchmark series and runtime platform context.
+- `report.html`: self-contained SVG graph and warm startup sample chart, **cold subprocess startup** median/p95, synthetic 1/10/100-provider comparison table, B/op, allocs/op, findings and environment context. No external CDNs.
 - `runtime.New` benchmark measures **warm handler initialization from prebuilt metadata**, including provider materialization/injection, controller wiring, route signature validation and `net/http` handler registration. It **excludes** OS process cold start, module compilation, generated `init()` metadata registration and socket listening.
+- `-cold-samples N` (default 3; `0` disables) runs the **already-built CLI executable** as N new OS processes. Each subprocess creates the same provider/route fixture and exits. This includes OS process launch, Go runtime/package `init`, CLI argument processing, and `runtime.New`, but **not** compiler invocation, Go builds, network listening or HTTP readiness. Cold timings are not comparable to a complete production server becoming ready.
+- `-scale` measures three reproducible synthetic fixtures of **1, 10 and 100 providers**, with **no dependencies and no HTTP routes**. They quantify provider registration/materialization overhead, not large service applications. All timing samples are nondeterministic and carry runner metadata.
+- `go run` can still execute the sample, but for cold timing consistency build the executable once as illustrated above. The subprocess does not invoke `go run` or a shell.
 
 Graph cycles are reported as strongly connected provider sets, **not necessarily ordered minimal cycle paths**. Current injector rules skip unexported/anonymous fields. Static analysis cannot guarantee runtime behavior for not-yet-modeled request scopes or future dynamic provider factories.
 
@@ -68,10 +72,11 @@ Graph cycles are reported as strongly connected provider sets, **not necessarily
 - [ ] CI uploads an offline HTML report and real sample measurements with environment metadata.
 - [ ] Warm startup timing is clearly labelled, separated from deterministic graph data.
 - [ ] A future issue adds full module graph and cross-module import/export analysis (see #10, #11, #36).
-- [ ] Broader startup and allocation comparison across provider graph sizes is scoped in #37; integrated reporting improvements in #38.
+- [ ] Baseline provider-scale comparison (1/10/100) and cold process launch-to-exit samples added as incremental deliverables for #37; full application readiness and large route matrices remain pending.
+- [ ] Cold timing and scale data displayed in the same offline report under #38; graph layout refinement and arbitrary application discovery remain pending.
 
 ## Review / Ship
 
-PR correctness checks are required before merge. Link the relevant issues but do **not** close #36–#38 until their complete acceptance criteria are met. This iteration supplies the deterministic provider graph and initial warm startup reporting; cold process boot, package-level imports/exports, full route scale sweeps and strict compiler integration remain incremental work.
+PR correctness checks are required before merge. Link the relevant issues but do **not** close #36–#38 until their complete acceptance criteria are met. The initial implementation supplies a deterministic provider graph and warm startup reporting. This iteration adds a **bounded cold subprocess** and synthetic provider scale benchmarks; full application cold readiness, package-level imports/exports, full route scale sweeps and strict compiler integration remain incremental work.
 
 **GSD:** Discuss → Plan → Execute → Verify → Review → Ship.

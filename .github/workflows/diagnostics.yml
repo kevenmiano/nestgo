@@ -34,11 +34,14 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          go run ./cmd/nestgo diagnose -example -out diagnostics-output -samples 12 -iterations 100 -strict
+          go build -o "$RUNNER_TEMP/nestgo-diagnostics" ./cmd/nestgo
+          "$RUNNER_TEMP/nestgo-diagnostics" diagnose -example -out diagnostics-output -samples 8 -iterations 50 -cold-samples 5 -scale -strict
           test -s diagnostics-output/report.html
           test -s diagnostics-output/graph.dot
           test -s diagnostics-output/graph.json
           test -s diagnostics-output/report.json
+          grep -q coldStartup diagnostics-output/report.json
+          grep -q '"providers": 100' diagnostics-output/report.json
       - name: Upload diagnostic report
         uses: actions/upload-artifact@v4
         with:

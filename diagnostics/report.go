@@ -11,8 +11,10 @@ import (
 )
 
 type Report struct {
-	Graph   Graph   `json:"graph"`
-	Startup Startup `json:"startup"`
+	Graph   Graph           `json:"graph"`
+	Startup Startup         `json:"startup"`
+	Cold    *ProcessStartup `json:"coldStartup,omitempty"`
+	Scale   []ScaleStartup  `json:"scale,omitempty"`
 }
 
 func (r Report) JSON() ([]byte, error) { return json.MarshalIndent(r, "", "  ") }
@@ -80,7 +82,7 @@ func startupSVG(s Startup) template.HTML {
 	return template.HTML(b.String())
 }
 
-var htmlTemplate = template.Must(template.New("diagnostics").Funcs(template.FuncMap{"join": strings.Join}).Parse(`<!doctype html>
+var htmlTemplate = template.Must(template.New("diagnostics").Funcs(template.FuncMap{"join": strings.Join, "micro": func(ns float64) float64 { return ns / 1000 }}).Parse(`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NestGo diagnostic report</title>
 <style>
 :root{color-scheme:dark;background:#0b1220;color:#f8fafc;font:15px/1.5 system-ui,sans-serif}*{box-sizing:border-box}body{margin:0}main{max-width:1180px;padding:35px 22px 70px;margin:auto}
@@ -107,6 +109,8 @@ footer{margin-top:22px;color:#94a3b8;font-size:13px}
 <section class="panel"><h2>Provider dependency graph</h2><p class="muted">Red-outline nodes belong to cycles. Structural output is stable for identical inputs.</p>{{.GraphSVG}}</section>
 <section class="panel"><h2>Measured startup performance</h2><p class="muted">Actual wall-clock samples per runtime.New invocation. Excludes process boot, compilation, package init and socket listening.</p>{{.StartupSVG}}
 <p class="muted">{{len .Startup.SamplesNS}} samples × {{.Startup.IterationsPerSample}} calls; {{.Startup.GoVersion}} · {{.Startup.GOOS}}/{{.Startup.GOARCH}} · {{.Startup.CPUCount}} CPUs · commit {{.Startup.Commit}}</p></section>
+{{if .Cold}}<section class="panel"><h2>Cold process startup</h2><p class="muted">Real launch-to-exit time from an already-built executable; includes OS process boot, Go package initialization and NestGo runtime.New. It excludes compilation and network listening.</p><div class="metrics"><div class="metric"><strong>{{printf "%.2f" .ColdMedianMS}} ms</strong><span>Cold median</span></div><div class="metric"><strong>{{printf "%.2f" .ColdP95MS}} ms</strong><span>Cold p95</span></div><div class="metric"><strong>{{len .Cold.SamplesNS}}</strong><span>Process launches</span></div></div><p class="muted">Commit {{.Cold.Commit}} · {{.Cold.GoVersion}} · {{.Cold.GOOS}}/{{.Cold.GOARCH}}</p></section>{{end}}
+{{if .Scale}}<section class="panel"><h2>Startup by provider count</h2><p class="muted">Synthetic fixture: distinct providers without injected fields or HTTP routes. Warm runtime.New; numbers are measured and not deterministic.</p><table><thead><tr><th>Providers</th><th>Median (µs)</th><th>p95 (µs)</th><th>Bytes/op</th><th>Allocs/op</th></tr></thead><tbody>{{range .Scale}}<tr><td>{{.Providers}}</td><td>{{printf "%.2f" (micro .Startup.MedianNS)}}</td><td>{{printf "%.2f" (micro .Startup.P95NS)}}</td><td>{{.Startup.BytesPerOp}}</td><td>{{.Startup.AllocsPerOp}}</td></tr>{{end}}</tbody></table></section>{{end}}
 <section class="panel"><h2>Circular and unresolved dependencies</h2>
 {{if .Graph.Cycles}}<ul>{{range .Graph.Cycles}}<li class="warning"><code>{{join . " · "}}</code></li>{{end}}</ul>{{else}}<p>No cycles found in the modeled provider graph.</p>{{end}}
 {{if .Graph.Findings}}<table><thead><tr><th>Type</th><th>Provider</th><th>Field</th><th>Details</th></tr></thead><tbody>{{range .Graph.Findings}}<tr><td>{{.Kind}}</td><td><code>{{.Provider}}</code></td><td>{{.Field}}</td><td>{{.Details}}</td></tr>{{end}}</tbody></table>{{else}}<p>No unresolved, duplicate or ambiguous dependency findings.</p>{{end}}</section>
@@ -116,13 +120,21 @@ footer{margin-top:22px;color:#94a3b8;font-size:13px}
 
 func (r Report) HTML() ([]byte, error) {
 	data := struct {
-		Graph      Graph
-		Startup    Startup
-		MedianUS   float64
-		P95US      float64
-		GraphSVG   template.HTML
-		StartupSVG template.HTML
-	}{r.Graph, r.Startup, r.Startup.MedianNS / 1000, r.Startup.P95NS / 1000, graphSVG(r.Graph), startupSVG(r.Startup)}
+		Graph        Graph
+		Startup      Startup
+		MedianUS     float64
+		P95US        float64
+		GraphSVG     template.HTML
+		StartupSVG   template.HTML
+		Cold         *ProcessStartup
+		Scale        []ScaleStartup
+		ColdMedianMS float64
+		ColdP95MS    float64
+	}{r.Graph, r.Startup, r.Startup.MedianNS / 1000, r.Startup.P95NS / 1000, graphSVG(r.Graph), startupSVG(r.Startup), r.Cold, r.Scale, 0, 0}
+	if r.Cold != nil {
+		data.ColdMedianMS = r.Cold.MedianNS / 1e6
+		data.ColdP95MS = r.Cold.P95NS / 1e6
+	}
 	var out bytes.Buffer
 	err := htmlTemplate.Execute(&out, data)
 	return out.Bytes(), err
