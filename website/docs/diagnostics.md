@@ -62,3 +62,20 @@ Full module imports/exports validation, cold-process startup, large provider/rou
 The analyzer now produces `modules.json` and `modules.dot` alongside the provider graph. Explicit `metadata.Module.Imports` and `metadata.Module.Exports` describe directed module imports and exported provider types. It reports module cycles and missing or invalid references in the same HTML report.
 
 Existing `@Module("users")` generated metadata is compatible and appears as a module node. **The compiler does not yet generate imports/exports**, and runtime module visibility is not enforced; use explicit programmatic module metadata to model those relationships. See the [diagnostics GSD guide](https://github.com/kevenmiano/nestgo/blob/main/docs/DIAGNOSTICS.md).
+
+## Declare module relationships in `.mgo`
+
+```go
+@Injectable()
+type UsersService struct{}
+
+@Module("database")
+type DatabaseModule struct{}
+
+@Module("users")
+@Imports("DatabaseModule")
+@Exports("UsersService")
+type UsersModule struct{}
+```
+
+The compiler converts these decorators to typed `metadata.Module.Imports` and `.Exports`, with deterministic ordering and compile-time validation. References are limited to modules and providers declared in the same Go package; cross-package imports and runtime enforcement of module visibility are not yet supported. The legacy `@Module("name")` form remains compatible.
