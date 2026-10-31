@@ -1,10 +1,15 @@
 name: Sync NestGo issues to GitHub Project
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/project-sync.yml'
+      - '.github/scripts/project-sync-logic.cjs'
   issues:
     types: [opened, reopened, edited, closed, labeled, unlabeled, milestoned, demilestoned]
   pull_request_target:
-    types: [opened, reopened, edited, ready_for_review, closed]
+    types: [opened, reopened, edited, ready_for_review, converted_to_draft, closed]
   workflow_dispatch:
     inputs:
       backfill:
@@ -26,6 +31,11 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          # pull_request_target must never check out untrusted PR head code.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
       - name: Synchronize issue metadata and status
         uses: actions/github-script@v7
         env:
@@ -34,12 +44,14 @@ jobs:
         with:
           github-token: ${{ secrets.PROJECTS_TOKEN }}
           script: |
+            const { parseMetadata, parsePrReferences, issueStatus, prStatus } =
+              require('./.github/scripts/project-sync-logic.cjs');
             const owner = process.env.PROJECT_OWNER;
             const number = Number(process.env.PROJECT_NUMBER);
             const repo = context.repo;
             const definitions = {
               Priority: ["P0", "P1", "P2"],
-              Milestone: ["M001", "M002", "M003", "M004", "M005", "M006"]
+              Roadmap: ["M001", "M002", "M003", "M004", "M005", "M006"]
             };
             const projectData = await github.graphql(`
               query($login: String!, $number: Int!) {
@@ -86,17 +98,6 @@ jobs:
               });
               fields.set(name, created.createProjectV2Field.projectV2Field);
             }
-            const extract = (body, key) => {
-              const match = (body || "").match(new RegExp("^\\*\\*" + key + ":\\*\\*\\s*([^\\r\\n]+)", "mi"));
-              return match ? match[1].trim() : null;
-            };
-            const parseMetadata = body => {
-              const milestoneText = extract(body, "Roadmap") || extract(body, "Milestone") || "";
-              const priorityText = extract(body, "Priority") || "";
-              const milestone = milestoneText.match(/\bM00[1-6]\b/)?.[0] || null;
-              const priority = priorityText.match(/\bP[012]\b/)?.[0] || null;
-              return {milestone, priority};
-            };
             const getOption = (fieldName, value) =>
               fields.get(fieldName)?.options?.find(o => o.name.toLowerCase() === value.toLowerCase())?.id;
             const updateSelect = async (item, fieldName, value) => {
@@ -124,11 +125,11 @@ jobs:
               const metadata = parseMetadata(issue.body);
               if (status) await updateSelect(item, "Status", status);
               await updateSelect(item, "Priority", metadata.priority);
-              await updateSelect(item, "Milestone", metadata.milestone);
+              await updateSelect(item, "Roadmap", metadata.milestone);
               core.info("Synced #" + issue.number + " " + JSON.stringify(metadata) + (status ? " status=" + status : ""));
             };
-            if (context.eventName === "workflow_dispatch") {
-              if (context.payload.inputs?.backfill === "false") return;
+            if (context.eventName === "workflow_dispatch" || context.eventName === "push") {
+              if (context.eventName === "workflow_dispatch" && context.payload.inputs?.backfill === "false") return;
               const issues = await github.paginate(github.rest.issues.listForRepo, {
                 ...repo, state: "all", per_page: 100
               });
@@ -138,13 +139,22 @@ jobs:
               }
             } else if (context.eventName === "issues") {
               const issue = context.payload.issue;
-              await sync(issue, issue.state === "closed" ? "Done" : context.payload.action === "opened" ? "Backlog" : null);
+              await sync(issue, issueStatus(context.payload.action, issue.state));
             } else {
               const pr = context.payload.pull_request;
-              const numbers = [...new Set([...(pr.body || "").matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?)\s+#(\d+)/gi)].map(m => Number(m[1])))];
-              const status = pr.merged ? "Done" : pr.state === "closed" ? "Backlog" : "In Review";
-              for (const issue_number of numbers) {
+              const references = parsePrReferences(pr.body);
+              const hasInProgress = Boolean(getOption("Status", "In Progress"));
+              for (const [issue_number, closes] of references) {
                 const {data: issue} = await github.rest.issues.get({...repo, issue_number});
+                const status = prStatus({
+                  issueState: issue.state,
+                  prState: pr.state,
+                  merged: pr.merged,
+                  draft: pr.draft,
+                  closes,
+                  hasInProgress
+                });
                 await sync(issue, status);
               }
             }
+
