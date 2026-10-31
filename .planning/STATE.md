@@ -96,3 +96,11 @@
 - **Execute:** `diagnostics/process.go`, CLI `-cold-samples` and `-scale`, HTML comparison table, CI verification and tests.
 - **Verify:** PR CI must show functional cold subprocess execution, scale fixture tests, graph correctness and no invented performance thresholds.
 - **Review/Ship:** Real application HTTP readiness, module import/export analysis and representative benchmark matrix remain pending on #36–#38.
+
+## Real-application diagnostics bridge — GSD
+
+- **Discuss:** The prior CLI only accepted `-example`; a separately installed CLI cannot discover the consumer's Go type metadata without linking the application package.
+- **Plan:** Add `nestgo diagnose -app <importable-package>` using a temporary Go runner that imports generated registration, with no application source changes.
+- **Execute:** Resolve the target via `go list`, compile an ephemeral runner, inspect real `metadata.All()`, measure warm startup and linked-process cold startup, export JSON/DOT/HTML.
+- **Verify:** CI diagnoses `./examples/shop` and checks that `UsersService` appears in the graph; Go quality and Docusaurus checks gate merging.
+- **Review/Ship:** Module import/export graph edges remain unavailable in the current metadata contract; track in #10, #11 and #36. The import-time execution of application `init()` is explicitly documented.
