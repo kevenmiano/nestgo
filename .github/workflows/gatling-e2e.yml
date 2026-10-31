@@ -1,0 +1,56 @@
+name: Gatling HTTP E2E performance
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'performance/gatling/**'
+      - 'cmd/perfserver/**'
+      - '.github/workflows/gatling-e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build server
+        run: go build -o /tmp/nestgo-perf-server ./cmd/perfserver
+      - name: Install Gatling JS SDK
+        working-directory: performance/gatling
+        run: npm install --no-audit --no-fund
+      - name: Start NestGo fixture
+        run: |
+          /tmp/nestgo-perf-server -mode=nestgo > /tmp/nestgo-e2e-server.log 2>&1 &
+          echo $! > /tmp/nestgo-e2e-server.pid
+          for i in $(seq 1 50); do
+            if curl -fsS http://127.0.0.1:18080/users/ >/dev/null; then exit 0; fi
+            sleep 0.2
+          done
+          cat /tmp/nestgo-e2e-server.log
+          exit 1
+      - name: Gatling E2E smoke (local only)
+        working-directory: performance/gatling
+        env:
+          NESTGO_BASE_URL: http://127.0.0.1:18080
+          NESTGO_RATE: '10'
+          NESTGO_DURATION: '20'
+          NESTGO_WARMUP: '10'
+        run: npm run test:load
+      - name: Upload HTML reports and server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gatling-nestgo-e2e
+          path: |
+            performance/gatling/target/gatling/
+            /tmp/nestgo-e2e-server.log
+          if-no-files-found: warn
