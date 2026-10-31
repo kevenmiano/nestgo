@@ -51,3 +51,23 @@ Never log secrets or raw request bodies by default. Use level filtering in high-
 - Execute: logging API, adapters, examples and tests in this branch.
 - Verify: local package tests completed; repository CI/race tests and real runtime instrumentation pending.
 - Review/Ship: do not merge or close #50 until CI and review pass.
+
+## Automatic runtime diagnostics
+
+`runtime.New(...packages)` now emits lifecycle logs through the standard Go logger by default. For custom logging, use `runtime.NewWithOptions`:
+
+```go
+logger := logging.New(logging.Config{
+    Logger: logging.NewPretty(os.Stdout, true),
+    MinLevel: logging.LevelDebug,
+})
+handler, err := runtime.NewWithOptions(runtime.Options{
+    Logger: logger,
+    Debug: true,
+}, packages...)
+```
+
+Real events: NestFactory begins bootstrap, InstanceLoader tracks package/provider registration and dependency resolution, RoutesResolver registers controllers, RouterExplorer maps validated routes, NestApplication reports handler initialization. Provider instantiation detail is DEBUG. Timings are actual `time.Since` values, not samples or estimates.
+
+**Limits:** `runtime.New` returns an `http.Handler`; handler initialization is not HTTP listener readiness. Port bind, transport adapter lifecycle, graceful shutdown, request timing, failed bootstrap details for every validation path and complete module import/export graph need follow-up integration. `Debug` gates expensive detailed event creation; `MinLevel` still controls output. There is no promise of ordering for individual provider-resolution events from maps.
+
