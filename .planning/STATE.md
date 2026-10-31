@@ -88,3 +88,11 @@
 - **Execute:** `diagnostics/` package, JSON/DOT and standalone SVG HTML exports, `nestgo diagnose -example`, CI artifacts and reproducible instructions.
 - **Verify:** CI must test graph ordering, cycles, missing/ambiguous provider findings and the sample `runtime.New` timings. Measured latency is nondeterministic, so no fake baselines or absolute-ms gating.
 - **Review/Ship:** This initial iteration does not complete cold process startup profiling, module-level graphing or large-scale benchmark matrices; issues #36–#38 remain open until those acceptance criteria are met.
+
+## Diagnostics iteration — cold subprocess and scale (GSD)
+
+- **Discuss:** Initial report only measured warm `runtime.New` on a 3-provider example. A full process launch and provider scaling need distinct, honestly labeled measurements.
+- **Plan:** Extend the optional report with real fresh-process launch-to-exit samples and separate stable synthetic provider fixtures (1/10/100); preserve a deterministic graph JSON without timestamps.
+- **Execute:** `diagnostics/process.go`, CLI `-cold-samples` and `-scale`, HTML comparison table, CI verification and tests.
+- **Verify:** PR CI must show functional cold subprocess execution, scale fixture tests, graph correctness and no invented performance thresholds.
+- **Review/Ship:** Real application HTTP readiness, module import/export analysis and representative benchmark matrix remain pending on #36–#38.
