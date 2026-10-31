@@ -12,7 +12,7 @@ GitHub's native **Milestone** field is not necessarily a single-select. Do not o
 
 | Project field | Type | Options |
 | --- | --- | --- |
-| Status | Existing single-select | Backlog, In Review, Done; In Progress recommended |
+| Status | Existing single-select | The workflow supports common names including Todo, In Progress and Done; In Review is optional |
 | Priority | Custom single-select | P0, P1, P2 |
 | **Roadmap** | **Custom single-select** | M001, M002, M003, M004, M005, M006 |
 | Milestone | GitHub native | Not modified by this workflow |
@@ -38,14 +38,14 @@ For backward compatibility, `**Milestone:** M002` is also accepted as an **issue
 | Issue opened or reopened | Backlog |
 | Issue closed | Done |
 | Issue edited / backfill | Preserve existing Status |
-| PR opened / ready for review referencing an open issue | In Review |
+| PR opened / ready for review referencing an open issue | In Review if available; otherwise In Progress, or preserve the existing Status |
 | Draft PR | In Progress, if available |
 | Merged PR with `Refs #N` | In Progress, if available; **never Done** |
 | Merged PR with `Closes #N`, `Fixes #N`, or `Resolves #N` | Done |
 | PR closed without merge | In Progress, if available |
 | PR references an already closed issue | Done |
 
-If In Progress does not exist, the workflow preserves the existing Status rather than forcing Backlog. Explicit closing keywords take precedence over a plain reference. Use `Refs #N` for partial work and closing keywords only when the complete issue is delivered.
+Status labels are matched to existing Project options rather than created or renamed: Backlog can map to Todo, In Review can map to In Progress, and Done can map to Completed. If no safe match exists, the workflow logs a warning and preserves the existing Status. It never maps review or in-progress work to Done or Backlog. Explicit closing keywords take precedence over a plain reference. Use `Refs #N` for partial work and closing keywords only when the complete issue is delivered.
 
 ## Reconciliation
 
@@ -61,7 +61,8 @@ The M001–M006 values represent **groups, not dates**. A timeline requires expl
 - `Milestone must be a single-select field`: old workflow incorrectly collided with the native GitHub Milestone field. This fix uses Roadmap.
 - `Roadmap must be a single-select field`: inspect the existing Roadmap field in Project settings.
 - Project not found or permission denied: check `PROJECTS_TOKEN` and Project access.
-- Missing field option: add the expected option in Project settings.
+- Missing Priority or Roadmap option: add the expected option in Project settings.
+- Missing `In Review` Status: automatically map to `In Progress` if available; inspect the log for the chosen option. No Project Status options are changed automatically.
 - A successful CI build does not prove the Project was populated. Check the synchronization Action logs after merging.
 
 The sync changes custom field values only when matching metadata is present; removing an issue-body line does not clear the old Project value.
