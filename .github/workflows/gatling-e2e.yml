@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'performance/gatling/**'
+      - 'runtime/**'
+      - 'compiler/**'
+      - 'metadata/**'
+      - 'examples/shop/**'
       - 'cmd/perfserver/**'
       - '.github/workflows/gatling-e2e.yml'
 
@@ -62,6 +66,5 @@ jobs:
         with:
           name: gatling-nestgo-e2e-${{ github.sha }}
           path: |
-            performance/gatling/target/gatling/
-            performance/gatling/*.log
+            performance/gatling/results/
           if-no-files-found: warn
