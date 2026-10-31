@@ -1,8 +1,8 @@
-# HTTP engines (initial compatibility implementation)
+# HTTP platform adapters
 
-NestGo supports engine selection at application startup. The default is `fasthttp`;
-`net/http` remains available. Controller decorators, dependency injection and
-generated metadata are not configured per engine.
+NestGo's application-level API accepts a transport-independent `httpadapter.Adapter`.
+The default adapter is `platform/fasthttp`; the standard-library adapter is
+`platform/nethttp`. Custom engines can implement the same interface.
 
 ```go
 app, err := runtime.ApplicationFromRegistry(runtime.ApplicationOptions{}, "shop")
@@ -10,30 +10,38 @@ if err != nil { log.Fatal(err) }
 log.Fatal(app.Listen(":8080"))
 ```
 
-To explicitly select the Go standard HTTP engine:
+To explicitly select the standard library adapter:
 
 ```go
 app, err := runtime.ApplicationFromRegistry(
-    runtime.ApplicationOptions{Engine: runtime.EngineNetHTTP}, "shop",
+    runtime.ApplicationOptions{Adapter: nethttp.New()}, "shop",
 )
+if err != nil { log.Fatal(err) }
+log.Fatal(app.Listen(":8080"))
 ```
 
-**Important performance caveat:** this first implementation uses
-`fasthttpadaptor.NewFastHTTPHandler` to reuse the current `net/http` runtime.
-It is a working fasthttp server selection mechanism, **not yet a zero-copy
-native fasthttp execution path**. Conversion overhead must be measured.
-The public `runtime.New` and `runtime.FromRegistry` APIs remain compatible
-and return `http.Handler`. Application engines are selected on bootstrap,
-not switched while serving requests.
+Custom adapters must implement `Register(httpadapter.Route) error`,
+`Serve(net.Listener) error` and `Shutdown(context.Context) error`.
+`httpadapter.Context` abstracts request parsing and response writing.
+The application core performs controller/provider resolution once during
+bootstrap and registers handlers independently of platform.
 
-## Next milestones
+**Native fast path:** the fasthttp platform uses `fasthttp.RequestCtx`
+without `fasthttpadaptor`; the standard-library platform uses
+`http.ServeMux`. The initial fasthttp path matcher is linear in route count;
+it must be replaced with an indexed router and benchmarked before release.
 
-1. Extract precompiled controller invocation, route descriptors and bindings
-   from the `http.ServeMux` registration code.
-2. Implement a native `fasthttp.RequestCtx` router with identical route
-   matching, JSON body limits, status codes, params and query behavior.
-3. Add concurrent HTTP integration tests for both engines, startup benchmarks,
-   requests/sec, allocs/op and p95/p99 latency using Gatling.
-4. Add explicit engine feature capability checks (WebSocket, streaming,
-   multipart, context cancellation and middleware compatibility).
-5. Generate an up-to-date `go.sum` using `go mod tidy` before merging.
+**Backward compatibility:** `runtime.New` and `runtime.FromRegistry`
+continue to return `http.Handler`; these legacy APIs remain on net/http.
+The application-level API uses adapters. Not all net/http-specific middleware
+can operate unchanged on fasthttp; use platform-aware integration when needed.
+
+## Open verification work
+
+- Produce and commit `go.sum` with `go mod tidy` (network-enabled CI).
+- Run `go test ./...` and `go vet ./...` on Go 1.23.
+- Validate route precedence, 404/405, trailing slash, request-body limits,
+  response status and headers, and shutdown parity across engines.
+- Measure throughput, allocations, startup time and p95/p99 latency.
+- Replace runtime `reflect.Call` with generated invokers.
+- Document unsupported platform capabilities such as WebSocket and streaming.
