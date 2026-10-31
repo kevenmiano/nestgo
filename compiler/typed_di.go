@@ -67,22 +67,22 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 							continue
 						}
 					}
-					id, ok := field.Type.(*ast.Ident)
-					if !ok {
+					fieldType := info.TypeOf(field.Type)
+					if fieldType == nil {
 						continue
 					}
-					named := objects[id.Name]
-					if named == nil {
-						continue
-					}
-					iface, ok := named.Underlying().(*types.Interface)
+					iface, ok := types.Unalias(fieldType).Underlying().(*types.Interface)
 					if !ok {
 						continue
 					}
 					iface.Complete()
-					for _, moduleName := range sortedModuleContracts(modules) {
+					moduleNames := sortedModuleContracts(modules)
+					if len(moduleNames) == 0 {
+						moduleNames = []string{""} // legacy packages have no explicit modules
+					}
+					for _, moduleName := range moduleNames {
 						mod := modules[moduleName]
-						if !containsModuleType(mod.Providers, typ.Name.Name) && !containsModuleType(mod.Controllers, typ.Name.Name) {
+						if moduleName != "" && !containsModuleType(mod.Providers, typ.Name.Name) && !containsModuleType(mod.Controllers, typ.Name.Name) {
 							continue
 						}
 						visible := make(map[string]bool)
@@ -107,7 +107,7 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 						if len(candidates) == 1 {
 							continue
 						}
-						fieldName := id.Name
+						fieldName := types.TypeString(fieldType, func(p *types.Package) string { return p.Name() })
 						if len(field.Names) > 0 {
 							fieldName = field.Names[0].Name
 						}
@@ -115,7 +115,7 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 						if len(candidates) > 1 {
 							reason = "ambiguous"
 						}
-						return Diagnostic{File: fset.Position(field.Pos()).Filename, Line: fset.Position(field.Pos()).Line, Message: fmt.Sprintf("%s interface dependency %s.%s (%s) in module %s: candidates %v", reason, typ.Name.Name, fieldName, id.Name, moduleName, candidates)}
+						return Diagnostic{File: fset.Position(field.Pos()).Filename, Line: fset.Position(field.Pos()).Line, Message: fmt.Sprintf("%s interface dependency %s.%s (%s) in module %s: candidates %v", reason, typ.Name.Name, fieldName, fieldType.String(), moduleName, candidates)}
 					}
 				}
 			}
