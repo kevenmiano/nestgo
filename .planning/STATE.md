@@ -80,3 +80,11 @@
 - **Execute:** Add `.goreleaser.yaml`, GoReleaser GitHub Action v7, PR snapshot validation, [ADR 0001](../docs/adr/0001-goreleaser-distribution.md), and distribution guide updates.
 - **Verify:** Run `goreleaser check` and a no-publish cross-platform snapshot in CI. A live tagged GitHub Release is still required to confirm publication and consumer installs.
 - **Review/Ship:** Pending CI and PR review; issue #25 remains in progress.
+
+## Deterministic diagnostics and startup instrumentation — GSD
+
+- **Discuss:** Inspired by NestJS circular dependency diagnostics, prioritize a provider graph and measured Go-native startup performance; avoid claiming that the existing metadata contains a complete module graph.
+- **Plan:** Issue #36 dependency SCC/finding diagnostics; #37 warm-startup benchmarks; #38 unified offline visual report.
+- **Execute:** `diagnostics/` package, JSON/DOT and standalone SVG HTML exports, `nestgo diagnose -example`, CI artifacts and reproducible instructions.
+- **Verify:** CI must test graph ordering, cycles, missing/ambiguous provider findings and the sample `runtime.New` timings. Measured latency is nondeterministic, so no fake baselines or absolute-ms gating.
+- **Review/Ship:** This initial iteration does not complete cold process startup profiling, module-level graphing or large-scale benchmark matrices; issues #36–#38 remain open until those acceptance criteria are met.
