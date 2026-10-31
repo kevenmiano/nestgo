@@ -85,10 +85,10 @@ func BenchmarkBootstrapLogging(b *testing.B) {
 	}
 }
 
-type missingRequired struct { Dependency *lifecycleA }
-type optionalRequired struct { Dependency *lifecycleA `nestgo:"optional"` }
-type missingInterface interface { Missing() }
-type missingInterfaceProvider struct { Dependency missingInterface }
+type missingRequired struct{ Dependency *lifecycleA }
+type optionalRequired struct{ Dependency *lifecycleA `nestgo:"optional"` }
+type missingInterface interface{ Missing() }
+type missingInterfaceProvider struct{ Dependency missingInterface }
 
 func TestMissingRequiredDependencyBlocksBootstrap(t *testing.T) {
 	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*missingRequired)(nil))}}}
