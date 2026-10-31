@@ -267,7 +267,12 @@ func Generate(files []*File) ([]byte, error) {
 			for _, n := range exportNames {
 				exportsCode = append(exportsCode, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n))
 			}
-			modules = append(modules, fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)), Name:%q, Imports:[]reflect.Type{%s}, Exports:[]reflect.Type{%s}}`, d.Name, name, strings.Join(importsCode, ","), strings.Join(exportsCode, ",")))
+			if len(imports) == 0 && len(exports) == 0 {
+				// Preserve exact legacy generated metadata for plain @Module.
+				modules = append(modules, fmt.Sprintf(`{Type: reflect.TypeOf((*%s)(nil)), Name: %q}`, d.Name, name))
+			} else {
+				modules = append(modules, fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)), Name:%q, Imports:[]reflect.Type{%s}, Exports:[]reflect.Type{%s}}`, d.Name, name, strings.Join(importsCode, ","), strings.Join(exportsCode, ",")))
+			}
 		}
 	}
 	// Module metadata order must not depend on source-file enumeration.
