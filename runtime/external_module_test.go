@@ -21,11 +21,11 @@ func TestImportedModuleAcrossPackages(t *testing.T) {
 	root := reflect.TypeOf((*importedModuleRoot)(nil))
 	remote := metadata.Package{
 		Providers: []metadata.Provider{{Type: repo}},
-		Modules: []metadata.Module{{Type: external, Providers: []reflect.Type{repo}, Exports: []reflect.Type{repo}}},
+		Modules:   []metadata.Module{{Type: external, Providers: []reflect.Type{repo}, Exports: []reflect.Type{repo}}},
 	}
 	local := metadata.Package{
 		Providers: []metadata.Provider{{Type: service}},
-		Modules: []metadata.Module{{Type: root, Providers: []reflect.Type{service}, Imports: []reflect.Type{external}}},
+		Modules:   []metadata.Module{{Type: root, Providers: []reflect.Type{service}, Imports: []reflect.Type{external}}},
 	}
 	if _, err := New(remote, local); err != nil {
 		t.Fatal(err)
