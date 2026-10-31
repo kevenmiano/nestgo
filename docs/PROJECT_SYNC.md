@@ -37,13 +37,16 @@ For backward compatibility, `**Milestone:** M002` is also accepted as an **issue
 | --- | --- |
 | Issue opened or reopened | Backlog |
 | Issue closed | Done |
-| Issue edited / backfill | Preserve existing Status |
+| Issue edited | Preserve existing Status |
+| Backfill | Closed issues become Done; open issue statuses are preserved |
 | PR opened / ready for review referencing an open issue | In Review if available; otherwise In Progress, or preserve the existing Status |
 | Draft PR | In Progress, if available |
 | Merged PR with `Refs #N` | In Progress, if available; **never Done** |
-| Merged PR with `Closes #N`, `Fixes #N`, or `Resolves #N` | Done |
+| Merged PR with `Closes #N`, `Fixes #N`, or `Resolves #N` | Done **only if the GitHub issue is actually closed**; otherwise In Progress |
 | PR closed without merge | In Progress, if available |
 | PR references an already closed issue | Done |
+
+**Source of truth:** GitHub issue state, not PR text. A closing keyword alone cannot promote an open issue to Done. GitHub normally closes an issue via a qualifying merged PR targeting the default branch; if it remains open, investigate linkage/merge target or unmet acceptance criteria before manually closing it.
 
 Status labels are matched to existing Project options rather than created or renamed: Backlog can map to Todo, In Review can map to In Progress, and Done can map to Completed. If no safe match exists, the workflow logs a warning and preserves the existing Status. It never maps review or in-progress work to Done or Backlog. Explicit closing keywords take precedence over a plain reference. Use `Refs #N` for partial work and closing keywords only when the complete issue is delivered.
 
@@ -51,7 +54,7 @@ Status labels are matched to existing Project options rather than created or ren
 
 1. Merge the fix after the **Project sync policy tests** check passes.
 2. A push to main modifying the workflow or its logic **automatically triggers a backfill**. To retry, open **Actions → Sync NestGo issues to GitHub Project → Run workflow** with `backfill=true`.
-3. Verify that issues #10–#25 show the expected Roadmap and Priority selections, and existing statuses were preserved.
+3. Verify that issues #10–#25 show the expected Roadmap and Priority selections; closed issues are Done and open issue statuses remain preserved during backfill.
 4. Configure Kanban grouped by Status and a Roadmap/table view that displays the custom Roadmap field. Project views are not created by the workflow.
 
 The M001–M006 values represent **groups, not dates**. A timeline requires explicit dates; do not invent them.
