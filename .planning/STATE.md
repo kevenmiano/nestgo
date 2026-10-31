@@ -56,3 +56,11 @@
 - A PR opened after the Roadmap repair (run 41238977312) exposed a separate incompatible assumption: the board has no `In Review` status option.
 - Correction: reuse safe existing statuses instead of requiring `In Review`. The status mapping is tested against `Todo`, `In Progress` and `Done`, and logs missing options without mutating the Project field configuration.
 - Verify that both opening and merging a PR now complete the synchronization workflow; never mark `Refs #N` as Done.
+
+## GitHub Project Status compatibility — follow-up verification
+
+- **Failure:** run [41238977312](https://github.com/kevenmiano/nestgo/actions/runs/41238977312) failed on PR open with `Missing Status option In Review`.
+- **Root cause:** Project #2's actual Status options are `Todo`, `In Progress` and `Done`, rather than the workflow's former `In Review` assumption.
+- **Execute/Review:** PR #30 added safe Status aliases and regression coverage without changing the Project's field options.
+- **Verify:** Project policy tests [41239221015](https://github.com/kevenmiano/nestgo/actions/runs/41239221015) and Go quality gates [41239220984](https://github.com/kevenmiano/nestgo/actions/runs/41239220984) passed. Post-merge backfill [41239288817](https://github.com/kevenmiano/nestgo/actions/runs/41239288817) and merged-PR status reconciliation [41239289370](https://github.com/kevenmiano/nestgo/actions/runs/41239289370) passed. The PR merge reconciled issue #2 to In Progress, not Done.
+- **Ship:** PR #30 squash-merged as `bcc27ad7e7c9017467816e2c13545e333408b37b`. Kanban/Roadmap view configuration remains a manual review item.
