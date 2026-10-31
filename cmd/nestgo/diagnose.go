@@ -51,11 +51,12 @@ func diagnose(args []string) error {
 	}
 	pkg := samplePackage()
 	graph := diagnostics.Analyze(pkg)
+	modules := diagnostics.AnalyzeModules(pkg)
 	startup, err := diagnostics.MeasureStartup("built-in sample (3 providers, 1 route)", []metadata.Package{pkg}, *samples, *iterations, os.Getenv("GITHUB_SHA"))
 	if err != nil {
 		return err
 	}
-	report := diagnostics.Report{Graph: graph, Startup: startup}
+	report := diagnostics.Report{Graph: graph, Modules: modules, Startup: startup}
 	if *coldSamples > 0 {
 		binary, err := os.Executable()
 		if err != nil {
@@ -89,6 +90,8 @@ func diagnose(args []string) error {
 	}{
 		{"report.json", report.JSON},
 		{"graph.json", graph.JSON},
+		{"modules.json", modules.JSON},
+		{"modules.dot", func() ([]byte, error) { return []byte(modules.DOT()), nil }},
 		{"graph.dot", func() ([]byte, error) { return []byte(graph.DOT()), nil }},
 		{"report.html", report.HTML},
 	} {
@@ -101,7 +104,7 @@ func diagnose(args []string) error {
 		}
 	}
 	fmt.Printf("NestGo diagnostics: %s (warm median %.2f µs; p95 %.2f µs; %d allocs/op)\n", filepath.Join(*out, "report.html"), startup.MedianNS/1000, startup.P95NS/1000, startup.AllocsPerOp)
-	if *strict && (len(graph.Cycles) > 0 || len(graph.Findings) > 0) {
+	if *strict && (len(graph.Cycles) > 0 || len(graph.Findings) > 0 || len(modules.Cycles) > 0 || len(modules.Findings) > 0) {
 		return errors.New("strict diagnostics found cyclic or unresolved dependencies")
 	}
 	return nil

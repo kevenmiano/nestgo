@@ -104,3 +104,11 @@
 - **Execute:** Resolve the target via `go list`, compile an ephemeral runner, inspect real `metadata.All()`, measure warm startup and linked-process cold startup, export JSON/DOT/HTML.
 - **Verify:** CI diagnoses `./examples/shop` and checks that `UsersService` appears in the graph; Go quality and Docusaurus checks gate merging.
 - **Review/Ship:** Module import/export graph edges remain unavailable in the current metadata contract; track in #10, #11 and #36. The import-time execution of application `init()` is explicitly documented.
+
+## Module graph diagnostics — GSD iteration
+
+- **Discuss:** `metadata.Module` originally held only Type and Name; module import/export edges were unavailable, so the report could not responsibly claim cross-module cycle detection.
+- **Plan:** Add backwards-compatible `Imports []reflect.Type` and `Exports []reflect.Type`, canonical module graph export, Tarjan SCC, and strict validation of missing/unknown metadata.
+- **Execute:** `diagnostics/modules.go`, `modules.json`/`modules.dot`, unified HTML and CI fixtures. Keep legacy compiler generated metadata compiling.
+- **Verify:** Require shuffled-order stable JSON/DOT, cyclic and self imports, missing modules, unknown exports and real `UsersModule` generated metadata in Actions.
+- **Review/Ship:** The compiler still emits `@Module` Type/Name only; module visibility and export enforcement in runtime are deferred to #10/#11/#36. PR merge requires green CI.

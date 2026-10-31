@@ -39,6 +39,8 @@ jobs:
           test -s diagnostics-output/report.html
           test -s diagnostics-output/graph.dot
           test -s diagnostics-output/graph.json
+          test -s diagnostics-output/modules.json
+          test -s diagnostics-output/modules.dot
           test -s diagnostics-output/report.json
           grep -q coldStartup diagnostics-output/report.json
           grep -q '"providers": 100' diagnostics-output/report.json
@@ -49,6 +51,8 @@ jobs:
           go run ./cmd/nestgo diagnose -app ./examples/shop -out diagnostics-app-output -samples 4 -iterations 20 -cold-samples 2 -strict
           test -s diagnostics-app-output/report.html
           test -s diagnostics-app-output/graph.json
+          test -s diagnostics-app-output/modules.json
+          grep -q UsersModule diagnostics-app-output/modules.json
           grep -q UsersService diagnostics-app-output/graph.json
           grep -q '"coldStartup"' diagnostics-app-output/report.json
       - name: Upload diagnostic report
