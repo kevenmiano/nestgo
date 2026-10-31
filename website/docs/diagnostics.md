@@ -56,3 +56,9 @@ The HTML includes real **cold subprocess** median/p95 times measured from proces
 ## Planned improvements
 
 Full module imports/exports validation, cold-process startup, large provider/route benchmark matrices and expanded CLI discovery are tracked in [#36](https://github.com/kevenmiano/nestgo/issues/36), [#37](https://github.com/kevenmiano/nestgo/issues/37) and [#38](https://github.com/kevenmiano/nestgo/issues/38).
+
+## Module dependency graph
+
+The analyzer now produces `modules.json` and `modules.dot` alongside the provider graph. Explicit `metadata.Module.Imports` and `metadata.Module.Exports` describe directed module imports and exported provider types. It reports module cycles and missing or invalid references in the same HTML report.
+
+Existing `@Module("users")` generated metadata is compatible and appears as a module node. **The compiler does not yet generate imports/exports**, and runtime module visibility is not enforced; use explicit programmatic module metadata to model those relationships. See the [diagnostics GSD guide](https://github.com/kevenmiano/nestgo/blob/main/docs/DIAGNOSTICS.md).
