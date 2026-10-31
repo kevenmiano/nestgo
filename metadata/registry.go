@@ -33,6 +33,8 @@ type Module struct {
 	Type    reflect.Type
 	Name    string
 	Imports []reflect.Type
+	Providers []reflect.Type
+	Controllers []reflect.Type
 	Exports []reflect.Type
 }
 type Package struct {
