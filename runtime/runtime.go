@@ -1,19 +1,35 @@
 package runtime
 import(
+"context"
 "encoding/json"
+"log/slog"
+"time"
+"github.com/kevenmiano/nestgo/logging"
 "fmt"
 "net/http"
 "reflect"
 "strings"
 "github.com/kevenmiano/nestgo/metadata"
 )
-func New(packages ...metadata.Package)(http.Handler,error){
+func New(packages ...metadata.Package)(http.Handler,error){return NewWithOptions(Options{},packages...)}
+// Options controls framework lifecycle diagnostics without affecting request handling.
+type Options struct { Logger *logging.Service; Debug bool }
+func NewWithOptions(options Options,packages ...metadata.Package)(http.Handler,error){
+ logger:=options.Logger
+ if logger==nil {logger=logging.New(logging.Config{MinLevel:logging.LevelInfo})}
+ ctx:=context.Background()
+ boot:=time.Now()
+ logger.Info(ctx,"NestFactory","Starting NestGo application...")
+ logDebug:=func(component,message string,attrs ...slog.Attr){if options.Debug{logger.Debug(ctx,component,message,attrs...)}}
+
  providers:=map[reflect.Type]reflect.Value{};controllers:=[]metadata.Controller{}
  for _,pkg:=range packages{
+ moduleStart:=time.Now()
  for _,p:=range pkg.Providers{if p.Type.Kind()!=reflect.Ptr||p.Type.Elem().Kind()!=reflect.Struct{return nil,fmt.Errorf("provider must be pointer to struct: %v",p.Type)}
  if _,exists:=providers[p.Type];exists{return nil,fmt.Errorf("duplicate provider: %v",p.Type)}
- providers[p.Type]=reflect.New(p.Type.Elem())
+ providers[p.Type]=reflect.New(p.Type.Elem());logDebug("InstanceLoader","Provider instantiated",slog.String("provider",p.Type.String()))
  };controllers=append(controllers,pkg.Controllers...)
+ logger.Startup(ctx,"InstanceLoader","Package providers registered",moduleStart)
  }
  inject:=func(v reflect.Value)error{
  for i:=0;i<v.Elem().NumField();i++{
@@ -24,11 +40,14 @@ func New(packages ...metadata.Package)(http.Handler,error){
  if ok{f.Set(dep)}
  };return nil
  }
- for _,v:=range providers{if err:=inject(v);err!=nil{return nil,err}}
+ diStart:=time.Now()
+ for _,v:=range providers{if err:=inject(v);err!=nil{logger.Error(ctx,"InstanceLoader","Provider injection failed",slog.String("error",err.Error()));return nil,err}}
+ logger.Startup(ctx,"InstanceLoader","Provider dependencies resolved",diStart)
  mux:=http.NewServeMux();seen:=map[string]bool{}
  for _,c:=range controllers{
  if c.Type.Kind()!=reflect.Ptr||c.Type.Elem().Kind()!=reflect.Struct{return nil,fmt.Errorf("invalid controller %v",c.Type)}
  instance:=reflect.New(c.Type.Elem());if err:=inject(instance);err!=nil{return nil,err}
+ logger.Info(ctx,"RoutesResolver","Controller registered",slog.String("controller",c.Type.String()),slog.String("prefix",c.Prefix))
  for _,route:=range c.Routes{
  method:=instance.MethodByName(route.Handler);if !method.IsValid(){return nil,fmt.Errorf("missing handler %s.%s",c.Type,route.Handler)}
  typ:=method.Type()
@@ -58,8 +77,10 @@ func New(packages ...metadata.Package)(http.Handler,error){
  status:=spec.Status;if status==0{if spec.Method=="POST"{status=201}else{status=200}}
  w.Header().Set("Content-Type","application/json");w.WriteHeader(status);_ = json.NewEncoder(w).Encode(results[0].Interface())
  })
+ logger.Info(ctx,"RouterExplorer","Mapped route",slog.String("method",route.Method),slog.String("path",path))
  }
  }
+ logger.Startup(ctx,"NestApplication","Application handler initialized",boot)
  return mux,nil
 }
 func FromRegistry(names ...string)(http.Handler,error){pkgs:=make([]metadata.Package,0,len(names));for _,name:=range names{p,ok:=metadata.Lookup(name);if !ok{return nil,fmt.Errorf("metadata package not found: %s",name)};pkgs=append(pkgs,p)};return New(pkgs...)}
