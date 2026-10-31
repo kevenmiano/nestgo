@@ -205,6 +205,9 @@ func Generate(files []*File) ([]byte, error) {
 			}
 		}
 	}
+	if err := validateRequiredConcreteDependencies(files, providerNames, controllers); err != nil {
+		return nil, err
+	}
 	// Resolve module references after collecting all decorated types across files.
 	for _, f := range files {
 		for _, d := range f.Declarations {
