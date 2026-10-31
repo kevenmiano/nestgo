@@ -1,4 +1,22 @@
+<div align="center">
+
+<img src="website/static/img/nestgo-mascot.svg" alt="NestGo mascot" width="150" />
+
 # NestGo
+
+**Structured applications. Native Go.**
+
+*Independent project inspired by NestJS and built with Go; not affiliated with either project.*
+
+[![Go quality gates](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml)
+[![Documentation site](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml)
+[![Go version](https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white)](go.mod)
+[![Status](https://img.shields.io/badge/status-experimental-orange)](https://github.com/kevenmiano/nestgo/issues)
+[![GitHub Project](https://img.shields.io/badge/roadmap-Project%20%232-ce0038)](https://github.com/users/kevenmiano/projects/2)
+
+[Documentation](website/docs/intro.md) · [Project roadmap](.planning/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+
+</div>
 
 **NestGo Compiler v3** is an experimental Go source-to-source compiler and HTTP runtime inspired by NestJS decorators. Write annotated `.mgo` files, generate standard Go source and route metadata, and serve requests with Go's `net/http`.
 
