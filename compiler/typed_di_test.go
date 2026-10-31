@@ -1,6 +1,8 @@
 package compiler
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -54,5 +56,32 @@ func TestTypedDIOptionalInterface(t *testing.T) {
 	}
 	if _, err := Generate([]*File{f}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestTypedDIFailsClosedOnTypeErrors(t *testing.T) {
+	f, err := Parse("invalid.mgo", []byte("package demo\n@Injectable()\ntype Service struct { Missing UnknownType }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Generate([]*File{f})
+	if err == nil || !strings.Contains(err.Error(), "type-check dependency graph") {
+		t.Fatalf("expected type-check failure, got %v", err)
+	}
+}
+
+func TestCompileDirDoesNotWriteOnTypeError(t *testing.T) {
+	dir := t.TempDir()
+	source := "package demo\n@Injectable()\ntype Service struct { Missing UnknownType }\n"
+	if err := os.WriteFile(filepath.Join(dir, "invalid.mgo"), []byte(source), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompileDir(dir); err == nil {
+		t.Fatal("expected compiler failure")
+	}
+	for _, name := range []string{"invalid_generated.go", "zz_modforge_metadata.go"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("unexpected generated artifact %s: %v", name, err)
+		}
 	}
 }

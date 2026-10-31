@@ -25,11 +25,14 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 	}
 	// Source may contain incomplete application code. Check declarations for
 	// reliable interfaces and implementations without requiring function bodies.
-	cfg := types.Config{Importer: importer.Default(), IgnoreFuncBodies: true, Error: func(error) {}}
+	cfg := types.Config{Importer: importer.Default(), IgnoreFuncBodies: true}
 	info := &types.Info{Defs: make(map[*ast.Ident]types.Object), Types: make(map[ast.Expr]types.TypeAndValue)}
-	pkg, _ := cfg.Check(files[0].Package, fset, parsed, info)
+	pkg, err := cfg.Check(files[0].Package, fset, parsed, info)
+	if err != nil {
+		return fmt.Errorf("type-check dependency graph: %w", err)
+	}
 	if pkg == nil {
-		return nil
+		return fmt.Errorf("type-check dependency graph: no package returned")
 	}
 	objects := make(map[string]*types.Named)
 	for _, name := range pkg.Scope().Names() {
