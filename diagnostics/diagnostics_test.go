@@ -58,7 +58,7 @@ func TestOfflineHTMLAndStartup(t *testing.T) {
 	r:=Report{Graph:Analyze(p),Startup:m}
 	content,err:=r.HTML()
 	if err!=nil {t.Fatal(err)}
-	for _,want:=range []string{"<svg","unit-test","Samples","deadbeef","Startup p95"} {
+	for _,want:=range []string{"<svg","unit-test","samples","deadbeef","Startup p95"} {
 		if !bytes.Contains(content,[]byte(want)) {t.Errorf("missing %q",want)}
 	}
 	j,err:=r.JSON()
