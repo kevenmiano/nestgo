@@ -71,7 +71,7 @@ A single GitHub **Release published** event for a valid root-module tag (for exa
 | --- | --- | --- |
 | Documentation | [docs-release.yml](../.github/workflows/docs-release.yml) | Builds tagged Docusaurus content; deploys GitHub Pages |
 | Go libraries | [go-packages.yml](../.github/workflows/go-packages.yml) | Validates `compiler`, `metadata`, `runtime`; builds and tests an external consumer against the exact module tag |
-| CLI / framework | [framework-release.yml](../.github/workflows/framework-release.yml) | Validates `go install .../cmd/nestgo@tag` and `modforge@tag`; creates Linux/macOS/Windows binaries and SHA256SUMS, attaches assets to the GitHub Release |
+| CLI / framework | [framework-release.yml](../.github/workflows/framework-release.yml) | Validates `go install .../cmd/nestgo@tag` and `modforge@tag`; uses GoReleaser OSS v2 to build Linux/macOS/Windows CLI archives, SHA-256 checksums, and attach them to the existing GitHub Release |
 
 **Go packages are published by pushing an immutable root-module version tag to GitHub.** There is no separate `npm publish`-style Go package upload. Go module proxies can resolve the tagged module and its public packages. The packages workflow acts as a **release conformance gate**, not as a nonexistent per-package registry push.
 
@@ -82,9 +82,13 @@ A single GitHub **Release published** event for a valid root-module tag (for exa
 - Versions must match `v0.x.y` or `v1.x.y` (optional prerelease suffix); the module does not yet support `v2` because Go requires a `/v2` module path for semantic import versioning.
 - A release tag must identify a commit reachable from `main`. Workflows verify this before checking out the immutable tagged commit.
 - Create and publish a GitHub Release from the same tag after Go and Docusaurus CI are green.
-- Release workflows can be rerun manually for an existing tag. The CLI workflow uses `--clobber` for reproducible asset refreshes, but tags themselves should never be moved.
+- Release workflows can be rerun manually for an existing tag. GoReleaser manages the existing release and its assets (`release.mode: keep-existing`). Tags themselves must never be moved; avoid re-running a published release unnecessarily.
 - The docs workflow requires repository **Settings → Pages → Build and deployment: GitHub Actions** and Pages deployment permissions.
-- CLI assets upload requires the release to exist and the Actions token to have `contents: write` (scoped to the CLI job).
+- The GoReleaser Action requires the published release to exist, full git history and a job-scoped Actions token with `contents: write`. GoReleaser itself performs archive creation, checksums, changelog and release asset upload. The Go 1.23 environment is configured separately via `actions/setup-go`.
+- The repository's tag-check script is intentionally retained only to verify the v0/v1 module major version and ancestry on `main`, not to implement build/release features.
+- PR CI validates `.goreleaser.yaml` with `goreleaser check` and builds no-publish snapshots with `goreleaser release --snapshot --clean`.
+- Supported CLI archive targets: Linux/macOS amd64+arm64 and Windows amd64+arm64; Windows uses ZIP, the other platforms use tar.gz. `cmd/modforge` remains available via `go install` but does not generate an additional release binary archive.
+- Decision record: [ADR 0001](adr/0001-goreleaser-distribution.md).
 - Package, CLI and docs pipelines are **operationally independent**: one may succeed while another fails. The release is fully verified only when all three are green.
 - Do **not** claim a release, GitHub Pages publication, Go proxy indexing or CLI installation has succeeded before the corresponding release jobs have run.
 

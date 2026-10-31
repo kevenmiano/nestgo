@@ -1,4 +1,4 @@
-name: NestGo framework — CLI release
+name: NestGo framework — GoReleaser
 
 on:
   release:
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   release-cli:
-    name: Install CLI and build platform binaries
+    name: Verify and publish NestGo CLI with GoReleaser
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -34,6 +34,7 @@ jobs:
         id: version
         env:
           RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+        shell: bash
         run: |
           bash .github/scripts/verify-release-tag.sh "$RELEASE_TAG"
           git checkout --detach "refs/tags/$RELEASE_TAG"
@@ -43,13 +44,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Test framework from the released commit
+      - name: Test released source
         run: |
           go test ./...
           go vet ./...
-          go build ./cmd/nestgo ./cmd/modforge
 
-      - name: Smoke-test go install with the versioned module
+      - name: Smoke-test versioned Go installation
         shell: bash
         env:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
@@ -64,32 +64,12 @@ jobs:
           "$RUNNER_TEMP/nestgo-bin/nestgo" compile ./examples/shop
           git diff --exit-code -- examples/shop
           test -z "$(git ls-files --others --exclude-standard -- examples/shop)"
-          echo "go install works for the released version $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Build downloadable CLI binaries
-        shell: bash
+      - name: Release archives and checksums with GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --clean
         env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          set -euo pipefail
-          mkdir -p dist
-          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
-            GOOS="${target%%/*}"
-            GOARCH="${target##*/}"
-            suffix=""
-            if [[ "$GOOS" == "windows" ]]; then suffix=".exe"; fi
-            output="dist/nestgo_${RELEASE_TAG}_${GOOS}_${GOARCH}${suffix}"
-            CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build -trimpath -ldflags="-s -w" -o "$output" ./cmd/nestgo
-          done
-          (cd dist && sha256sum nestgo_* > SHA256SUMS.txt)
-
-      - name: Attach CLI binaries to the existing GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
-          gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
-          echo "CLI assets uploaded for $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

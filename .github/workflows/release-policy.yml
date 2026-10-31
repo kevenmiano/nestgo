@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'cmd/nestgo/**'
+      - '.goreleaser.yaml'
       - '.github/scripts/verify-release-tag.sh'
       - '.github/workflows/framework-release.yml'
       - '.github/workflows/go-packages.yml'
@@ -14,6 +15,7 @@ on:
     branches: [main]
     paths:
       - 'cmd/nestgo/**'
+      - '.goreleaser.yaml'
       - '.github/scripts/verify-release-tag.sh'
       - '.github/workflows/framework-release.yml'
       - '.github/workflows/go-packages.yml'
@@ -56,3 +58,34 @@ jobs:
           "$GOBIN/nestgo" compile ./examples/shop
           git diff --exit-code -- examples/shop
           test -z "$(git ls-files --others --exclude-standard -- examples/shop)"
+
+  goreleaser:
+    name: Validate GoReleaser config and snapshot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Check GoReleaser configuration
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: check
+      - name: Build snapshot without publishing
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          args: release --snapshot --clean
+      - name: Verify archives and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/checksums.txt
+          test -s dist/artifacts.json
+          find dist -maxdepth 1 -name '*.tar.gz' -print | grep -q .
+          find dist -maxdepth 1 -name '*.zip' -print | grep -q .

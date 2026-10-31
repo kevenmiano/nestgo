@@ -17,7 +17,7 @@
 [![Status](https://img.shields.io/badge/status-experimental-orange)](https://github.com/kevenmiano/nestgo/issues)
 [![GitHub Project](https://img.shields.io/badge/roadmap-Project%20%232-ce0038)](https://github.com/users/kevenmiano/projects/2)
 
-[Documentation](website/docs/intro.md) · [Release publishing](docs/DOCS_SITE.md#release-tag-publishing-pipeline) · [Project roadmap](.planning/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Documentation](website/docs/intro.md) · [Release publishing](docs/DISTRIBUTION.md#three-independent-github-actions-release-workflows) · [Project roadmap](.planning/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -43,7 +43,7 @@ go get github.com/kevenmiano/nestgo@latest
 nestgo compile ./myapp
 ```
 
-The `compiler`, `runtime`, and `metadata` packages share one Go module and one version. `go install` installs the CLI; `go get` adds the library dependency to your application. These commands are intentionally separate. Releases must exist before `@latest` resolves a numbered version. See [Distribution and independent release pipelines](docs/DISTRIBUTION.md).
+The `compiler`, `runtime`, and `metadata` packages share one Go module and one version. `go install` installs the CLI; `go get` adds the library dependency to your application. These commands are intentionally separate. Releases must exist before `@latest` resolves a numbered version. See [Distribution and independent release pipelines](docs/DISTRIBUTION.md). The framework's release binaries and checksums are generated with [GoReleaser](https://goreleaser.com/), while Go module dependencies and documentation keep their own release workflows.
 
 ## Getting started
 
