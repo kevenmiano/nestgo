@@ -2,7 +2,7 @@ package metadata
 
 import ("fmt";"reflect";"sync")
 type Parameter struct {Index int;Kind string;Name string}
-type Route struct {Method,Path,Handler string;Status int;Parameters []Parameter}
+type Route struct {Method,Path,Handler string;Status int;Parameters []Parameter; StaticInvoke func(any)(any,error)}
 type Controller struct {Type reflect.Type;Prefix string;Routes []Route}
 type Provider struct {Type reflect.Type;Scope string}
 type Module struct {Type reflect.Type;Name string}
