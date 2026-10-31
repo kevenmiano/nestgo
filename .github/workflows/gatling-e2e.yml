@@ -27,24 +27,35 @@ jobs:
       - name: Install Gatling JS SDK
         working-directory: performance/gatling
         run: npm install --no-audit --no-fund
-      - name: Start NestGo fixture
-        run: |
-          /tmp/nestgo-perf-server -mode=nestgo > /tmp/nestgo-e2e-server.log 2>&1 &
-          echo $! > /tmp/nestgo-e2e-server.pid
-          for i in $(seq 1 50); do
-            if curl -fsS http://127.0.0.1:18080/users/ >/dev/null; then exit 0; fi
-            sleep 0.2
-          done
-          cat /tmp/nestgo-e2e-server.log
-          exit 1
-      - name: Gatling E2E smoke (local only)
+      - name: Compare identical HTTP endpoint across both runtimes
         working-directory: performance/gatling
         env:
           NESTGO_BASE_URL: http://127.0.0.1:18080
           NESTGO_RATE: '10'
           NESTGO_DURATION: '20'
           NESTGO_WARMUP: '10'
-        run: npm run test:load
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          for mode in nethttp nestgo; do
+            /tmp/nestgo-perf-server -mode="$mode" > "results/server-$mode.log" 2>&1 &
+            pid=$!
+            trap 'kill "$pid" 2>/dev/null || true' EXIT
+            ready=0
+            for i in $(seq 1 50); do
+              if curl -fsS http://127.0.0.1:18080/users/ >/dev/null; then ready=1; break; fi
+              sleep 0.2
+            done
+            if [ "$ready" != 1 ]; then cat "results/server-$mode.log"; exit 1; fi
+            npm run test:load
+            mkdir -p "results/$mode"
+            if [ -d target/gatling ]; then cp -R target/gatling "results/$mode/"; fi
+            kill "$pid"
+            wait "$pid" || true
+            trap - EXIT
+            rm -rf target/gatling
+            sleep 1
+          done
       - name: Upload HTML reports and server logs
         if: always()
         uses: actions/upload-artifact@v4
