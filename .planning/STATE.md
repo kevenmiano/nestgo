@@ -72,3 +72,11 @@
 - **Execute:** Add `cmd/nestgo`, package and framework release workflows, tag verification, installation guides and CI verification.
 - **Verify:** PR checks must pass before merging. No successful tagged CLI installation, release artifact upload or GitHub Pages deployment is claimed until a real GitHub Release triggers the corresponding workflows.
 - **Review/Ship:** Pending PR review, CI and first official release. GSD issue #25 remains open.
+
+## GoReleaser migration — GSD execution
+
+- **Discuss:** Custom platform loops, sha256sum and gh release upload duplicate GoReleaser OSS capabilities.
+- **Plan:** Preserve independent docs, libraries and framework workflows; replace only CLI packaging/upload with GoReleaser v2, keep tag ancestry and real go-install smoke checks.
+- **Execute:** Add `.goreleaser.yaml`, GoReleaser GitHub Action v7, PR snapshot validation, [ADR 0001](../docs/adr/0001-goreleaser-distribution.md), and distribution guide updates.
+- **Verify:** Run `goreleaser check` and a no-publish cross-platform snapshot in CI. A live tagged GitHub Release is still required to confirm publication and consumer installs.
+- **Review/Ship:** Pending CI and PR review; issue #25 remains in progress.
