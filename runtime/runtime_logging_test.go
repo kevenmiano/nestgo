@@ -84,3 +84,34 @@ func BenchmarkBootstrapLogging(b *testing.B) {
 		})
 	}
 }
+
+type missingRequired struct { Dependency *lifecycleA }
+type optionalRequired struct { Dependency *lifecycleA `nestgo:"optional"` }
+type missingInterface interface { Missing() }
+type missingInterfaceProvider struct { Dependency missingInterface }
+
+func TestMissingRequiredDependencyBlocksBootstrap(t *testing.T) {
+	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*missingRequired)(nil))}}}
+	if _, err := NewWithOptions(Options{}, p); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+		t.Fatalf("expected missing dependency, got %v", err)
+	}
+}
+func TestOptionalDependencyAllowed(t *testing.T) {
+	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*optionalRequired)(nil))}}}
+	if _, err := NewWithOptions(Options{}, p); err != nil { t.Fatal(err) }
+}
+func TestMissingInterfaceBlocksBootstrap(t *testing.T) {
+	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*missingInterfaceProvider)(nil))}}}
+	if _, err := NewWithOptions(Options{}, p); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+		t.Fatalf("expected missing interface, got %v", err)
+	}
+}
+func TestNilMetadataDoesNotPanic(t *testing.T) {
+	cases := []metadata.Package{
+		{Providers: []metadata.Provider{{Type: nil}}},
+		{Controllers: []metadata.Controller{{Type: nil}}},
+	}
+	for _, p := range cases {
+		if _, err := NewWithOptions(Options{}, p); err == nil {t.Fatal("expected nil metadata error")}
+	}
+}
