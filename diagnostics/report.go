@@ -12,7 +12,7 @@ import (
 
 type Report struct {
 	Graph   Graph           `json:"graph"`
-	Modules ModuleGraph `json:"modules"`
+	Modules ModuleGraph     `json:"modules"`
 	Startup Startup         `json:"startup"`
 	Cold    *ProcessStartup `json:"coldStartup,omitempty"`
 	Scale   []ScaleStartup  `json:"scale,omitempty"`
