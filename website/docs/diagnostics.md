@@ -79,3 +79,21 @@ type UsersModule struct{}
 ```
 
 The compiler converts these decorators to typed `metadata.Module.Imports` and `.Exports`, with deterministic ordering and compile-time validation. References are limited to modules and providers declared in the same Go package; cross-package imports and runtime enforcement of module visibility are not yet supported. The legacy `@Module("name")` form remains compatible.
+
+## Declarative module configuration with type-reference arrays
+
+The preferred syntax is a **single** declarative module decorator, with actual type references rather than comma-separated strings:
+
+```go
+@Module({
+    name: "users",
+    imports: [DatabaseModule, CacheModule],
+    controllers: [UsersController],
+    providers: [UsersService],
+    exports: [UsersService],
+})
+type UsersModule struct{}
+```
+
+The .mgo compiler parses these arrays statically, validates local @Module/@Injectable/@Controller declarations, rejects quoted items, unknown or duplicate entries, and emits ordered typed reflect metadata. A provider listed in exports must also be in providers when the providers property is present. `@Module("users")` and the earlier `@Imports/@Exports` forms remain available for compatibility, but the new object syntax is the preferred design. Type references currently must be declared in the same Go package; cross-package selectors and runtime ownership enforcement are not implemented. The object is compile-time .mgo syntax, not ordinary Go source.
+
