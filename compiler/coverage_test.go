@@ -9,10 +9,10 @@ import (
 
 func TestDecoratorDiagnostics(t *testing.T) {
 	tests := []struct {
-		name string
-		source string
+		name    string
+		source  string
 		message string
-		line int
+		line    int
 	}{
 		{"unknown", "package demo\n@Unknown()\ntype A struct{}\n", "unknown decorator", 2},
 		{"dangling", "package demo\n@Controller(\"/\")\n", "dangling decorator", 2},
@@ -25,7 +25,9 @@ func TestDecoratorDiagnostics(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := Parse("fixture.mgo", []byte(tt.source))
-			if err == nil { t.Fatal("expected diagnostic") }
+			if err == nil {
+				t.Fatal("expected diagnostic")
+			}
 			var d Diagnostic
 			if !errors.As(err, &d) {
 				t.Fatalf("expected Diagnostic, got %T: %v", err, err)
@@ -39,8 +41,8 @@ func TestDecoratorDiagnostics(t *testing.T) {
 
 func TestGenerationValidation(t *testing.T) {
 	tests := []struct {
-		name string
-		source string
+		name    string
+		source  string
 		message string
 	}{
 		{"orphan route", "package demo\ntype A struct{}\n@Get(\"/\")\nfunc (a *A) List() {}\n", "not decorated with @Controller"},
@@ -65,19 +67,33 @@ func TestGenerationValidation(t *testing.T) {
 
 func TestGenerateMultiFileDeterministic(t *testing.T) {
 	first, err := Parse("a.mgo", []byte("package demo\n@Controller(\"/alpha\")\ntype Alpha struct{}\n@Get(\"/\")\nfunc (a *Alpha) List() string { return \"ok\" }\n"))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	second, err := Parse("b.mgo", []byte("package demo\n@Injectable()\ntype Provider struct{}\n@Module(\"app\")\ntype App struct{}\n"))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	out, err := Generate([]*File{first, second})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	repeated, err := Generate([]*File{first, second})
-	if err != nil { t.Fatal(err) }
-	if !bytes.Equal(out, repeated) { t.Fatal("generated output is not deterministic") }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(out, repeated) {
+		t.Fatal("generated output is not deterministic")
+	}
 	for _, expected := range []string{"Alpha", "Provider", "App", "/alpha", "List"} {
-		if !bytes.Contains(out, []byte(expected)) { t.Errorf("missing %q in output", expected) }
+		if !bytes.Contains(out, []byte(expected)) {
+			t.Errorf("missing %q in output", expected)
+		}
 	}
 	other, err := Parse("other.mgo", []byte("package other\ntype Other struct{}\n"))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := Generate([]*File{first, other}); err == nil || !strings.Contains(err.Error(), "mixed packages") {
 		t.Fatalf("expected mixed-package error, got %v", err)
 	}
@@ -86,10 +102,16 @@ func TestGenerateMultiFileDeterministic(t *testing.T) {
 func TestParameterDecorators(t *testing.T) {
 	src := "package demo\n@Controller(\"/\")\ntype A struct{}\n@Post(\"/\")\nfunc (a *A) Create(@Param(\"id\") id string, @Query(\"q\") q string, @Headers(\"x-test\") header string, @Body() body string) {}\n"
 	file, err := Parse("params.mgo", []byte(src))
-	if err != nil { t.Fatal(err) }
-	if len(file.Declarations) != 2 { t.Fatalf("unexpected declarations: %+v", file.Declarations) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(file.Declarations) != 2 {
+		t.Fatalf("unexpected declarations: %+v", file.Declarations)
+	}
 	params := file.Declarations[1].Params
-	if len(params) != 4 { t.Fatalf("expected four parameter decorators, got %+v", params) }
+	if len(params) != 4 {
+		t.Fatalf("expected four parameter decorators, got %+v", params)
+	}
 	kinds := []string{"Param", "Query", "Headers", "Body"}
 	names := []string{"id", "q", "x-test", ""}
 	for i, param := range params {
