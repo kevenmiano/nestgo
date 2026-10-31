@@ -16,10 +16,10 @@ const config = {
     theme: {customCss: require.resolve('./src/css/custom.css')}
   }]],
   themeConfig: {
-    image: 'img/nestgo-mark.svg',
+    image: 'img/favicon.svg',
     navbar: {
       title: 'NestGo',
-      logo: {alt: 'NestGo mark', src: 'img/nestgo-mark.svg'},
+      
       items: [
         {to: '/docs/intro', label: 'Documentation', position: 'left'},
         {to: '/docs/roadmap', label: 'Roadmap', position: 'left'},
