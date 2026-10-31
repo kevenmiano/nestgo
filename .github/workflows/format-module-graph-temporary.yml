@@ -1,0 +1,27 @@
+name: Format module graph files (temporary)
+on:
+  push:
+    branches: [feat/diagnostics-module-graph]
+    paths: ['.github/workflows/format-module-graph-temporary.yml']
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/diagnostics-module-graph
+      - name: Apply gofmt to changed Go files
+        shell: bash
+        run: |
+          set -euo pipefail
+          gofmt -w metadata/registry.go diagnostics/modules.go diagnostics/modules_test.go diagnostics/report.go diagnostics/registered.go cmd/nestgo/diagnose.go
+          git diff --check
+          if [[ -n "$(git status --porcelain -- metadata diagnostics cmd/nestgo)" ]]; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add metadata diagnostics cmd/nestgo
+            git commit -m 'style(diagnostics): gofmt module graph implementation'
+            git push origin HEAD:feat/diagnostics-module-graph
+          fi
