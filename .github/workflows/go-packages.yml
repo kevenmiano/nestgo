@@ -1,0 +1,103 @@
+name: Go packages — verify and publish
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'go.mod'
+      - 'compiler/**'
+      - 'runtime/**'
+      - 'metadata/**'
+      - 'cmd/nestgo/**'
+      - '.github/scripts/verify-release-tag.sh'
+      - '.github/workflows/go-packages.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'go.mod'
+      - 'compiler/**'
+      - 'runtime/**'
+      - 'metadata/**'
+      - 'cmd/nestgo/**'
+      - '.github/scripts/verify-release-tag.sh'
+      - '.github/workflows/go-packages.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to verify (v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  packages:
+    name: Verify compiler, runtime and metadata packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release and check out tagged source
+        if: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' }}
+        id: version
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+        run: |
+          bash .github/scripts/verify-release-tag.sh "$RELEASE_TAG"
+          git checkout --detach "refs/tags/$RELEASE_TAG"
+
+      - name: Check out pull request source for non-release CI
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          git fetch --no-tags origin "${{ github.event.pull_request.head.sha }}"
+          git checkout --detach "${{ github.event.pull_request.head.sha }}"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify packages and dependency graph
+        run: |
+          go list ./compiler ./runtime ./metadata
+          go test -race ./compiler ./runtime ./metadata
+          go vet ./compiler ./runtime ./metadata
+          go mod verify
+
+      - name: Check public module download and external imports
+        if: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' }}
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          GOPROXY: direct
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp="$(mktemp -d)"
+          cd "$temp"
+          go mod init example.com/nestgo-consumer-smoke
+          go get "github.com/kevenmiano/nestgo@$RELEASE_TAG"
+          cat > smoke_test.go <<'GO'
+          package smoke
+
+          import (
+            "testing"
+            "github.com/kevenmiano/nestgo/compiler"
+            "github.com/kevenmiano/nestgo/metadata"
+            "github.com/kevenmiano/nestgo/runtime"
+          )
+
+          func TestPublicPackages(t *testing.T) {
+            _ = compiler.Parse
+            _ = metadata.Lookup
+            _ = runtime.New
+          }
+          GO
+          go test ./...
+          echo "Packages are importable from the released module $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
