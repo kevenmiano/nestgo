@@ -102,5 +102,5 @@ jobs:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
           echo "### NestGo documentation published" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Release: `$TAG`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release: $TAG" >> "$GITHUB_STEP_SUMMARY"
           echo "- Website: $PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
