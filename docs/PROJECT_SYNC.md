@@ -1,41 +1,50 @@
-# GitHub Project #2 synchronization
+# GitHub Project #2 — automated metadata synchronization
 
-The workflow [`project-sync.yml`](../.github/workflows/project-sync.yml) synchronizes NestGo issues with the user-owned GitHub Project at https://github.com/users/kevenmiano/projects/2.
+[Project #2](https://github.com/users/kevenmiano/projects/2) is synchronized from NestGo repository issues by [project-sync.yml](../.github/workflows/project-sync.yml).
 
-## One-time authorization
+## Authentication
 
-Create a **classic personal access token** for the `kevenmiano` account with the `project` scope. This is necessary because the default repository `GITHUB_TOKEN` does not provide the required user-project permissions. Use the narrowest possible lifetime and rotate it periodically.
+Configure the repository Actions secret `PROJECTS_TOKEN` using a GitHub classic PAT owned by a user with access to Project #2 and the `project` scope. Do not commit the token. The workflow uses metadata only and does not check out PR code.
 
-1. Open GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic).
-2. Generate a token with the `project` scope.
-3. In `kevenmiano/nestgo`, open Settings → Secrets and variables → Actions.
-4. Create a repository secret named **`PROJECTS_TOKEN`** with that token.
-5. Confirm the Project #2 has a single-select **Status** field and options named exactly **Backlog**, **In Review**, and **Done** (other columns may coexist).
-6. Open Actions → **Sync NestGo issues to GitHub Project** → Run workflow, with **backfill** enabled.
+## Source of truth
 
-Never commit a token, paste it in an issue, or send it through chat.
+Issue descriptions contain these exact metadata lines:
 
-## Events and behavior
+```md
+**Roadmap:** M002 — Core architecture
+**Priority:** P0
+**GSD status:** Backlog
+```
 
-| Trigger | Effect |
+The workflow extracts the milestone identifier `M001`–`M006` from `**Roadmap:**` or `**Milestone:**`, and priority `P0`–`P2` from `**Priority:**`. It creates missing **Milestone** and **Priority** single-select fields and options when possible. Existing fields must be single-select with the matching options; an incompatible field fails loudly instead of silently corrupting the board. The existing **Status** field must offer `Backlog`, `In Review` and `Done`.
+
+| Event | Action |
 | --- | --- |
-| Issue opened/reopened | Add issue to project and set Backlog |
-| Pull request opened/reopened/ready for review | Set linked issues to In Review |
-| Pull request merged | Set linked issues to Done |
-| Pull request closed without merge | Return linked issues to Backlog |
-| Manual workflow dispatch | Import **all open issues** and set Backlog |
+| Issue opened | Add to project, set Backlog and sync metadata |
+| Issue edited, labeled, unlabeled or milestone changed | Sync metadata without resetting status |
+| Issue reopened | Sync metadata, preserve status |
+| Issue closed | Set Done and sync metadata |
+| PR opened/reopened/edited/ready for review | Set referenced issues In Review |
+| PR merged | Set referenced issues Done |
+| PR closed without merge | Set referenced issues Backlog |
+| Manual dispatch with backfill enabled | Import all repository issues and reconcile metadata, preserving existing Status |
 
-The PR body must reference local issues using `Closes #N`, `Fixes #N`, `Resolves #N`, or `Refs #N`. Only issues in the same repository are resolved.
+PR references in the description must use `Refs #N`, `Closes #N`, `Fixes #N`, or `Resolves #N`. References only in the GitHub sidebar are not detected.
 
-**Caveats:** Manual backfill resets the status of all open issues to Backlog. Avoid rerunning it after the board is actively managed. The workflow does not yet synchronize Priority, Phase, Milestone or estimates; these remain manual project fields. Issues linked only in GitHub's sidebar but not in the PR body are not detected. No code from pull requests is checked out or executed.
+## One-time setup
 
-## Troubleshooting
+1. Ensure `PROJECTS_TOKEN` is configured and Project #2 is accessible to its owner.
+2. Merge the workflow PR.
+3. Open **Actions → Sync NestGo issues to GitHub Project → Run workflow**, with `backfill=true`.
+4. Verify that issues #10–#25 have **Priority** and **Milestone** values. Check the workflow logs if not.
+5. In Project #2, create a **Kanban** view grouped by Status and a **Roadmap** or table view grouped/filtered by Milestone, showing Priority. Project views themselves are not created by this workflow.
 
-- **Missing secret:** GitHub GraphQL requests fail authentication; add `PROJECTS_TOKEN`.
-- **Project not found:** Confirm the token owner has access to user Project #2 and the `project` scope.
-- **Status missing:** Create the matching single-select Status option. The item is still added if a status option is missing.
-- **Issue not updated by PR:** Add a reference such as `Closes #5` to the PR description and reopen or update the PR through a supported trigger.
+The milestone values are release groups, **not dates**. A true GitHub Projects Roadmap timeline requires start/target date fields and scheduling decisions. Do not invent dates.
 
-## Security
+## Troubleshooting and limitations
 
-The workflow uses `pull_request_target` for metadata-only processing and never checks out or executes untrusted PR code. Keep the workflow permissions minimal, protect the default branch and limit who can edit workflows. Review any workflow changes before merging.
+- Missing or insufficient token: GraphQL authentication/authorization fails; rotate or fix `PROJECTS_TOKEN`.
+- Existing Priority/Milestone field has the wrong type or missing options: adjust it in Project settings.
+- A manually edited Project field can be overwritten on the next issue edit or backfill; **issue metadata is authoritative**.
+- The sync updates field values only when metadata is present; removing a metadata line does not clear the prior Project value.
+- GitHub Actions execution and board population must be verified after merging. No passing run or board configuration is claimed in this document.
