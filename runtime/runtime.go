@@ -46,7 +46,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	for _, pkg := range packages {
 		moduleStart := time.Now()
 		for _, p := range pkg.Providers {
-			if p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
+			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
 				return fail(fmt.Errorf("provider must be pointer to struct: %v", p.Type))
 			}
 			if _, exists := providers[p.Type]; exists {
@@ -79,9 +79,16 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 					}
 				}
 			}
-			if ok {
-				f.Set(dep)
+			if !ok {
+				if sf.Tag.Get("nestgo") == "optional" {
+					continue
+				}
+				return fmt.Errorf("missing required dependency %s.%s (%s)", v.Elem().Type(), sf.Name, f.Type())
 			}
+			if !dep.IsValid() || (dep.Kind() == reflect.Ptr && dep.IsNil()) {
+				return fmt.Errorf("nil dependency %s.%s (%s)", v.Elem().Type(), sf.Name, f.Type())
+			}
+			f.Set(dep)
 		}
 		return nil
 	}
@@ -89,7 +96,6 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	for _, providerType := range orderedProviders {
 		v := providers[providerType]
 		if err := inject(v); err != nil {
-			logger.Error(ctx, "InstanceLoader", "Provider injection failed", slog.String("error", err.Error()))
 			return fail(err)
 		}
 	}
@@ -98,7 +104,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	mux := http.NewServeMux()
 	seen := map[string]bool{}
 	for _, c := range controllers {
-		if c.Type.Kind() != reflect.Ptr || c.Type.Elem().Kind() != reflect.Struct {
+		if c.Type == nil || c.Type.Kind() != reflect.Ptr || c.Type.Elem().Kind() != reflect.Struct {
 			return fail(fmt.Errorf("invalid controller %v", c.Type))
 		}
 		instance := reflect.New(c.Type.Elem())
