@@ -201,11 +201,6 @@ func Generate(files []*File) ([]byte, error) {
 					providers = append(providers, fmt.Sprintf(`{Type: reflect.TypeOf((*%s)(nil)), Scope: "singleton"}`, d.Name))
 				case "Module":
 					moduleNames[d.Name] = true
-					name, err := arg(a, d.Name)
-					if err != nil {
-						return nil, err
-					}
-					_ = name // metadata generation is deferred until all declarations are collected
 				}
 			}
 		}
@@ -242,10 +237,13 @@ func Generate(files []*File) ([]byte, error) {
 			if len(imports) > 1 || len(exports) > 1 {
 				return nil, Diagnostic{f.Path, moduleAnnotation.Line, "only one @Imports and @Exports decorator allowed per module"}
 			}
-			name, err := arg(*moduleAnnotation, d.Name)
-			if err != nil {
-				return nil, Diagnostic{f.Path, moduleAnnotation.Line, err.Error()}
+			options, err := parseModuleOptions(f.Path, *moduleAnnotation, d.Name)
+			if err != nil {return nil,err}
+			if err := validateModuleOptions(f.Path, moduleAnnotation.Line, options, moduleNames, providerNames, controllerTypeNames(controllers)); err != nil {return nil,err}
+			if strings.HasPrefix(strings.TrimSpace(moduleAnnotation.Argument), "{") && (len(imports)>0 || len(exports)>0) {
+				return nil,Diagnostic{f.Path,moduleAnnotation.Line,"do not mix @Module({...}) with legacy @Imports/@Exports decorators"}
 			}
+			name := options.Name
 			var importNames, exportNames []string
 			if len(imports) > 0 {
 				importNames, err = moduleReferences(f.Path, imports[0], moduleNames, "module")
@@ -259,6 +257,8 @@ func Generate(files []*File) ([]byte, error) {
 					return nil, err
 				}
 			}
+			if options.Defined["imports"] {importNames=options.Imports}
+			if options.Defined["exports"] {exportNames=options.Exports}
 			importsCode := []string{}
 			for _, n := range importNames {
 				importsCode = append(importsCode, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n))
@@ -267,11 +267,16 @@ func Generate(files []*File) ([]byte, error) {
 			for _, n := range exportNames {
 				exportsCode = append(exportsCode, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n))
 			}
-			if len(imports) == 0 && len(exports) == 0 {
+			if len(imports) == 0 && len(exports) == 0 && !strings.HasPrefix(strings.TrimSpace(moduleAnnotation.Argument), "{") {
 				// Preserve exact legacy generated metadata for plain @Module.
 				modules = append(modules, fmt.Sprintf(`{Type: reflect.TypeOf((*%s)(nil)), Name: %q}`, d.Name, name))
 			} else {
-				modules = append(modules, fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)), Name:%q, Imports:[]reflect.Type{%s}, Exports:[]reflect.Type{%s}}`, d.Name, name, strings.Join(importsCode, ","), strings.Join(exportsCode, ",")))
+				providerCodes := []string{}
+				for _, n := range options.Providers { providerCodes=append(providerCodes,fmt.Sprintf("reflect.TypeOf((*%s)(nil))",n)) }
+				controllerCodes := []string{}
+				for _, n := range options.Controllers {controllerCodes=append(controllerCodes,fmt.Sprintf("reflect.TypeOf((*%s)(nil))",n))}
+				modules = append(modules, fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)), Name:%q, Imports:[]reflect.Type{%s}, Providers:[]reflect.Type{%s}, Controllers:[]reflect.Type{%s}, Exports:[]reflect.Type{%s}}`,
+					d.Name,name,strings.Join(importsCode,","),strings.Join(providerCodes,","),strings.Join(controllerCodes,","),strings.Join(exportsCode,",")))
 			}
 		}
 	}
@@ -369,6 +374,11 @@ func moduleReferences(path string, annotation Annotation, allowed map[string]boo
 	return names, nil
 }
 
+func controllerTypeNames(controllers map[string]string) map[string]bool {
+	result:=map[string]bool{}
+	for name:=range controllers {result[name]=true}
+	return result
+}
 func sortStrings(a []string) {
 	for i := 1; i < len(a); i++ {
 		for j := i; j > 0 && a[j] < a[j-1]; j-- {
