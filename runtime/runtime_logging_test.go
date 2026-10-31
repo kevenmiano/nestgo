@@ -86,7 +86,9 @@ func BenchmarkBootstrapLogging(b *testing.B) {
 }
 
 type missingRequired struct{ Dependency *lifecycleA }
-type optionalRequired struct{ Dependency *lifecycleA `nestgo:"optional"` }
+type optionalRequired struct {
+	Dependency *lifecycleA `nestgo:"optional"`
+}
 type missingInterface interface{ Missing() }
 type missingInterfaceProvider struct{ Dependency missingInterface }
 
