@@ -15,6 +15,7 @@ import (
 type sampleDatabase struct{}
 type sampleService struct{ Database *sampleDatabase }
 type sampleController struct{ Service *sampleService }
+func (*sampleController) Ping() string { return "ok" }
 
 func diagnose(args []string) error {
 	flags:=flag.NewFlagSet("diagnose",flag.ContinueOnError)
@@ -25,13 +26,13 @@ func diagnose(args []string) error {
 	strict:=flags.Bool("strict",false,"return failure for provider cycles or injection findings")
 	if err:=flags.Parse(args);err!=nil{return err}
 	if !*example {return errors.New("diagnose currently requires -example; real applications use diagnostics.Analyze and diagnostics.MeasureStartup programmatically with their metadata.Package values")}
-	pkg:=metadata.Package{Providers:[]metadata.Provider{
+	pkg:=metadata.Package{Controllers:[]metadata.Controller{{Type:reflect.TypeOf((*sampleController)(nil)),Prefix:"/health",Routes:[]metadata.Route{{Method:"GET",Path:"/ping",Handler:"Ping"}}}},Providers:[]metadata.Provider{
 		{Type:reflect.TypeOf((*sampleDatabase)(nil)), Scope:"singleton"},
 		{Type:reflect.TypeOf((*sampleService)(nil)), Scope:"singleton"},
 		{Type:reflect.TypeOf((*sampleController)(nil)), Scope:"singleton"},
 	}}
 	graph:=diagnostics.Analyze(pkg)
-	startup,err:=diagnostics.MeasureStartup("built-in sample (3 providers, no routes)",[]metadata.Package{pkg},*samples,*iterations,os.Getenv("GITHUB_SHA"))
+	startup,err:=diagnostics.MeasureStartup("built-in sample (3 providers, 1 route)",[]metadata.Package{pkg},*samples,*iterations,os.Getenv("GITHUB_SHA"))
 	if err!=nil{return err}
 	report:=diagnostics.Report{Graph:graph,Startup:startup}
 	if err:=os.MkdirAll(*out,0755);err!=nil{return err}
