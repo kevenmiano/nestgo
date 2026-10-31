@@ -2,13 +2,13 @@ name: Sync NestGo issues to GitHub Project
 
 on:
   issues:
-    types: [opened, reopened]
+    types: [opened, reopened, edited, closed, labeled, unlabeled, milestoned, demilestoned]
   pull_request_target:
-    types: [opened, reopened, ready_for_review, closed]
+    types: [opened, reopened, edited, ready_for_review, closed]
   workflow_dispatch:
     inputs:
       backfill:
-        description: "Import all open repository issues into Project #2"
+        description: "Reconcile issue metadata into Project #2 without resetting statuses"
         required: false
         type: boolean
         default: true
@@ -19,15 +19,14 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: project-sync-${{ github.event.issue.number || github.event.pull_request.number || 'backfill' }}
+  group: project-sync
   cancel-in-progress: false
 
 jobs:
   sync:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'issues' || github.event_name == 'pull_request_target' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Sync issue and PR status
+      - name: Synchronize issue metadata and status
         uses: actions/github-script@v7
         env:
           PROJECT_OWNER: kevenmiano
@@ -38,71 +37,114 @@ jobs:
             const owner = process.env.PROJECT_OWNER;
             const number = Number(process.env.PROJECT_NUMBER);
             const repo = context.repo;
+            const definitions = {
+              Priority: ["P0", "P1", "P2"],
+              Milestone: ["M001", "M002", "M003", "M004", "M005", "M006"]
+            };
             const projectData = await github.graphql(`
               query($login: String!, $number: Int!) {
                 user(login: $login) {
                   projectV2(number: $number) {
                     id
-                    field(name: "Status") {
-                      ... on ProjectV2SingleSelectField {
-                        id
-                        options { id name }
+                    fields(first: 100) {
+                      nodes {
+                        ... on ProjectV2FieldCommon { id name dataType }
+                        ... on ProjectV2SingleSelectField { options { id name } }
                       }
                     }
                   }
                 }
               }`, {login: owner, number});
             const project = projectData.user?.projectV2;
-            if (!project) throw new Error('Project #2 was not found or token cannot access it');
-            const statusField = project.field;
-            if (!statusField?.options) throw new Error('Project requires a single-select Status field');
-            const getStatus = (name) => statusField.options.find(o => o.name.toLowerCase() === name.toLowerCase())?.id;
-            const add = async (issue, statusName) => {
-              const result = await github.graphql(`
-                mutation($project: ID!, $content: ID!) {
-                  addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
-                    item { id }
+            if (!project) throw new Error("Project not found or token lacks project permission");
+            const fields = new Map(project.fields.nodes.filter(Boolean).map(f => [f.name, f]));
+            if (!fields.get("Status")?.options) throw new Error("Project requires a single-select Status field");
+            
+            for (const [name, values] of Object.entries(definitions)) {
+              if (fields.has(name)) {
+                if (!fields.get(name).options) throw new Error(name + " must be a single-select field");
+                for (const value of values) {
+                  if (!fields.get(name).options.some(o => o.name === value)) {
+                    throw new Error(name + " is missing option " + value + "; configure the field once in Project settings");
                   }
-                }`, {project: project.id, content: issue.node_id});
-              const itemId = result.addProjectV2ItemById.item.id;
-              const optionId = getStatus(statusName);
-              if (!optionId) {
-                core.warning(`Status "${statusName}" not found; item added without changing status`);
-                return;
+                }
+                continue;
               }
+              const created = await github.graphql(`
+                mutation($project: ID!, $name: String!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) {
+                  createProjectV2Field(input: {
+                    projectId: $project, name: $name, dataType: SINGLE_SELECT,
+                    singleSelectOptions: $options
+                  }) {
+                    projectV2Field {
+                      ... on ProjectV2SingleSelectField { id name options { id name } }
+                    }
+                  }
+                }`, {
+                project: project.id, name,
+                options: values.map(v => ({name: v, color: "GRAY", description: v}))
+              });
+              fields.set(name, created.createProjectV2Field.projectV2Field);
+            }
+            const extract = (body, key) => {
+              const match = (body || "").match(new RegExp("^\\*\\*" + key + ":\\*\\*\\s*([^\\r\\n]+)", "mi"));
+              return match ? match[1].trim() : null;
+            };
+            const parseMetadata = body => {
+              const milestoneText = extract(body, "Roadmap") || extract(body, "Milestone") || "";
+              const priorityText = extract(body, "Priority") || "";
+              const milestone = milestoneText.match(/\bM00[1-6]\b/)?.[0] || null;
+              const priority = priorityText.match(/\bP[012]\b/)?.[0] || null;
+              return {milestone, priority};
+            };
+            const getOption = (fieldName, value) =>
+              fields.get(fieldName)?.options?.find(o => o.name.toLowerCase() === value.toLowerCase())?.id;
+            const updateSelect = async (item, fieldName, value) => {
+              if (!value) return;
+              const field = fields.get(fieldName);
+              const option = getOption(fieldName, value);
+              if (!option) throw new Error("Missing " + fieldName + " option " + value);
               await github.graphql(`
                 mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
                   updateProjectV2ItemFieldValue(input: {
                     projectId: $project, itemId: $item, fieldId: $field,
                     value: {singleSelectOptionId: $option}
                   }) { projectV2Item { id } }
-                }`, {project: project.id, item: itemId, field: statusField.id, option: optionId});
-              core.info(`Synced issue #${issue.number} → ${statusName}`);
+                }`, {project: project.id, item, field: field.id, option});
             };
-            if (context.eventName === 'workflow_dispatch') {
-              if (context.payload.inputs?.backfill === 'false') return;
+            const sync = async (issue, status) => {
+              if (issue.pull_request) return;
+              const result = await github.graphql(`
+                mutation($project: ID!, $content: ID!) {
+                  addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
+                    item { id }
+                  }
+                }`, {project: project.id, content: issue.node_id});
+              const item = result.addProjectV2ItemById.item.id;
+              const metadata = parseMetadata(issue.body);
+              if (status) await updateSelect(item, "Status", status);
+              await updateSelect(item, "Priority", metadata.priority);
+              await updateSelect(item, "Milestone", metadata.milestone);
+              core.info("Synced #" + issue.number + " " + JSON.stringify(metadata) + (status ? " status=" + status : ""));
+            };
+            if (context.eventName === "workflow_dispatch") {
+              if (context.payload.inputs?.backfill === "false") return;
               const issues = await github.paginate(github.rest.issues.listForRepo, {
-                ...repo, state: 'open', per_page: 100
+                ...repo, state: "all", per_page: 100
               });
               for (const issue of issues.filter(i => !i.pull_request)) {
-                await add(issue, 'Backlog');
+                // Reconcile metadata without overwriting the workflow status of existing items.
+                await sync(issue, null);
               }
-              return;
-            }
-            if (context.eventName === 'issues') {
-              await add(context.payload.issue, 'Backlog');
-              return;
-            }
-            const pr = context.payload.pull_request;
-            const body = pr.body || '';
-            const issueNumbers = [...new Set([...body.matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?)\s+#(\d+)/gi)].map(m => Number(m[1])))];
-            if (!issueNumbers.length) {
-              core.info('PR body does not reference local issues with Closes/Fixes/Resolves/Refs #N');
-              return;
-            }
-            const status = pr.merged ? 'Done' : pr.state === 'closed' ? 'Backlog' : 'In Review';
-            for (const issueNumber of issueNumbers) {
-              const {data: issue} = await github.rest.issues.get({...repo, issue_number: issueNumber});
-              if (issue.pull_request) continue;
-              await add(issue, status);
+            } else if (context.eventName === "issues") {
+              const issue = context.payload.issue;
+              await sync(issue, issue.state === "closed" ? "Done" : context.payload.action === "opened" ? "Backlog" : null);
+            } else {
+              const pr = context.payload.pull_request;
+              const numbers = [...new Set([...(pr.body || "").matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?)\s+#(\d+)/gi)].map(m => Number(m[1])))];
+              const status = pr.merged ? "Done" : pr.state === "closed" ? "Backlog" : "In Review";
+              for (const issue_number of numbers) {
+                const {data: issue} = await github.rest.issues.get({...repo, issue_number});
+                await sync(issue, status);
+              }
             }
