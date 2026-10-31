@@ -3,14 +3,14 @@
 **Project:** NestGo Compiler v3
 **Milestone:** M001 — Stabilization
 **Current phase:** 1 — CI and compiler coverage
-**Current status:** CI iteration merged (#8); compiler coverage iteration proposed in PR #9, verification pending.
+**Current status:** Phase 1 CI (#8) and compiler coverage (#9) merged; GitHub Project Roadmap field synchronization is undergoing regression repair.
 
 ## Verified repository facts
 
 - Compiler v3 is on `main`.
 - GitHub Issues #2–#7 define the initial milestone backlog.
 - GitHub Project #2 exists: https://github.com/users/kevenmiano/projects/2.
-- Project synchronization workflow is on `main`; its first successful run and board import have **not been verified**.
+- Project synchronization is on `main`, but three post-merge runs failed because the native `Milestone` field is not a single-select (runs 41237925067, 41237971244, 41237993520); a corrected custom `Roadmap` field and status policy are being validated.
 - A repository-level GSD-style planning scaffold exists; **GSD Core installation/onboarding has not been verified**.
 
 ## Phase 1 execution log
@@ -24,9 +24,9 @@
 
 ## Next actions
 
-1. Confirm `PROJECTS_TOKEN` and run the project-sync workflow with backfill once; inspect the Project #2 items.
-2. Review and merge the phase 1 CI PR only after its checks pass.
-3. Address issue #4 compiler tests; record test cases and results in the next PR.
+1. Verify the corrected Project sync workflow, its policy tests, automatic backfill and Project #2 field values.
+2. Complete the remaining issue #4 compiler coverage acceptance criteria, including a measured baseline.
+3. Keep issue statuses accurate: `Refs #N` means partial work, not completion.
 4. Complete issue #2 only after actual GSD Core onboarding is performed and verified.
 5. Keep GitHub Issues as the work-item source of truth; link PRs using `Closes #N` and update this file at each phase gate.
 
@@ -41,5 +41,5 @@
 
 - **Discuss/Plan:** Issue #4 defines decorator diagnostics, binding and deterministic output coverage.
 - **Execute:** PR #9 adds table-driven tests and `docs/COMPILER_TESTING.md`.
-- **Verify:** GitHub Actions and measured coverage baseline pending; no passing result claimed.
-- **Review/Ship:** Pending checks and review. Issue #4 remains open until the full acceptance criteria are met.
+- **Verify:** Go quality gates passed on commit 72f7464f5dd98d19c43020f1d05c46810cdddd5d before merge; measured coverage baseline remains outstanding.
+- **Review/Ship:** PR #9 squash-merged as 65a11c37c2a83dafeb0109205f5cecdb9e9485e8. Issue #4 remains open until the full acceptance criteria are met.
