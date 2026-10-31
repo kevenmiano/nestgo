@@ -11,21 +11,21 @@ func TestModuleProviderVisibility(t *testing.T) {
 	}{
 		{
 			name: "imported and exported",
-			src: "package demo\n@Injectable()\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n@Module({providers:[Repo],exports:[Repo]})\ntype DatabaseModule struct{}\n@Module({imports:[DatabaseModule],providers:[Service]})\ntype AppModule struct{}\n",
+			src:  "package demo\n@Injectable()\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n@Module({providers:[Repo],exports:[Repo]})\ntype DatabaseModule struct{}\n@Module({imports:[DatabaseModule],providers:[Service]})\ntype AppModule struct{}\n",
 		},
 		{
 			name: "missing import",
-			src: "package demo\n@Injectable()\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n@Module({providers:[Repo],exports:[Repo]})\ntype DatabaseModule struct{}\n@Module({providers:[Service]})\ntype AppModule struct{}\n",
+			src:  "package demo\n@Injectable()\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n@Module({providers:[Repo],exports:[Repo]})\ntype DatabaseModule struct{}\n@Module({providers:[Service]})\ntype AppModule struct{}\n",
 			want: "inaccessible provider Repo",
 		},
 		{
 			name: "not exported",
-			src: "package demo\n@Injectable()\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n@Module({providers:[Repo]})\ntype DatabaseModule struct{}\n@Module({imports:[DatabaseModule],providers:[Service]})\ntype AppModule struct{}\n",
+			src:  "package demo\n@Injectable()\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n@Module({providers:[Repo]})\ntype DatabaseModule struct{}\n@Module({imports:[DatabaseModule],providers:[Service]})\ntype AppModule struct{}\n",
 			want: "inaccessible provider Repo",
 		},
 		{
 			name: "same module",
-			src: "package demo\n@Injectable()\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n@Module({providers:[Repo,Service]})\ntype AppModule struct{}\n",
+			src:  "package demo\n@Injectable()\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n@Module({providers:[Repo,Service]})\ntype AppModule struct{}\n",
 		},
 	}
 	for _, tc := range cases {
