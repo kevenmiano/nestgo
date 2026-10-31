@@ -181,6 +181,8 @@ func Generate(files []*File) ([]byte, error) {
 	providers := []string{}
 	modules := []string{}
 	moduleNames := map[string]bool{}
+	moduleEdges := map[string][]string{}
+	moduleLocations := map[string]Diagnostic{}
 	providerNames := map[string]bool{}
 	routes := map[string][]string{}
 	for _, f := range files {
@@ -270,6 +272,8 @@ func Generate(files []*File) ([]byte, error) {
 			if options.Defined["exports"] {
 				exportNames = options.Exports
 			}
+			moduleEdges[d.Name] = append([]string(nil), importNames...)
+			moduleLocations[d.Name] = Diagnostic{File: f.Path, Line: moduleAnnotation.Line}
 			importsCode := []string{}
 			for _, n := range importNames {
 				importsCode = append(importsCode, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n))
@@ -294,6 +298,9 @@ func Generate(files []*File) ([]byte, error) {
 					d.Name, name, strings.Join(importsCode, ","), strings.Join(providerCodes, ","), strings.Join(controllerCodes, ","), strings.Join(exportsCode, ",")))
 			}
 		}
+	}
+	if err := validateModuleCycles(moduleEdges, moduleLocations); err != nil {
+		return nil, err
 	}
 	// Module metadata order must not depend on source-file enumeration.
 	sortStrings(modules)
