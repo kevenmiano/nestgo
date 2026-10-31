@@ -1,0 +1,44 @@
+name: NestGo performance baseline
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'compiler/**'
+      - 'runtime/**'
+      - 'metadata/**'
+      - '.github/workflows/performance-baseline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Record reproducibility context
+        run: |
+          mkdir -p performance-artifacts
+          go version > performance-artifacts/environment.txt
+          go env GOOS GOARCH GOAMD64 GOMAXPROCS >> performance-artifacts/environment.txt
+          git rev-parse HEAD >> performance-artifacts/environment.txt
+          lscpu >> performance-artifacts/environment.txt
+      - name: Run correctness first
+        run: go test ./compiler ./runtime -count=1
+      - name: Compiler parse and generation
+        run: |
+          go test ./compiler -run '^$' -bench 'BenchmarkCompiler' -benchmem -count=8 -timeout=8m > performance-artifacts/compiler.txt
+      - name: Warm startup and HTTP dispatch
+        run: |
+          go test ./runtime -run '^$' -bench 'BenchmarkStartupProviders|BenchmarkHTTPRequest' -benchmem -count=8 -timeout=8m > performance-artifacts/runtime.txt
+      - name: Upload measurements regardless of regression
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nestgo-performance-${{ github.sha }}
+          path: performance-artifacts/
+          if-no-files-found: warn
