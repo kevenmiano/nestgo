@@ -61,6 +61,9 @@ func moduleVisibility(packages []metadata.Package) (map[reflect.Type]map[reflect
 			}
 		}
 		for _, imported := range mod.Imports {
+			if imported == nil {
+				return nil, fmt.Errorf("module %s imports nil module", moduleType)
+			}
 			if _, exists := modules[imported]; !exists {
 				return nil, fmt.Errorf("module %s imports unknown module %v", moduleType, imported)
 			}
