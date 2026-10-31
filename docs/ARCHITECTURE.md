@@ -1,201 +1,70 @@
-# Arquitetura do NestGo
+# Architecture
 
-## Visão Geral
+NestGo is an experimental source-to-source compiler and HTTP runtime written in Go.
 
-O NestGo é um framework Go que implementa uma arquitetura modular inspirada no NestJS, proporcionando uma estrutura organizada e escalável para desenvolvimento de APIs.
+## Design goals
 
-## Componentes Principais
+- Preserve Go as the execution language.
+- Keep the generated output inspectable and compatible with standard Go tooling.
+- Separate compilation from request handling.
+- Minimize runtime dependencies and magic.
+- Keep the compiler and runtime modular.
 
-### 1. Application Layer
-- **Localização**: `pkg/application/`
-- **Responsabilidade**: Ponto de entrada da aplicação e gerenciamento do ciclo de vida
-- **Componentes**:
-  - `Application`: Classe principal que gerencia a aplicação
-  - `Bootstrap`: Funções de inicialização
-  - `TreeNode`: Estrutura de árvore para dependências
+## Compilation pipeline
 
-### 2. Module System
-- **Localização**: `pkg/module/`
-- **Responsabilidade**: Sistema de módulos e registro automático
-- **Componentes**:
-  - `Module`: Interface base para todos os módulos
-  - `BaseModule`: Implementação base com funcionalidades comuns
-  - `ModuleRegistry`: Registro global de módulos
-  - `AutoRegister`: Sistema de auto-registro
-
-### 3. Controller Layer
-- **Localização**: `pkg/controller/`
-- **Responsabilidade**: Gerenciamento de rotas HTTP e handlers
-- **Componentes**:
-  - `BaseController`: Controller base com funcionalidades comuns
-  - `MetaExtractor`: Extração de metadados de controllers
-
-### 4. Service Layer
-- **Localização**: `pkg/service/`
-- **Responsabilidade**: Lógica de negócio da aplicação
-- **Componentes**:
-  - `BaseService`: Service base com funcionalidades comuns
-
-### 5. Server Layer
-- **Localização**: `pkg/server/`
-- **Responsabilidade**: Servidor HTTP e descoberta de rotas
-- **Componentes**:
-  - `Server`: Servidor HTTP principal
-  - `RouteDiscovery`: Descoberta automática de rotas
-
-### 6. Router Layer
-- **Localização**: `pkg/router/`
-- **Responsabilidade**: Roteamento HTTP e gerenciamento de rotas
-- **Componentes**:
-  - `Router`: Gerenciador de rotas
-  - `Route`: Estrutura de rota individual
-
-### 7. Dependency Injection
-- **Localização**: `pkg/container/`
-- **Responsabilidade**: Sistema de injeção de dependências
-- **Componentes**:
-  - `Container`: Container de dependências
-  - `AutoRegister`: Registro automático de serviços
-
-### 8. Logging
-- **Localização**: `pkg/logger/`
-- **Responsabilidade**: Sistema de logging estruturado
-- **Componentes**:
-  - `Logger`: Logger principal com suporte a JSON
-
-## Fluxo de Execução
-
-### 1. Inicialização
-```
-main() → application.StartApplication() → Bootstrap
+```text
+.mgo source
+    |
+    v
+Decorator lexer (compiler/lexer.go)
+    |
+    v
+Go parser and decorator validation (compiler/compiler.go)
+    |
+    +--> *_generated.go
+    |
+    +--> zz_modforge_metadata.go
+                  |
+                  v
+         metadata.Registry
+                  |
+                  v
+         runtime.FromRegistry
+                  |
+                  v
+           net/http Handler
 ```
 
-### 2. Descoberta de Módulos
-```
-AutoRegister → ModuleRegistry → Module Discovery
-```
+The lexer removes supported decorators while preserving offsets so the standard `go/parser` package can parse the remaining Go syntax. The compiler then inspects declarations, associates annotations with types and methods, and emits metadata.
 
-### 3. Construção da Árvore de Dependências
-```
-buildDependencyTree() → addModuleNode() → addControllerNode() → addRouteNode()
-```
+## Components
 
-### 4. Registro de Rotas
-```
-RouteDiscovery → Server.RegisterController() → Router.RegisterRoute()
-```
+### Compiler
 
-### 5. Injeção de Dependências
-```
-Container.AutoRegister() → Inject() → Dependency Resolution
-```
+The compiler reads `.mgo` files, validates supported annotations, generates plain Go source, and writes a package-level metadata registry. Generated files should be treated as build artifacts.
 
-## Sistema de Árvore de Dependências
+### Metadata
 
-### Estrutura TreeNode
-```go
-type TreeNode struct {
-    Name     string                 // Nome do nó
-    Type     string                 // Tipo: root, module, controller, route
-    Data     map[string]interface{} // Dados do nó
-    Children []*TreeNode            // Nós filhos
-    Module   module.Module          // Referência ao módulo (se aplicável)
-}
-```
+The `metadata` package contains the controller, provider, module, route, and parameter descriptors used by the runtime. Registration happens during generated package initialization.
 
-### Hierarquia de Nós
-```
-Application (root)
-├── UserModule (module)
-│   ├── UserController (controller)
-│   │   ├── GetUsers (route)
-│   │   └── CreateUser (route)
-│   └── UserService (service)
-└── AuthModule (module)
-    ├── AuthController (controller)
-    └── AuthService (service)
-```
+### Runtime
 
-## Sistema de Rotas
+The runtime creates a `net/http` handler using Go 1.23 `ServeMux`. It instantiates controller and provider structs, injects compatible exported fields, binds selected request parameters, invokes handlers with reflection, and serializes JSON responses.
 
-### Descoberta Automática
-1. **Reflexão**: Análise de métodos de controllers
-2. **Convenções**: Prefixos de método (Get, Create, Update, Delete)
-3. **Decorators**: Comentários `@route` para configuração
-4. **Mapeamento**: Geração automática de rotas HTTP
+## Limitations and trade-offs
 
-### Convenções de Nomenclatura
-- `Get*` → GET
-- `Create*` → POST
-- `Update*` → PUT
-- `Delete*` → DELETE
+- Reflection simplifies the proof of concept but does not offer compile-time dependency validation.
+- Provider injection is basic and not a full dependency-injection container.
+- The current compiler does not implement a full language grammar or robust source mapping.
+- Only some parameter decorators have corresponding runtime bindings.
+- Metadata registration is global, so package names must be unique.
+- Compiler output and public interfaces may change between revisions.
 
-## Dependency Injection
+## Next milestones
 
-### Sistema de Tags
-```go
-type UserController struct {
-    UserService *UserService `inject:"UserService"`
-}
-```
-
-### Resolução de Dependências
-1. **Registro**: Serviços registrados no container
-2. **Resolução**: Injeção automática baseada em tags
-3. **Singleton**: Instâncias únicas por tipo
-
-## Logging Estruturado
-
-### Formato JSON
-```json
-{
-  "time": "2025-09-19T20:12:33.005788158-03:00",
-  "level": "INFO",
-  "msg": "Registering route",
-  "method": "GetUsers",
-  "httpMethod": "GET",
-  "path": "/users/"
-}
-```
-
-### Níveis de Log
-- `DEBUG`: Informações detalhadas para debugging
-- `INFO`: Informações gerais da aplicação
-- `WARN`: Avisos sobre situações anômalas
-- `ERROR`: Erros que não interrompem a aplicação
-
-## Performance e Escalabilidade
-
-### Otimizações
-- **Reflexão Cached**: Metadados de reflexão são cacheados
-- **Lazy Loading**: Módulos carregados sob demanda
-- **Connection Pooling**: Pool de conexões para recursos externos
-
-### Escalabilidade
-- **Modular**: Estrutura modular permite crescimento horizontal
-- **Stateless**: Controllers e services são stateless
-- **Concurrent**: Suporte nativo à concorrência do Go
-
-## Segurança
-
-### Middleware de Segurança
-- **CORS**: Configuração de Cross-Origin Resource Sharing
-- **Rate Limiting**: Limitação de taxa de requisições
-- **Authentication**: Sistema de autenticação integrado
-
-### Validação
-- **Input Validation**: Validação automática de entrada
-- **Type Safety**: Tipagem forte do Go
-- **Error Handling**: Tratamento robusto de erros
-
-## Extensibilidade
-
-### Plugins
-- **Middleware**: Sistema de middleware extensível
-- **Decorators**: Decorators customizáveis
-- **Hooks**: Hooks de ciclo de vida
-
-### Integração
-- **Database**: Integração com bancos de dados
-- **Cache**: Sistema de cache integrado
-- **Message Queue**: Suporte a filas de mensagens
+1. Add strict decorator grammar and semantic validation.
+2. Improve error reporting and source positions.
+3. Add deterministic code generation and golden-file tests.
+4. Define module and provider lifecycle semantics.
+5. Introduce CI and integration tests across supported Go versions.
+6. Evaluate an LSP after the language syntax stabilizes.

@@ -1,0 +1,22 @@
+package shop
+
+@Controller("/users")
+type UsersController struct { Service *UsersService }
+
+@Get("/")
+func (c *UsersController) FindAll() []string { return []string{"Ada","Grace"} }
+
+@Get("/{id}")
+func (c *UsersController) FindOne(id string) string { return id }
+
+@Post("/")
+@HttpCode(201)
+func (c *UsersController) Create(@Body() dto CreateUserDTO) string { return dto.Name }
+
+type CreateUserDTO struct { Name string `json:"name"` }
+
+@Injectable()
+type UsersService struct{}
+
+@Module("users")
+type UsersModule struct{}
