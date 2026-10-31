@@ -49,8 +49,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gatling-nestgo-e2e
+          name: gatling-nestgo-e2e-${{ github.sha }}
           path: |
             performance/gatling/target/gatling/
-            /tmp/nestgo-e2e-server.log
+            performance/gatling/*.log
           if-no-files-found: warn
