@@ -56,3 +56,14 @@ func TestTypedDIOptionalInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestTypedDIFailsClosedOnTypeErrors(t *testing.T) {
+	f, err := Parse("invalid.mgo", []byte("package demo\n@Injectable()\ntype Service struct { Missing UnknownType }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Generate([]*File{f})
+	if err == nil || !strings.Contains(err.Error(), "type-check dependency graph") {
+		t.Fatalf("expected type-check failure, got %v", err)
+	}
+}
