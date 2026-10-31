@@ -34,7 +34,7 @@ M004 and M006 can run in parallel after their relevant interfaces stabilize; M00
 5. **Review:** reconcile implementation with acceptance criteria.
 6. **Ship:** merge, close the issue and update `.planning/STATE.md`.
 
-**Project automation:** [project-sync.yml](../.github/workflows/project-sync.yml) reconciles issue-body Priority and Roadmap metadata into custom single-select Project fields. The destination is **Roadmap** (M001–M006), not GitHub's native Milestone field. A merged PR with `Refs #N` does **not** complete an issue; `Closes #N` / `Fixes #N` / `Resolves #N` explicitly indicate completion. The corrected workflow backfills after its merge; verify the Action and actual Project field values before claiming synchronization is operational. See [sync guide](../docs/PROJECT_SYNC.md).
+**Project automation:** [project-sync.yml](../.github/workflows/project-sync.yml) reconciles issue-body Priority and Roadmap metadata into custom single-select Project fields. The destination is **Roadmap** (M001–M006), not GitHub's native Milestone field. A merged PR with `Refs #N` does **not** complete an issue; `Closes #N` / `Fixes #N` / `Resolves #N` explicitly indicate completion. PR #28 was merged; automatic backfill run [41238808688](https://github.com/kevenmiano/nestgo/actions/runs/41238808688) succeeded, processing issues #10–#25 with Roadmap and Priority. Kanban/Roadmap view layout and field visibility should still be reviewed in the Project UI. See [sync guide](../docs/PROJECT_SYNC.md).
 
 ## Current iteration
 
