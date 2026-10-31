@@ -10,6 +10,8 @@
 
 [![Go quality gates](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml)
 [![Documentation site](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml)
+[![Go packages](https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml)
+[![Framework release](https://github.com/kevenmiano/nestgo/actions/workflows/framework-release.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/framework-release.yml)
 [![Docs release deploy](https://github.com/kevenmiano/nestgo/actions/workflows/docs-release.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/docs-release.yml)
 [![Go version](https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Status](https://img.shields.io/badge/status-experimental-orange)](https://github.com/kevenmiano/nestgo/issues)
@@ -27,6 +29,21 @@
 
 - Go 1.23 or newer
 - No external runtime dependencies
+
+## Install the CLI and runtime
+
+```bash
+# Installs the compiler command without updating your app's go.mod.
+go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
+
+# In your application's Go module, add NestGo's public packages.
+go get github.com/kevenmiano/nestgo@latest
+
+# Compile your annotated application sources.
+nestgo compile ./myapp
+```
+
+The `compiler`, `runtime`, and `metadata` packages share one Go module and one version. `go install` installs the CLI; `go get` adds the library dependency to your application. These commands are intentionally separate. Releases must exist before `@latest` resolves a numbered version. See [Distribution and independent release pipelines](docs/DISTRIBUTION.md).
 
 ## Getting started
 
