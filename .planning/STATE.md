@@ -120,3 +120,11 @@
 - **Execute:** Resolve declared type names across `.mgo` files, generate `[]reflect.Type` edges, preserve stable serialization, reject unknown/ambiguous/duplicate references with source-local errors.
 - **Verify:** Deterministic metadata regardless of file ordering, negative and legacy compatibility tests, Go quality gates, generated fixtures and docs CI.
 - **Review/Ship:** Scope remains same-package declarations. Cross-package module linking, enforceable runtime DI visibility and ownership contracts remain #10/#11/#36 work.
+
+## NestJS-style module arrays — GSD
+
+- **Discuss:** The earlier `@Imports("Foo,Bar")` string API was not high-level and obscured typed dependency references.
+- **Plan:** Add a single `@Module({ imports: [Type], controllers: [Type], providers: [Type], exports: [Type] })` configuration with compiler-validated local type identifiers.
+- **Execute:** Tokenize a restricted compile-time object DSL; generate typed metadata and retain legacy module compatibility.
+- **Verify:** Golden generation, invalid quoted entries, duplicate symbols, missing types, and CI Go quality. Do not claim runtime module ownership is enforced.
+- **Review/Ship:** Merge only when checks pass. Cross-package type selectors and runtime visibility remain tracked under #10/#11/#36.
