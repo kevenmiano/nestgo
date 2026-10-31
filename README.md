@@ -1,18 +1,20 @@
 <div align="center">
 
-<img src="https://nestjs.com/img/logo-small.svg" alt="Official NestJS logo" width="76" /> &nbsp; + &nbsp; <img src="https://go.dev/images/go-logo-blue.svg" alt="Official Go language logo" width="120" />
+<img src="website/static/img/nestgo-mascot.svg" alt="NestGo mascot" width="150" />
 
 # NestGo
 
-**Structured applications. Native Go.**\n\n*Independent project inspired by NestJS and built with Go; not affiliated with either project.*
+**Structured applications. Native Go.**
+
+*Independent project inspired by NestJS and built with Go; not affiliated with either project.*
 
 [![Go quality gates](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml)
 [![Documentation site](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml)
 [![Go version](https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white)](go.mod)
 [![Status](https://img.shields.io/badge/status-experimental-orange)](https://github.com/kevenmiano/nestgo/issues)
-[![GitHub Project](https://img.shields.io/badge/roadmap-Project%20%232-087d73)](https://github.com/users/kevenmiano/projects/2)
+[![GitHub Project](https://img.shields.io/badge/roadmap-Project%20%232-ce0038)](https://github.com/users/kevenmiano/projects/2)
 
-[Documentation source](website/docs/intro.md) · [Project roadmap](.planning/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+[Documentation](website/docs/intro.md) · [Project roadmap](.planning/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
