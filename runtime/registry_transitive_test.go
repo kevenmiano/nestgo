@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"sync"
@@ -53,7 +54,7 @@ func TestRegistryImportClosureTraversesThreePackages(t *testing.T) {
 func TestRegistryTransitiveImportDoesNotLeakProviderVisibility(t *testing.T) {
 	registerTransitiveFixture()
 	for name, bootstrap := range map[string]func() error{
-		"legacy": func() error { _, err := FromRegistry("nestgo-transitive-root-test"); return err },
+		"canonical": func() error { _, err := NewApp(context.Background(), WithRegistry("nestgo-transitive-root-test")); return err },
 		"adapter": func() error {
 			_, err := ApplicationFromRegistry(ApplicationOptions{}, "nestgo-transitive-root-test")
 			return err
