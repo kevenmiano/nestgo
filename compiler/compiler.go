@@ -278,6 +278,17 @@ func generateMetadata(files []*File, allowPersistence bool, repositories ...Repo
 			if err != nil {
 				return nil, err
 			}
+			// A single local module owns generated repositories by default.
+			// With multiple modules the declaration must choose the owner explicitly.
+			for _, repository := range repositories {
+				typ := repository.Name + "Generated"
+				if len(moduleNames) == 1 {
+					found := false
+					for _, name := range options.Providers { if name == typ { found = true } }
+					if !found { options.Providers = append(options.Providers, typ) }
+					sortStrings(options.Providers)
+				}
+			}
 			if err := validateModuleOptions(f.Path, moduleAnnotation.Line, options, moduleNames, providerNames, controllerTypeNames(controllers)); err != nil {
 				return nil, err
 			}
