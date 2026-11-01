@@ -24,6 +24,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Show formatting differences
+        run: gofmt -d compiler/compiler.go examples/shop/zz_modforge_metadata.go runtime/http_typed_binding_test.go
       - name: Test compiler and runtime
         run: go test ./compiler ./runtime ./httpadapter -count=1
       - name: Benchmark identical handlers with typed and reflective bindings
