@@ -4,6 +4,25 @@ NestGo has **one application factory** and one lifecycle owner for all HTTP engi
 
 ## Get started
 
+### Plain Go HTTP server (no NestGo compiler)
+
+```go
+app, err := runtime.New(runtime.WithRoutes(runtime.Route{
+    Method: "GET",
+    Path: "/health",
+    Handler: func(ctx runtime.Context) error {
+        ctx.Status(200)
+        return ctx.Write([]byte("OK"))
+    },
+}))
+if err != nil { log.Fatal(err) }
+log.Fatal(app.Listen(":8080"))
+```
+
+The `runtime` package is a regular Go dependency: no prebuilt runtime binary, NestGo code-generation step, or runtime compiler invocation is required. Go builds and links the imported package with the application, as it does for gRPC.
+
+### Optional generated modules
+
 ```go
 // Import the generated package to register its metadata.
 app, err := runtime.New(runtime.WithRegistry("shop"))
@@ -16,11 +35,17 @@ log.Fatal(app.Listen(":8080"))
 
 | Option | Function |
 | --- | --- |
+| `WithRoutes(routes...)` | Register Go HTTP functions directly (no codegen) |
 | `WithRegistry(names...)` | Resolve registered packages and transitive module imports |
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
-| `WithMiddleware(...)` | Register global middleware |\n| `WithRouteMiddleware(method, path, ...)` | Register middleware for an exact route |\n| `WithGuards(...)` | Register global guards |\n| `WithPipes(...)` | Register global parameter pipes |\n| `WithFilters(...)` | Register global exception filters |\n| `WithDebug(true)` | Enable detailed per-provider diagnostics |
+| `WithMiddleware(...)` | Global middleware on matched routes |
+| `WithRouteMiddleware(method, path, ...)` | Middleware for an exact route |
+| `WithGuards(...)` | Global guards |
+| `WithPipes(...)` | Global parameter pipes |
+| `WithFilters(...)` | Global exception filters |
+| `WithDebug(true)` | Enable detailed per-provider diagnostics |
 | `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
 
 Do not combine `WithRegistry` and `WithPackages`. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
@@ -37,13 +62,16 @@ flowchart TD
   Graph --> Providers["Instantiate and inject providers"]
   Providers --> Controllers["Instantiate and inject controllers"]
   Controllers --> Routes["Validate and register HTTP routes"]
-  Routes --> Hooks["OnModuleInit / OnApplicationBootstrap"]
+  New --> Raw["WithRoutes: predeclared Go handlers"]
+  Routes --> Registration["Register direct routes in same adapter"]
+  Raw --> Registration
+  Registration --> Hooks["OnModuleInit / OnApplicationBootstrap"]
   Hooks --> Application["Application ready"]
 ```
 
 Providers are initialized in stable type-name order and controllers follow metadata order. Field injection supports exported pointer and interface fields. The `nestgo:"optional"` tag permits missing optional dependencies; module scopes control imports and exports.
 
-Generated invokers can bypass reflective calls, while other handlers use reflection as needed. Both native `platform/fasthttp` and `platform/nethttp` use the same route contract and lifecycle.
+Direct Go handlers execute without reflective controller dispatch. For decorator-generated controllers, generated invokers can bypass reflective calls, while other handlers use reflection as needed. Both native `platform/fasthttp` and `platform/nethttp` use the same route namespace and lifecycle. Conflicts between direct and controller-generated routes are rejected at bootstrap.
 
 `app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup, but registered adapter routes are not transactionally rolled back. The caller owns OS signal handling and deadlines.
 
@@ -51,6 +79,8 @@ Generated invokers can bypass reflective calls, while other handlers use reflect
 
 Use `WithBootstrapMetrics` for route registration, lifecycle initialization and total durations. The `BenchmarkApplicationBootstrapProviders` benchmark and CI baseline comparison cover 1/10/100 providers.
 
-Constructor injection, request scopes, automatic OS signals, interceptors and arbitrary resource disposal are not implemented. See [request pipeline](REQUEST_PIPELINE.md) for middleware/guards/pipes/filters and limitations. Successful application construction does not mean the HTTP port is bound.
+Constructor injection, request scopes, automatic OS signals, interceptors and arbitrary resource disposal are not implemented. Successful application construction does not mean the HTTP port is bound.
 
 See [HTTP adapters](HTTP_ADAPTERS.md) and [lifecycle guide](../website/docs/fundamentals/lifecycle.md).
+
+See the [request pipeline](REQUEST_PIPELINE.md) for middleware, guards, pipes and exception filters.
