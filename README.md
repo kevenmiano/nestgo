@@ -99,6 +99,11 @@ nestgo compile --watch ./myapp
 
 The CLI fingerprints top-level `.mgo` sources and recompiles the package when they change; `--poll-interval` configures the default 250 ms check. It also generates a compiler-owned wiring test and **editable, skipped** test stubs for controllers/providers. Add `@Dto()` to opt into serialization/deserialization and tagged validation test TODOs. Existing developer tests are preserved. See [compiler tooling](docs/COMPILER.md).
 
+For CI or editor tooling, `nestgo compile --format=json ./myapp` and
+`nestgo check --format=json ./myapp` provide a versioned diagnostics array with
+stable error codes and source positions where available. The default output
+remains human-readable. See the [compiler diagnostics contract](docs/COMPILER.md).
+
 ## Optional: decorators and modules
 
 NestGo's decorators are written in `.mgo` files and compiled into regular Go source:
