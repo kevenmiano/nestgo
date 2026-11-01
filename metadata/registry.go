@@ -26,8 +26,8 @@ type Controller struct {
 	Routes []Route
 }
 type Provider struct {
-	Type  reflect.Type
-	Scope string
+	Type    reflect.Type
+	Scope   string
 	Factory func(resolve func(reflect.Type) (any, bool)) (any, error)
 }
 
