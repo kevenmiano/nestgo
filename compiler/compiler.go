@@ -462,6 +462,10 @@ func CompileDir(dir string) error {
 	if err != nil {
 		return err
 	}
+	contract, err := exportModuleContract(files)
+	if err != nil {
+		return err
+	}
 	for _, file := range files {
 		if _, err := parser.ParseFile(token.NewFileSet(), file.Path, file.Source, parser.AllErrors); err != nil {
 			return err
@@ -480,7 +484,10 @@ func CompileDir(dir string) error {
 			return err
 		}
 	}
-	return writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry)
+	if err := writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry); err != nil {
+		return err
+	}
+	return writeIfChanged(filepath.Join(dir, moduleContractFile), append(contract, '\n'))
 }
 func writeIfChanged(path string, content []byte) error {
 	old, err := os.ReadFile(path)
