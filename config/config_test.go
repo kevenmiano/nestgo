@@ -19,8 +19,8 @@ func TestLoadAndValidate(t *testing.T) {
 		t.Fatal(err)
 	}
 	var cfg struct {
-		Host string `env:"HOST,required"`
-		Port int `env:"PORT,default=5432,min=1,max=65535"`
+		Host    string        `env:"HOST,required"`
+		Port    int           `env:"PORT,default=5432,min=1,max=65535"`
 		Timeout time.Duration `env:"TIMEOUT,default=3s"`
 	}
 	if err := s.Decode("APP", &cfg); err != nil {
@@ -40,8 +40,8 @@ func TestValidationRejectsInvalidValuesWithoutLeakingSecrets(t *testing.T) {
 	}
 	var cfg struct {
 		Password string `env:"PASSWORD,required"`
-		Host string `env:"HOST,required"`
-		Port int `env:"PORT,min=1,max=65535"`
+		Host     string `env:"HOST,required"`
+		Port     int    `env:"PORT,min=1,max=65535"`
 	}
 	err = s.Decode("DB", &cfg)
 	if err == nil || !strings.Contains(err.Error(), "DB_HOST") || strings.Contains(err.Error(), "secret-value") {
