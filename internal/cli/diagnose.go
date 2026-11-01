@@ -34,12 +34,12 @@ type diagnoseOptions struct {
 func newDiagnoseCommand() *cobra.Command {
 	options := &diagnoseOptions{}
 	cmd := &cobra.Command{
-		Use:   "diagnose",
-		Short: "Inspect dependency graphs and measure application startup",
-		Long: "Generate offline HTML, JSON and DOT diagnostics for compiled NestGo metadata or a built-in fixture. Importing an app package executes its Go init functions; use trusted packages.",
-		Args:  cobra.NoArgs,
+		Use:     "diagnose",
+		Short:   "Inspect dependency graphs and measure application startup",
+		Long:    "Generate offline HTML, JSON and DOT diagnostics for compiled NestGo metadata or a built-in fixture. Importing an app package executes its Go init functions; use trusted packages.",
+		Args:    cobra.NoArgs,
 		Example: "  nestgo diagnose -example -out diagnostics-output\n  nestgo diagnose -app ./examples/shop -strict -cold-samples 3",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE:    func(cmd *cobra.Command, _ []string) error {
 			return runDiagnose(cmd, options)
 		},
 	}
