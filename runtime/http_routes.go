@@ -18,7 +18,9 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 
 func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
 	graph, err := prepareBootstrap(packages, nil, nil)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	if lifecycle != nil {
 		for _, typ := range graph.orderedProviders {
 			lifecycle.instances = append(lifecycle.instances, graph.providers[typ].Interface())
@@ -27,7 +29,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 	seen := map[string]bool{}
 	for _, controller := range graph.controllers {
 		instance, err := graph.newController(controller.Type)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if lifecycle != nil {
 			lifecycle.instances = append(lifecycle.instances, instance.Interface())
 		}

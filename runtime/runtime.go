@@ -46,14 +46,18 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	}, func() {
 		logger.Info(ctx, "InstanceLoader", "Package providers registered")
 	})
-	if err != nil { return fail(err) }
+	if err != nil {
+		return fail(err)
+	}
 	logger.Startup(ctx, "InstanceLoader", "Provider dependencies resolved", diStart)
 	routeStart := time.Now()
 	mux := http.NewServeMux()
 	seen := map[string]bool{}
 	for _, c := range graph.controllers {
 		instance, err := graph.newController(c.Type)
-		if err != nil { return fail(err) }
+		if err != nil {
+			return fail(err)
+		}
 		logger.Info(ctx, "RoutesResolver", "Controller registered", slog.String("controller", c.Type.String()), slog.String("prefix", c.Prefix))
 		for _, route := range c.Routes {
 			method := instance.MethodByName(route.Handler)
