@@ -155,7 +155,9 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 			} else if name == "Expose" || name == "Exclude" || name == "ExcludeInput" || name == "ExcludeOutput" || name == "Transform" || name == "TransformInput" || name == "TransformOutput" || name == "Type" || isDTOValidator(name) {
 				lineStart := lineBeginning(src, start)
 				lineEnd := i
-				for lineEnd < len(src) && src[lineEnd] != '\n' { lineEnd++ }
+				for lineEnd < len(src) && src[lineEnd] != '\n' {
+					lineEnd++
+				}
 				if strings.TrimSpace(string(src[lineStart:start])) != "" || strings.TrimSpace(string(src[i:lineEnd])) != "" {
 					return "", nil, nil, nil, Diagnostic{path, startLine, "property decorator must be on its own line"}
 				}

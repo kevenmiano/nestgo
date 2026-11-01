@@ -5,9 +5,9 @@ go 1.27.0
 toolchain go1.27.3
 
 require (
-	github.com/spf13/cobra v1.10.2
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/paemuri/brdoc/v4 v4.7.0
+	github.com/spf13/cobra v1.10.2
 	github.com/valyala/fasthttp v1.77.0
 )
 
