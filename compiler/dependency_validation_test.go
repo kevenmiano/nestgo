@@ -36,7 +36,6 @@ func TestMissingControllerDependencyValidation(t *testing.T) {
 	}
 }
 
-
 func TestExplicitlyExcludedDependencyPassesCompile(t *testing.T) {
 	f, err := Parse("ignored.mgo", []byte("package demo\ntype External struct{}\n@Injectable()\ntype Service struct { External *External `nestgo:\"-\"` }\n"))
 	if err != nil {
