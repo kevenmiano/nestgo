@@ -1,0 +1,92 @@
+name: Compare compiled middleware overhead
+
+on:
+  push:
+    branches: [feat/http-request-pipeline]
+
+permissions:
+  contents: write
+
+jobs:
+  compare:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout unchanged baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 165fa4d8151d5b6296bdc5c561d9d1ecd4f5cee9
+          path: baseline
+          fetch-depth: 0
+      - name: Checkout optimized candidate
+        uses: actions/checkout@v4
+        with:
+          path: candidate
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: candidate/go.mod
+          cache: true
+          cache-dependency-path: candidate/go.sum
+      - name: Format and verify complete Go suite
+        working-directory: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          gofmt -w runtime/request_pipeline.go runtime/http_routes.go runtime/request_pipeline_chain_test.go
+          go test ./... -count=1
+          go vet ./...
+          go test -race ./runtime ./httpadapter ./examples/pipeline/... -count=1
+      - name: Measure same workload on baseline and candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bench-results
+          go version | tee bench-results/environment.txt
+          uname -a | tee -a bench-results/environment.txt
+          for name in baseline candidate; do
+            (
+              cd "$name"
+              GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkRequestPipeline$' -benchtime=300ms -count=5 -benchmem -timeout=12m
+            ) | tee "bench-results/$name.txt"
+          done
+          python3 - <<'PY'
+          import pathlib, re, statistics
+          d=pathlib.Path('bench-results')
+          pat=re.compile(r'^BenchmarkRequestPipeline/(.+?)-\d+\s+\d+\s+([\d.]+) ns/op\s+(\d+) B/op\s+(\d+) allocs/op')
+          def read(n):
+              rows={}
+              for line in (d/(n+'.txt')).read_text().splitlines():
+                  match=pat.match(line)
+                  if match:
+                      rows.setdefault(match.group(1), []).append(tuple(float(x) for x in match.groups()[1:]))
+              if not rows or any(len(v)!=5 for v in rows.values()):
+                  raise SystemExit('incomplete samples for '+n+': '+str({k:len(v) for k,v in rows.items()}))
+              return {k:tuple(statistics.median(row[i] for row in v) for i in range(3)) for k,v in rows.items()}
+          old,new=read('baseline'),read('candidate')
+          print('\n| Scenario | Baseline ns/op | Candidate ns/op | Δ time | Baseline B/op | Candidate B/op | Baseline allocs | Candidate allocs |')
+          print('|---|---:|---:|---:|---:|---:|---:|---:|')
+          for case in old:
+              if case not in new: raise SystemExit('missing scenario: '+case)
+              a,b=old[case],new[case]
+              delta=(b[0]/a[0]-1)*100
+              print(f'| {case} | {a[0]:.1f} | {b[0]:.1f} | {delta:+.1f}% | {a[1]:.0f} | {b[1]:.0f} | {a[2]:.0f} | {b[2]:.0f} |')
+          PY
+      - name: Upload comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: middleware-overhead-comparison
+          path: bench-results/
+      - name: Save formatted candidate sources
+        working-directory: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add runtime/request_pipeline.go runtime/http_routes.go runtime/request_pipeline_chain_test.go
+          if ! git diff --cached --quiet; then
+            git commit -m 'style(runtime): gofmt compiled middleware hot path'
+            git push origin HEAD:feat/http-request-pipeline
+          fi
