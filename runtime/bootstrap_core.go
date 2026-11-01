@@ -58,3 +58,4 @@ func (g *bootstrapGraph) newController(typ reflect.Type) (reflect.Value, error) 
     if err := g.inject(instance); err != nil { return reflect.Value{}, err }
     return instance, nil
 }
+
