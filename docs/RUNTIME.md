@@ -40,10 +40,11 @@ log.Fatal(app.Listen(":8080"))
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
+| `WithContext(ctx)` | Pass a cancellable context to bootstrap lifecycle hooks |
 | `WithDebug(true)` | Enable detailed per-provider diagnostics |
 | `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
 
-Do not combine `WithRegistry` and `WithPackages`. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
+Do not combine `WithRegistry` and `WithPackages`. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown(ctx)`, `Close()` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
 
 ## Lifecycle
 
@@ -64,11 +65,13 @@ flowchart TD
   Hooks --> Application["Application ready"]
 ```
 
-Providers are initialized in stable type-name order and controllers follow metadata order. Field injection supports exported pointer and interface fields. The `nestgo:"optional"` tag permits missing optional dependencies; module scopes control imports and exports.
+Providers are initialized in stable type-name order and controllers follow metadata order. Field injection supports exported pointer and interface fields. The supported explicit markers are `nestgo:"inject"` (required), `nestgo:"optional"` (missing provider is permitted), and `nestgo:"-"` (exclude a field from injection even if a provider exists). Invalid tags, tagged unexported fields, tagged non-pointer fields, ambiguous interface matches, and nil providers fail at bootstrap. Dependencies for each object are validated before writing any field, preventing partially injected objects after validation failure. Module scopes control imports and exports.
+
+**Migration warning:** untagged exported pointer and interface fields currently retain the prior implicit-*required* injection behavior to avoid silently changing existing compiled modules. New code should use explicit tags, especially `nestgo:"-"` for non-dependency pointers. Removing implicit behavior entirely remains a separate breaking-change step for #53; do not describe this migration as complete.
 
 Direct Go handlers execute without reflective controller dispatch. For decorator-generated controllers, generated invokers can bypass reflective calls, while other handlers use reflection as needed. Both native `platform/fasthttp` and `platform/nethttp` use the same route namespace and lifecycle. Conflicts between direct and controller-generated routes are rejected at bootstrap.
 
-`app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup, but registered adapter routes are not transactionally rolled back. The caller owns OS signal handling and deadlines.
+`app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup, but registered adapter routes are not transactionally rolled back. The caller owns OS signal handling and deadlines. `Close()` delegates to `Shutdown(context.Background())`; use `Shutdown(ctx)` when a timeout or cancellation deadline is required. `WithContext` applies only to bootstrap lifecycle hooks and does not implicitly cancel serving requests or shut down an already started application.
 
 ## Observability and constraints
 

@@ -4,23 +4,42 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/kevenmiano/nestgo/httpadapter"
+	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/kevenmiano/nestgo/httpadapter"
 )
 
 type Adapter struct {
 	mu      sync.Mutex
 	mux     *http.ServeMux
 	server  *http.Server
+	limits  httpadapter.ServerLimits
 	started bool
 }
 
 var _ httpadapter.Adapter = (*Adapter)(nil)
 
-func New() *Adapter { return &Adapter{mux: http.NewServeMux()} }
+// Option configures the net/http adapter before it starts.
+type Option func(*Adapter)
+
+// WithLimits overrides positive server limits while retaining secure defaults.
+func WithLimits(limits httpadapter.ServerLimits) Option {
+	return func(a *Adapter) { a.limits = a.limits.Override(limits) }
+}
+
+func New(options ...Option) *Adapter {
+	a := &Adapter{mux: http.NewServeMux(), limits: httpadapter.DefaultServerLimits()}
+	for _, option := range options {
+		if option != nil {
+			option(a)
+		}
+	}
+	return a
+}
 func (a *Adapter) Register(route httpadapter.Route) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -44,7 +63,23 @@ func (a *Adapter) register(pattern string, handler httpadapter.Handler) (err err
 		}
 	}()
 	a.mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-		ctx := &requestContext{w: w, r: r, status: 200}
+		if r.ContentLength > int64(a.limits.MaxBodyBytes) {
+			w.Header().Set("Connection", "close")
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		body, readErr := io.ReadAll(io.LimitReader(r.Body, int64(a.limits.MaxBodyBytes)+1))
+		if readErr != nil {
+			w.Header().Set("Connection", "close")
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		if len(body) > a.limits.MaxBodyBytes {
+			w.Header().Set("Connection", "close")
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		ctx := &requestContext{w: w, r: r, body: body, status: 200}
 		if e := handler(ctx); e != nil && !ctx.wrote {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
@@ -61,7 +96,14 @@ func (a *Adapter) Serve(listener net.Listener) error {
 		return errors.New("server already started")
 	}
 	a.started = true
-	server := &http.Server{Handler: a.mux}
+	server := &http.Server{
+		Handler:           a.mux,
+		ReadHeaderTimeout: a.limits.ReadHeaderTimeout,
+		ReadTimeout:       a.limits.ReadTimeout,
+		WriteTimeout:      a.limits.WriteTimeout,
+		IdleTimeout:       a.limits.IdleTimeout,
+		MaxHeaderBytes:    a.limits.MaxHeaderBytes,
+	}
 	a.server = server
 	a.mu.Unlock()
 	return server.Serve(listener)
@@ -80,6 +122,7 @@ func (a *Adapter) Instance() any { a.mu.Lock(); defer a.mu.Unlock(); return a.se
 type requestContext struct {
 	w      http.ResponseWriter
 	r      *http.Request
+	body   []byte
 	status int
 	wrote  bool
 }
@@ -89,21 +132,10 @@ func (c *requestContext) Path() string           { return c.r.URL.Path }
 func (c *requestContext) Param(n string) string  { return c.r.PathValue(n) }
 func (c *requestContext) Query(n string) string  { return c.r.URL.Query().Get(n) }
 func (c *requestContext) Header(n string) string { return c.r.Header.Get(n) }
-func (c *requestContext) Body() []byte {
-	b := make([]byte, 0, 4096)
-	buf := make([]byte, 4096)
-	for len(b) <= 1<<20 {
-		n, e := c.r.Body.Read(buf)
-		b = append(b, buf[:n]...)
-		if e != nil {
-			break
-		}
-	}
-	return b
-}
-func (c *requestContext) Status(code int)       { c.status = code }
-func (c *requestContext) SetHeader(k, v string) { c.w.Header().Set(k, v) }
-func (c *requestContext) AddHeader(k, v string) { c.w.Header().Add(k, v) }
+func (c *requestContext) Body() []byte           { return c.body }
+func (c *requestContext) Status(code int)        { c.status = code }
+func (c *requestContext) SetHeader(k, v string)  { c.w.Header().Set(k, v) }
+func (c *requestContext) AddHeader(k, v string)  { c.w.Header().Add(k, v) }
 func (c *requestContext) Write(p []byte) (intErr error) {
 	if !c.wrote {
 		c.w.WriteHeader(c.status)
