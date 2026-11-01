@@ -1,68 +1,76 @@
-<div align="center">
+<p align="center">
+  <a href="https://kevenmiano.github.io/nestgo/">
+    <img src="website/static/img/nestgo-mascot.svg" width="130" alt="NestGo logo" />
+  </a>
+</p>
 
-<img src="website/static/img/nestgo-mascot.svg" alt="NestGo mascot" width="150" />
+<h1 align="center">NestGo</h1>
 
-# NestGo
+<p align="center">
+  A modular Go framework for building structured, maintainable server-side applications.
+</p>
 
-**Structured applications. Native Go.**
+<p align="center">
+  <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg" alt="Go quality" /></a>
+  <a href="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg" alt="Documentation build" /></a>
+  <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml/badge.svg" alt="Go packages" /></a>
+  <img src="https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.23+" />
+  <img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental" />
+</p>
 
-*Independent project inspired by NestJS and built with Go; not affiliated with either project.*
+<p align="center">
+  <a href="https://kevenmiano.github.io/nestgo/">Documentation</a>
+  · <a href="https://github.com/kevenmiano/nestgo/tree/main/examples/shop">Example</a>
+  · <a href="https://github.com/kevenmiano/nestgo/issues">Issues</a>
+  · <a href="https://github.com/kevenmiano/nestgo/discussions">Discussions</a>
+</p>
 
-[![Go quality gates](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml)
-[![Documentation site](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml)
-[![Go packages](https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml)
-[![Framework release](https://github.com/kevenmiano/nestgo/actions/workflows/framework-release.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/framework-release.yml)
-[![Docs release deploy](https://github.com/kevenmiano/nestgo/actions/workflows/docs-release.yml/badge.svg)](https://github.com/kevenmiano/nestgo/actions/workflows/docs-release.yml)
-[![Go version](https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white)](go.mod)
-[![Status](https://img.shields.io/badge/status-experimental-orange)](https://github.com/kevenmiano/nestgo/issues)
-[![GitHub Project](https://img.shields.io/badge/roadmap-Project%20%232-ce0038)](https://github.com/users/kevenmiano/projects/2)
+## Description
 
-[Documentation](website/docs/intro.md) · [Release publishing](docs/DISTRIBUTION.md#three-independent-github-actions-release-workflows) · [Project roadmap](.planning/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+**NestGo** is an experimental, NestJS-inspired framework that brings a modular application structure to **Go**. It combines controllers, providers, dependency injection and declarative modules with a source-to-source compiler that turns decorated `.mgo` files into standard Go code.
 
-</div>
+NestGo offers a pluggable HTTP platform API with native **fasthttp** and **net/http** adapters. It also supports optional compiled handler invocation, with reflection as a fallback for other signatures.
 
-**NestGo Compiler v3** is an experimental Go source-to-source compiler and HTTP runtime inspired by NestJS decorators. Write annotated `.mgo` files, generate standard Go source and route metadata, and serve requests through pluggable HTTP adapters. The legacy `runtime.New`/`FromRegistry` API still returns a `net/http` handler.
+> [!IMPORTANT]
+> NestGo is an independent project inspired by NestJS. It is under active development, is not affiliated with NestJS and is not yet production-ready.
 
-> **Status:** Experimental proof of concept, not production-ready. NestGo is not a drop-in replacement for NestJS.
+## Philosophy
 
-## Requirements
+Go is well suited to efficient network services, but application architecture is often left to each team. NestGo explores an opinionated **organization model**, while retaining Go's native compiler, type system and ecosystem.
 
-- Go 1.23 or newer
-- Go module dependencies are managed by `go.mod`/`go.sum` (including `fasthttp` for the native adapter).
+Applications can be organized into focused modules with explicit imports and exports, making dependency relationships visible and easier to reason about.
 
-## Install the CLI and runtime
+## Getting started
+
+Install the CLI with Go 1.23 or newer:
 
 ```bash
-# Installs the compiler command without updating your app's go.mod.
 go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
+```
 
-# In your application's Go module, add NestGo's public packages.
+In your application's Go module, add the framework and compile your annotated source:
+
+```bash
 go get github.com/kevenmiano/nestgo@latest
-
-# Compile your annotated application sources.
 nestgo compile ./myapp
 ```
 
-The `compiler`, `runtime`, and `metadata` packages share one Go module and one version. `go install` installs the CLI; `go get` adds the library dependency to your application. These commands are intentionally separate. Releases must exist before `@latest` resolves a numbered version. See [Distribution and independent release pipelines](docs/DISTRIBUTION.md). The framework's release binaries and checksums are generated with [GoReleaser](https://goreleaser.com/), while Go module dependencies and documentation keep their own release workflows.
-
-## Getting started
+To explore the included application:
 
 ```bash
 git clone https://github.com/kevenmiano/nestgo.git
 cd nestgo
-go run ./cmd/modforge compile ./examples/shop
+go run ./cmd/nestgo compile ./examples/shop
 go test ./...
-go vet ./...
 ```
-
-The compiler accepts a directory or `.mgo` path (compiling its containing directory). It writes `*_generated.go` files and `zz_modforge_metadata.go`. Generated Go code is checked into the example so the tests can run with normal Go tooling.
 
 ## Example
 
-From [`examples/shop/users.mgo`](examples/shop/users.mgo):
+NestGo's decorators are written in `.mgo` files and compiled into regular Go source:
 
 ```go
-package shop
+@Injectable()
+type UsersService struct{}
 
 @Controller("/users")
 type UsersController struct {
@@ -74,145 +82,49 @@ func (c *UsersController) FindAll() []string {
     return []string{"Ada", "Grace"}
 }
 
-@Get("/{id}")
-func (c *UsersController) FindOne(id string) string {
-    return id
-}
-
-@Post("/")
-@HttpCode(201)
-func (c *UsersController) Create(@Body() dto CreateUserDTO) string {
-    return dto.Name
-}
-
-type CreateUserDTO struct {
-    Name string `json:"name"`
-}
-
-@Injectable()
-type UsersService struct{}
-
-@Module("users")
+@Module({
+    controllers: [UsersController],
+    providers: [UsersService],
+})
 type UsersModule struct{}
 ```
 
-To serve registered routes, import the generated package into your application and create the HTTP handler:
+Use the generated metadata with the application runtime. For example, after importing your generated package for registration:
 
 ```go
-package main
-
-import (
-    "log"
-    "net/http"
-
-    _ "github.com/kevenmiano/nestgo/examples/shop"
-    "github.com/kevenmiano/nestgo/runtime"
+app, err := runtime.ApplicationFromRegistry(
+    runtime.ApplicationOptions{}, // native fasthttp by default
+    "shop",
 )
-
-func main() {
-    handler, err := runtime.FromRegistry("shop")
-    if err != nil {
-        log.Fatal(err)
-    }
-    log.Fatal(http.ListenAndServe(":8080", handler))
-}
-```
-
-The example includes tests for `GET /users/`, `GET /users/{id}`, and `POST /users/`.
-
-## HTTP platform selection
-
-`runtime.NewApplication` accepts an adapter implementation; a nil adapter defaults to native fasthttp. The legacy `runtime.New` and `runtime.FromRegistry` continue to return `http.Handler` for standard-library interoperability.
-
-```go
-app, err := runtime.NewApplication(runtime.ApplicationOptions{
-    Adapter: nethttp.New(),
-}, registeredPackage)
 if err != nil {
     log.Fatal(err)
 }
 log.Fatal(app.Listen(":8080"))
 ```
 
-Import `github.com/kevenmiano/nestgo/platform/nethttp` as `nethttp` and `log` from the standard library. Choose an adapter at bootstrap; these are distinct APIs and the application adapter cannot be hot-swapped after routes have been registered. See [HTTP adapter documentation](docs/HTTP_ADAPTERS.md).
+The existing `runtime.FromRegistry` API also returns a standard `http.Handler`. For details on selecting a different HTTP engine, see [HTTP adapters](docs/HTTP_ADAPTERS.md).
 
-## Modules and visibility
+## Features
 
-`@Module({imports: [...], providers: [...], controllers: [...], exports: [...]})` records module contracts. Providers are injectable inside their declaring module and through explicitly imported modules that export them. `FromRegistry` discovers registered imported module packages transitively. Missing, duplicate, ambiguous or cyclic metadata dependencies fail during validation. Cross-package compilation and advanced provider lifecycles remain experimental.
+- **Modular architecture:** declare controllers, providers, module imports and exports.
+- **Dependency injection:** resolve dependencies and validate module visibility at bootstrap.
+- **Decorator compiler:** generate standard Go files and metadata from `.mgo` sources.
+- **HTTP adapters:** use native fasthttp or net/http through a platform interface.
+- **Hybrid invocation:** statically invoke eligible handlers while retaining reflection for other cases.
+- **Diagnostics:** inspect module graphs and collect startup measurements.
 
-## Supported decorators
-
-| Area | Decorators |
-| --- | --- |
-| Types | `@Controller`, `@Injectable`, `@Module` |
-| HTTP methods | `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete`, `@HttpCode` |
-| Parameters | `@Body`, `@Param`, `@Query` |
-| Compiler-only recognition | `@Headers` (**runtime binding not implemented**) |
-
-## Architecture
-
-```text
-.mgo files
-    |
-    v
-Decorator lexer + Go AST parser
-    |
-    v
-Compiler validation + metadata generation
-    |
-    +--> *_generated.go
-    +--> zz_modforge_metadata.go
-                |
-                v
-        metadata.Register
-                |
-                v
-        runtime.FromRegistry (legacy net/http)
-          OR runtime.NewApplication
-                |
-                v
-       httpadapter.Adapter
-          /          \\
-    fasthttp       net/http
-```
-
-| Directory | Responsibility |
-| --- | --- |
-| `cmd/modforge/` | Compiler command-line entry point |
-| `compiler/` | Lexer, AST validation, source and metadata generation |
-| `metadata/` | Process-wide metadata registry and descriptors |
-| `runtime/` | Module visibility, dependency injection, request binding, reflection fallback and optional compiled invokers |
-| `httpadapter/` | HTTP adapter contracts independent of the selected server |
-| `platform/fasthttp/` | Native fasthttp adapter (default for `NewApplication`) |
-| `platform/nethttp/` | Standard-library HTTP adapter |
-| `examples/shop/` | Sample annotated source, generated Go and HTTP tests |
-| `docs/` | Detailed compiler, runtime, architecture and development references |
-
-## Dependency diagnostics and measured startup
-
-Generate an offline SVG dependency graph and real warm-startup measurements:
-
-```bash
-go run ./cmd/nestgo diagnose -example -out diagnostics-output -samples 15 -iterations 100
-```
-
-Open `diagnostics-output/report.html` locally. The example is a labelled built-in fixture; real applications use the `diagnostics` Go API with their own `metadata.Package` definitions. The graph is deterministically ordered, while timing samples vary by environment. See [diagnostics and reproducibility](docs/DIAGNOSTICS.md).
+Features are evolving. Constructor injection, request-scoped providers, guards, interceptors and full cross-package compilation support are not yet stable.
 
 ## Documentation
 
-The Docusaurus portal is published to [GitHub Pages](https://kevenmiano.github.io/nestgo/) automatically **when a GitHub Release is published with a semantic version tag from `main`**, once GitHub Pages is configured to use GitHub Actions. A merge to `main` does **not** publish the website: `docs-site.yml` validates site builds for website changes, whereas `docs-release.yml` deploys the tagged release. The hosted URL is only available after a successful deployment. See [release publishing setup](docs/DOCS_SITE.md#release-tag-publishing-pipeline).
+Read the [documentation portal](https://kevenmiano.github.io/nestgo/) or browse the [documentation sources](website/docs/). The site is built in CI; GitHub Pages publication currently happens through the separate release workflow.
 
+Additional references: [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
 
-- [Architecture and design](docs/ARCHITECTURE.md)
-- [Compiler reference](docs/COMPILER.md)
-- [HTTP runtime and dependency injection](docs/RUNTIME.md)
-- [Development guide](docs/DEVELOPMENT.md)
-- [Contributing](CONTRIBUTING.md)
+## Contributing
 
-## Limitations
-
-NestGo currently provides module-scoped field injection for declared providers, JSON body binding, method routing, native fasthttp and net/http adapters, and a conservative static invocation fast path for eligible zero-argument handlers with reflection fallback. `runtime.New`/`FromRegistry` remain the legacy `http.Handler` entry points. It does **not** implement constructor injection, request-scoped providers, guards, pipes, interceptors, dynamic modules, a language server, or full NestJS compatibility. Generated metadata and public APIs may change.
+Contributions, bug reports and design discussions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md), the [issue tracker](https://github.com/kevenmiano/nestgo/issues) and the [project roadmap](https://github.com/users/kevenmiano/projects/2).
 
 ## License
 
-No license has been declared. All rights remain with the copyright holder until a license is added.
+A license has not yet been declared for this repository. See the repository contents for the current licensing status.
