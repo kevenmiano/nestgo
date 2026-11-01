@@ -32,3 +32,4 @@ func BenchmarkApplicationBootstrapProviders(b *testing.B) {
         })
     }
 }
+
