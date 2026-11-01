@@ -26,7 +26,7 @@ func TestCompileStatement(t *testing.T) {
 
 func TestCompileStatementValidation(t *testing.T) {
 	for _, tc := range []struct {
-		sql string
+		sql   string
 		names []string
 	}{
 		{"SELECT :id", nil},
@@ -40,7 +40,9 @@ func TestCompileStatementValidation(t *testing.T) {
 		}
 	}
 	stmt, err := Compile("SELECT :id", []string{"id"}, Question)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := stmt.Bind(map[string]any{"other": 1}); err == nil {
 		t.Fatal("expected missing parameter")
 	}
