@@ -2,7 +2,20 @@
 
 All HTTP engines use **the same** `runtime.New` factory, dependency injection, route metadata, lifecycle hooks and shutdown.
 
-Native fasthttp (default):
+Plain Go handler registration needs no metadata or code-generation step:
+
+```go
+app, err := runtime.New(
+    runtime.WithRoutes(runtime.Route{
+        Method: "GET", Path: "/ping",
+        Handler: func(ctx runtime.Context) error { return ctx.Write([]byte("pong")) },
+    }),
+)
+if err != nil { log.Fatal(err) }
+log.Fatal(app.Listen(":8080"))
+```
+
+Generated controller metadata is optional. Native fasthttp (default):
 
 ```go
 app, err := runtime.New(runtime.WithRegistry("shop"))
