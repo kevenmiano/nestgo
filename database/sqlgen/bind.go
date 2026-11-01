@@ -25,27 +25,27 @@ func Bind(query string, params map[string]any, dialect Dialect) (string, []any, 
 	for i := 0; i < len(query); {
 		switch {
 		case query[i] == '\'':
-			j, err := quotedEnd(query, i, '\'')
+			j, err := quotedEnd(query, i, '\'', escapeQuotedLiteral(query, i, dialect))
 			if err != nil {
 				return "", nil, err
 			}
 			out.WriteString(query[i:j])
 			i = j
 		case query[i] == '"':
-			j, err := quotedEnd(query, i, '"')
+			j, err := quotedEnd(query, i, '"', dialect == Question)
 			if err != nil {
 				return "", nil, err
 			}
 			out.WriteString(query[i:j])
 			i = j
 		case query[i] == '`':
-			j, err := quotedEnd(query, i, '`')
+			j, err := quotedEnd(query, i, '`', dialect == Question)
 			if err != nil {
 				return "", nil, err
 			}
 			out.WriteString(query[i:j])
 			i = j
-		case strings.HasPrefix(query[i:], "--"):
+		case strings.HasPrefix(query[i:], "--") || (dialect == Question && query[i] == '#'):
 			j := strings.IndexByte(query[i:], '\n')
 			if j < 0 {
 				out.WriteString(query[i:])
@@ -140,8 +140,21 @@ func dollarTag(s string) (string, bool) {
 	return "", false
 }
 
-func quotedEnd(s string, i int, quote byte) (int, error) {
+// escapeQuotedLiteral handles PostgreSQL E'...' and MySQL backslash-escaped strings.
+// Standard PostgreSQL strings keep their regular SQL quote rules.
+func escapeQuotedLiteral(query string, i int, dialect Dialect) bool {
+	if dialect == Question {
+		return true
+	}
+	return i > 0 && (query[i-1] == 'E' || query[i-1] == 'e') && (i == 1 || !identPart(query[i-2]))
+}
+
+func quotedEnd(s string, i int, quote byte, escaped bool) (int, error) {
 	for j := i + 1; j < len(s); j++ {
+		if escaped && s[j] == '\\' && j+1 < len(s) {
+			j++
+			continue
+		}
 		if s[j] != quote {
 			continue
 		}
