@@ -365,7 +365,11 @@ func writeDTOJSONMethod(out *strings.Builder, dto DTO, direction string) {
 				continue
 			}
 			name, _ := transformerSpec(a.Argument)
-			fmt.Fprintf(out, "next%d_%d, err%d_%d := %s(p%d)\n", i, n, i, n, name, i)
+			if transformerStructLiteral(name) {
+				fmt.Fprintf(out, "next%d_%d, err%d_%d := __nestgo_transform.Apply[%s](p%d, %s)\n", i, n, i, n, field.Type, i, name)
+			} else {
+				fmt.Fprintf(out, "next%d_%d, err%d_%d := __nestgo_transform.ApplyFunc[%s](p%d, %s)\n", i, n, i, n, field.Type, i, name)
+			}
 			fmt.Fprintf(out, "if err%d_%d != nil { return ", i, n)
 			if encoding {
 				out.WriteString("nil, ")
