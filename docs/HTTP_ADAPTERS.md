@@ -28,15 +28,16 @@ bootstrap and registers handlers independently of platform.
 
 **Native fast path:** the fasthttp platform uses `fasthttp.RequestCtx`
 without `fasthttpadaptor`; the standard-library platform uses
-`http.ServeMux`. The initial fasthttp path matcher is linear in route count;
-it must be replaced with an indexed router and benchmarked before release.
+`http.ServeMux`. The fasthttp adapter now builds a method/segment-count index during Serve startup and only scans matching buckets for common requests. This is not a fully indexed path trie; benchmark worst-case bucket sizes and route precedence before release.
 
-**Migration status:** The canonical application lifecycle is `runtime.NewApp(ctx, With...)`. The earlier `runtime.New`, `runtime.NewWithOptions` and `runtime.FromRegistry` entrypoints were removed. The legacy adapter-specific `Application` API is still isolated pending consolidation into `NewApp` (#103). Do not introduce new dependencies on that API; it will be removed before the first stable release. HTTP engine switching must retain parity for provider factories, route handlers, and shutdown semantics.\n\n## Open verification work
+**Migration status:** `runtime.NewApp(ctx, With...)` is the canonical lifecycle and returns the net/http handler through `HTTPHandler()`. `runtime.New`, `NewWithOptions` and `FromRegistry` have been removed. The adapter-specific `Application` API remains temporarily while HTTP adapter selection is consolidated into `NewApp` (#103). Not all net/http middleware works unchanged on fasthttp.
+
+## Open verification work
 
 - Produce and commit `go.sum` with `go mod tidy` (network-enabled CI).
 - Run `go test ./...` and `go vet ./...` on Go 1.23.
 - Validate route precedence, 404/405, trailing slash, request-body limits,
   response status and headers, and shutdown parity across engines.
 - Measure throughput, allocations, startup time and p95/p99 latency.
-- Replace runtime `reflect.Call` with generated invokers.
+- Extend generated static invokers beyond currently supported zero-argument and typed decorated handlers.
 - Document unsupported platform capabilities such as WebSocket and streaming.
