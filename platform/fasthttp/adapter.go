@@ -48,22 +48,12 @@ func (a *Adapter) Serve(listener net.Listener) error {
 		return errors.New("server already started")
 	}
 	a.started = true
-	routes := append([]httpadapter.Route(nil), a.routes...)
+	routes := compileRoutes(a.routes)
 	server := &fast.Server{Handler: func(c *fast.RequestCtx) {
-		path := string(c.Path())
-		method := string(c.Method())
-		foundPath := false
-		for _, route := range routes {
-			params, ok := match(route.Path, path)
-			if !ok {
-				continue
-			}
-			foundPath = true
-			if route.Method != method {
-				continue
-			}
+		handler, params, foundPath := routes.lookup(string(c.Method()), string(c.Path()))
+		if handler != nil {
 			ctx := &requestContext{r: c, params: params, status: 200}
-			if err := route.Handler(ctx); err != nil && !ctx.wrote {
+			if err := handler(ctx); err != nil && !ctx.wrote {
 				c.Error(err.Error(), 500)
 			}
 			return
