@@ -497,8 +497,33 @@ func CompileDir(dir string) error {
 	return CompileDirWithDialect(dir, sqlgen.PostgreSQL)
 }
 
-// CompileDirWithDialect compiles decorated repositories for a selected SQL dialect.
+// CompileDirWithDialect compiles repositories with one explicitly chosen dialect.
 func CompileDirWithDialect(dir string, dialect sqlgen.Dialect) error {
+	return compileDirWithDialectPlan(dir, dialect, nil)
+}
+
+// CompileDirWithDialects binds generated SQL to the named connection in each
+// @Repository declaration. It rejects missing mappings rather than accidentally
+// generating PostgreSQL placeholders for a MySQL repository.
+func CompileDirWithDialects(dir string, dialects map[string]sqlgen.Dialect) error {
+	if len(dialects) == 0 {
+		return fmt.Errorf("compiler: connection dialect mappings required")
+	}
+	for name, dialect := range dialects {
+		if !schemaIdentifier(name) {
+			return fmt.Errorf("compiler: invalid connection name %q", name)
+		}
+		if dialect != sqlgen.PostgreSQL && dialect != sqlgen.Question {
+			return fmt.Errorf("compiler: invalid SQL dialect for connection %q", name)
+		}
+	}
+	return compileDirWithDialectPlan(dir, sqlgen.PostgreSQL, dialects)
+}
+
+func compileDirWithDialectPlan(dir string, dialect sqlgen.Dialect, dialects map[string]sqlgen.Dialect) error {
+	if dialect != sqlgen.PostgreSQL && dialect != sqlgen.Question {
+		return fmt.Errorf("compiler: unsupported SQL dialect %d", dialect)
+	}
 	paths, err := filepath.Glob(filepath.Join(dir, "*.mgo"))
 	if err != nil {
 		return err
@@ -551,6 +576,13 @@ func CompileDirWithDialect(dir string, dialect sqlgen.Dialect) error {
 		if hasRepo {
 			def, err := RepositoryFromMGO(file, dialect)
 			if err != nil { return err }
+			if dialects != nil {
+				resolved, ok := dialects[def.Connection]
+				if !ok {
+					return fmt.Errorf("repository %s: missing SQL dialect for connection %q", def.Name, def.Connection)
+				}
+				def.Dialect = resolved
+			}
 			generated, err := GenerateRepository(def)
 			if err != nil { return err }
 			repositoryDefinitions = append(repositoryDefinitions, def)
