@@ -19,8 +19,7 @@ import (
 )
 
 app, err := runtime.New(
-    runtime.WithRegistry("pipeline"),
-    runtime.WithMiddleware(func(ctx httpadapter.Context, next httpadapter.Next) error {
+        runtime.WithMiddleware(func(ctx httpadapter.Context, next httpadapter.Next) error {
         ctx.SetHeader("X-Example", "pipeline")
         return next() // continue to the next middleware/guard/handler
     }),

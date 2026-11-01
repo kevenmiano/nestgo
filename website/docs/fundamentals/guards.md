@@ -65,8 +65,7 @@ Use functional options for an application-wide guard instance:
 
 ```go
 app, err := runtime.New(
-    runtime.WithRegistry("pipeline"),
-    runtime.WithGuards(&MetricsGuard{}),
+        runtime.WithGuards(&MetricsGuard{}),
 )
 ```
 

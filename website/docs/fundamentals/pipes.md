@@ -54,7 +54,7 @@ supported and preserves declaration order.
 ## Global pipes
 
 ```go
-runtime.New(runtime.WithRegistry("pipeline"), runtime.WithPipes(&AuditPipe{}))
+runtime.New(runtime.WithPipes(&AuditPipe{}))
 ```
 
 For compiler-generated handlers, `@Body`, `@Param` and `@Query` all
