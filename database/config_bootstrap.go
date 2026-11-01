@@ -13,7 +13,7 @@ import (
 // ConnectionEnv maps a named pool to a validated environment prefix.
 // Example prefix USERS_DB reads USERS_DB_DRIVER and USERS_DB_DSN.
 type ConnectionEnv struct {
-	Name string
+	Name   string
 	Prefix string
 }
 
@@ -29,11 +29,11 @@ func BootstrapFromConfig(ctx context.Context, settings *config.Service, entries 
 			return nil, fmt.Errorf("database: connection name and prefix required")
 		}
 		var env struct {
-			Driver string `env:"DRIVER,required"`
-			DSN string `env:"DSN,required"`
-			MaxOpenConns int `env:"MAX_OPEN_CONNS,default=10,min=1"`
-			MaxIdleConns int `env:"MAX_IDLE_CONNS,default=5,min=0"`
-			PingTimeout time.Duration `env:"PING_TIMEOUT,default=5s"`
+			Driver       string        `env:"DRIVER,required"`
+			DSN          string        `env:"DSN,required"`
+			MaxOpenConns int           `env:"MAX_OPEN_CONNS,default=10,min=1"`
+			MaxIdleConns int           `env:"MAX_IDLE_CONNS,default=5,min=0"`
+			PingTimeout  time.Duration `env:"PING_TIMEOUT,default=5s"`
 		}
 		if err := settings.Decode(strings.TrimSuffix(entry.Prefix, "_"), &env); err != nil {
 			return nil, fmt.Errorf("database: connection %s: %w", entry.Name, err)
@@ -42,12 +42,12 @@ func BootstrapFromConfig(ctx context.Context, settings *config.Service, entries 
 			return nil, fmt.Errorf("database: connection %s: idle limit exceeds open limit", entry.Name)
 		}
 		options = append(options, ConnectionOptions{
-			Name: entry.Name,
-			Driver: env.Driver,
-			DSN: env.DSN,
+			Name:         entry.Name,
+			Driver:       env.Driver,
+			DSN:          env.DSN,
 			MaxOpenConns: env.MaxOpenConns,
 			MaxIdleConns: env.MaxIdleConns,
-			PingTimeout: env.PingTimeout,
+			PingTimeout:  env.PingTimeout,
 		})
 	}
 	return Bootstrap(ctx, options)
