@@ -21,18 +21,18 @@ import (
 type Option func(*applicationConfig)
 
 type applicationConfig struct {
-	adapter     httpadapter.Adapter
-	packages    []metadata.Package
-	routes      []Route
-	registry    []string
-	logger      *logging.Service
+	adapter          httpadapter.Adapter
+	packages         []metadata.Package
+	routes           []Route
+	registry         []string
+	logger           *logging.Service
 	loggerConfigured bool
-	debug       bool
-	onBootstrap func(BootstrapMetrics)
-	configOptions []config.Option
-	databaseOptions []database.Option
-	instances []any
-	context context.Context
+	debug            bool
+	onBootstrap      func(BootstrapMetrics)
+	configOptions    []config.Option
+	databaseOptions  []database.Option
+	instances        []any
+	context          context.Context
 }
 
 // WithPackages supplies already-generated metadata to the application.
@@ -102,9 +102,9 @@ func WithBootstrapMetrics(observer func(BootstrapMetrics)) Option {
 
 // Application owns one HTTP adapter and the lifecycle of its providers.
 type Application struct {
-	adapter   httpadapter.Adapter
-	lifecycle *lifecycleRegistry
-	Config *config.Service
+	adapter     httpadapter.Adapter
+	lifecycle   *lifecycleRegistry
+	Config      *config.Service
 	Connections *database.Connections
 }
 
