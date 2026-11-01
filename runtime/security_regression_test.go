@@ -44,21 +44,56 @@ func securityRegressionPackages() []metadata.Package {
 		Type:   reflect.TypeOf((*securityRegressionController)(nil)),
 		Prefix: "/security",
 		Routes: []metadata.Route{
-			{Method: http.MethodGet, Path: "/named", Handler: "Named"},
-			{Method: http.MethodGet, Path: "/struct", Handler: "Struct"},
-			{Method: http.MethodGet, Path: "/nil", Handler: "NilPointer"},
 			{Method: http.MethodGet, Path: "/regular", Handler: "Regular"},
-			{Method: http.MethodGet, Path: "/static", Handler: "NilPointer", StaticInvoke: func(any) (any, error) {
+			{Method: http.MethodGet, Path: "/static", Handler: "Regular", StaticInvoke: func(any) (any, error) {
 				return nil, errors.New("PRIVATE_STATIC_SENTINEL")
 			}},
-			{Method: http.MethodGet, Path: "/static-http", Handler: "NilPointer", StaticHTTP: func(any, httpadapter.Context) (any, int, error) {
+			{Method: http.MethodGet, Path: "/static-http", Handler: "Regular", StaticHTTP: func(any, httpadapter.Context) (any, int, error) {
 				return nil, 503, errors.New("PRIVATE_HTTP_SENTINEL")
 			}},
 		},
 	}}}}
 }
 
-func TestSecurityAdapterErrorRedactionAndNilableErrorTypes(t *testing.T) {
+func TestSecurityRejectsConcreteErrorSignatures(t *testing.T) {
+	for _, method := range []string{"Named", "Struct", "NilPointer"} {
+		t.Run(method, func(t *testing.T) {
+			packages := []metadata.Package{{Controllers: []metadata.Controller{{
+				Type:   reflect.TypeOf((*securityRegressionController)(nil)),
+				Prefix: "/security",
+				Routes: []metadata.Route{{Method: http.MethodGet, Path: "/invalid", Handler: method}},
+			}}}}
+			if err := registerRoutes(&capturedAdapter{}, packages); err == nil || !strings.Contains(err.Error(), "signature") {
+				t.Fatalf("adapter runtime accepted concrete error output: %v", err)
+			}
+			if _, err := New(packages...); err == nil || !strings.Contains(err.Error(), "signature") {
+				t.Fatalf("legacy runtime accepted concrete error output: %v", err)
+			}
+		})
+	}
+}
+
+func TestSecurityReflectedErrorValueIsSafeForConcreteKinds(t *testing.T) {
+	for _, tc := range []struct {
+		value any
+		want  string
+	}{
+		{namedSecurityError("named"), "named"},
+		{structSecurityError{}, "PRIVATE_STRUCT_SENTINEL"},
+		{(*pointerSecurityError)(nil), ""},
+	} {
+		got := reflectedHandlerError(reflect.ValueOf(tc.value))
+		if tc.want == "" {
+			if got != nil {
+				t.Fatalf("expected nil error, got %v", got)
+			}
+		} else if got == nil || got.Error() != tc.want {
+			t.Fatalf("wrong error: %v", got)
+		}
+	}
+}
+
+func TestSecurityAdapterErrorRedaction(t *testing.T) {
 	a := &capturedAdapter{}
 	if err := registerRoutes(a, securityRegressionPackages()); err != nil {
 		t.Fatal(err)
@@ -66,25 +101,18 @@ func TestSecurityAdapterErrorRedactionAndNilableErrorTypes(t *testing.T) {
 	for _, tc := range []struct {
 		path   string
 		status int
-		body   string
 	}{
-		{"/named", 500, "Internal server error\n"},
-		{"/struct", 500, "Internal server error\n"},
-		{"/nil", 200, "\"safe\"\n"},
-		{"/regular", 500, "Internal server error\n"},
-		{"/static", 500, "Internal server error\n"},
-		{"/static-http", 503, "Internal server error\n"},
+		{"/regular", 500},
+		{"/static", 500},
+		{"/static-http", 503},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			ctx := &capturedContext{}
 			if err := a.routes[http.MethodGet+" /security"+tc.path](ctx); err != nil {
 				t.Fatal(err)
 			}
-			if ctx.status != tc.status || ctx.body != tc.body {
-				t.Fatalf("status=%d body=%q, want status=%d body=%q", ctx.status, ctx.body, tc.status, tc.body)
-			}
-			if strings.Contains(ctx.body, "PRIVATE_") {
-				t.Fatal("handler error leaked in HTTP response")
+			if ctx.status != tc.status || ctx.body != "Internal server error\n" {
+				t.Fatalf("status=%d body=%q, want status=%d", ctx.status, ctx.body, tc.status)
 			}
 		})
 	}
@@ -95,13 +123,9 @@ func TestSecurityLegacyHTTPErrorRedaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/named", "/struct", "/regular"} {
-		t.Run(path, func(t *testing.T) {
-			response := httptest.NewRecorder()
-			h.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/security"+path, nil))
-			if response.Code != http.StatusInternalServerError || strings.Contains(response.Body.String(), "PRIVATE_") {
-				t.Fatalf("unexpected HTTP response status=%d body=%q", response.Code, response.Body.String())
-			}
-		})
+	response := httptest.NewRecorder()
+	h.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/security/regular", nil))
+	if response.Code != http.StatusInternalServerError || strings.Contains(response.Body.String(), "PRIVATE_") {
+		t.Fatalf("unexpected HTTP response status=%d body=%q", response.Code, response.Body.String())
 	}
 }
