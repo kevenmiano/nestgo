@@ -50,10 +50,12 @@ func BenchmarkReleaseScale(b *testing.B) {
 		target := fmt.Sprintf("/scale/%d", count-1)
 		for _, engine := range engines {
 			b.Run(fmt.Sprintf("%s/routes_%d/providers_%d", engine.name, count, count), func(b *testing.B) {
+				bootstrapStarted := time.Now()
 				app, err := New(WithAdapter(engine.newAdapter()), WithPackages(pkg), WithRoutes(routes...))
 				if err != nil {
 					b.Fatal(err)
 				}
+				startupDuration := time.Since(bootstrapStarted)
 				listener, err := net.Listen("tcp", "127.0.0.1:0")
 				if err != nil {
 					b.Fatal(err)
@@ -125,6 +127,9 @@ func BenchmarkReleaseScale(b *testing.B) {
 				b.ReportMetric(float64(latencies[(n-1)*95/100])/1e6, "p95-ms")
 				b.ReportMetric(float64(latencies[(n-1)*99/100])/1e6, "p99-ms")
 				b.ReportMetric(float64(n)/b.Elapsed().Seconds(), "req/s")
+				// Bootstrap time includes metadata compilation, DI graph and
+				// route registration, but excludes the TCP listener and warmup.
+				b.ReportMetric(float64(startupDuration.Microseconds())/1e3, "startup-ms")
 			})
 		}
 	}
