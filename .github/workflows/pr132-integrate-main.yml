@@ -1,0 +1,57 @@
+name: PR132 Integrate and Benchmark
+on:
+  push:
+    branches: [feat/dto-property-transformers]
+    paths:
+      - '.github/workflows/pr132-integrate-main.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/dto-property-transformers
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge main into PR using main's version only where conflicts exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-ff --no-commit -X theirs origin/main
+          python3 .github/scripts/pr132_integrate.py
+          gofmt -w compiler/*.go httpadapter/*.go runtime/http_routes.go runtime/request_pipeline.go validation/*.go
+          git diff --check
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Reconcile module requirements
+        run: go mod tidy
+      - name: Full tests after integration
+        run: go test -mod=mod ./... -count=1
+      - name: Vet after integration
+        run: go vet -mod=mod ./...
+      - name: DTO and validation benchmarks
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./validation ./transform/... -run '^$' -bench 'Benchmark' -benchmem -benchtime=300x
+      - name: Runtime benchmarks (startup and HTTP)
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./runtime -run '^$' -bench 'Benchmark.*(Bootstrap|HTTP|Pipeline)' -benchmem -benchtime=100x
+      - name: Commit reconciled merge and update PR branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A
+          git commit -m "merge: integrate DTO transformers and validators with current NestGo main"
+          git push origin HEAD:feat/dto-property-transformers
