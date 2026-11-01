@@ -52,7 +52,7 @@ func BenchmarkRouteLookup(b *testing.B) {
 		target := fmt.Sprintf("/api/resource%d/42", count-1)
 		for _, benchmark := range []struct {
 			name string
-			run func() bool
+			run  func() bool
 		}{
 			{"linear", func() bool {
 				for _, route := range routes {
