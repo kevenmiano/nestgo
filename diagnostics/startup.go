@@ -1,6 +1,7 @@
 package diagnostics
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"sort"
@@ -40,7 +41,7 @@ func percentile(sorted []float64, fraction float64) float64 {
 	return sorted[index]
 }
 
-// MeasureStartup measures runtime.New with prebuilt metadata. It does not include
+// MeasureStartup measures runtime.NewApp with prebuilt metadata. It does not include
 // Go compilation, OS launch, imported package init(), or network listening.
 // The workload excludes graph analysis, avoiding measurement contamination.
 func MeasureStartup(scenario string, packages []metadata.Package, samples, iterations int, commit string) (Startup, error) {
@@ -48,13 +49,13 @@ func MeasureStartup(scenario string, packages []metadata.Package, samples, itera
 		return Startup{}, fmt.Errorf("samples and iterations must be between 1 and their limits (1000 / 100000)")
 	}
 	m := Startup{Scenario: scenario, GoVersion: runtime.Version(), GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, CPUCount: runtime.NumCPU(), Commit: commit, IterationsPerSample: iterations, SamplesNS: make([]float64, 0, samples)}
-	if _, err := nestgoruntime.New(packages...); err != nil {
+	if _, err := startMeasuredApp(packages...); err != nil {
 		return m, fmt.Errorf("startup fixture invalid: %w", err)
 	}
 	for i := 0; i < samples; i++ {
 		start := time.Now()
 		for j := 0; j < iterations; j++ {
-			if _, err := nestgoruntime.New(packages...); err != nil {
+			if _, err := startMeasuredApp(packages...); err != nil {
 				return m, err
 			}
 		}
@@ -67,10 +68,16 @@ func MeasureStartup(scenario string, packages []metadata.Package, samples, itera
 	b := testing.Benchmark(func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, _ = nestgoruntime.New(packages...)
+			_, _ = startMeasuredApp(packages...)
 		}
 	})
 	m.BytesPerOp = b.AllocedBytesPerOp()
 	m.AllocsPerOp = b.AllocsPerOp()
 	return m, nil
+}
+
+func startMeasuredApp(packages ...metadata.Package) (struct{}, error) {
+	app, err := nestgoruntime.NewApp(context.Background(), nestgoruntime.WithPackages(packages...))
+	if err != nil { return struct{}{}, err }
+	return struct{}{}, app.Close()
 }
