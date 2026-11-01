@@ -24,7 +24,6 @@ type applicationConfig struct {
 	adapter          httpadapter.Adapter
 	packages         []metadata.Package
 	routes           []Route
-	registry         []string
 	logger           *logging.Service
 	loggerConfigured bool
 	debug            bool
@@ -52,12 +51,6 @@ type Route = httpadapter.Route
 // WithRoutes registers direct handlers with the same namespace and lifecycle as compiled routes.
 func WithRoutes(routes ...Route) Option {
 	return func(c *applicationConfig) { c.routes = append(c.routes, routes...) }
-}
-
-// WithRegistry loads named registered packages and their transitive module imports.
-// Import the generated Go packages so their init functions register metadata.
-func WithRegistry(names ...string) Option {
-	return func(c *applicationConfig) { c.registry = append(c.registry, names...) }
 }
 
 // WithAdapter selects an HTTP engine; the default is fasthttp.
@@ -122,17 +115,8 @@ func New(options ...Option) (*Application, error) {
 	if cfg.loggerConfigured && cfg.logger == nil {
 		return nil, errors.New("runtime: nil logger")
 	}
-	if len(cfg.registry) > 0 && len(cfg.packages) > 0 {
-		return nil, errors.New("WithRegistry and WithPackages cannot be combined")
-	}
 	packages := cfg.packages
-	if len(cfg.registry) > 0 {
-		var err error
-		packages, err = registryImportClosure(cfg.registry)
-		if err != nil {
-			return nil, err
-		}
-	} else if len(cfg.packages) == 0 {
+	if len(cfg.packages) == 0 {
 		// Compiled modules self-register at import time. Their unique root and
 		// transitive imports are discovered once during bootstrap.
 		var err error
