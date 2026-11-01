@@ -101,8 +101,11 @@ func TestNginxProxySecurityBoundaries(t *testing.T) {
 			_ = reservation.Close()
 			workdir := t.TempDir()
 			cacheDir := filepath.Join(workdir, "cache")
-			if err := os.MkdirAll(cacheDir, 0700); err != nil {
-				t.Fatal(err)
+			proxyTempDir := filepath.Join(workdir, "proxytemp")
+			for _, dir := range []string{cacheDir, proxyTempDir} {
+				if err := os.MkdirAll(dir, 0700); err != nil {
+					t.Fatal(err)
+				}
 			}
 			config := fmt.Sprintf(`worker_processes 1;
 pid %s;
@@ -111,6 +114,7 @@ events { worker_connections 128; }
 http {
     access_log off;
     proxy_cache_path %s levels=1:2 keys_zone=nestgo_cache:1m max_size=10m inactive=1m;
+    proxy_temp_path %s 1 2;
     server_tokens off;
     client_max_body_size 128;
     client_header_buffer_size 1k;
@@ -142,7 +146,7 @@ http {
         }
     }
 }
-`, filepath.Join(workdir, "nginx.pid"), filepath.Join(workdir, "error.log"), cacheDir, proxyAddress, upstream.Addr().String(), upstream.Addr().String())
+`, filepath.Join(workdir, "nginx.pid"), filepath.Join(workdir, "error.log"), cacheDir, proxyTempDir, proxyAddress, upstream.Addr().String(), upstream.Addr().String())
 			configFile := filepath.Join(workdir, "nginx.conf")
 			if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
 				t.Fatal(err)
