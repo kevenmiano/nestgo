@@ -18,10 +18,10 @@ func TestGeneratedTransformerContractsRejectInvalidImplementations(t *testing.T)
 	}{
 		{"wrong-function-input", "Wrong", "func Wrong(value int) (int, error) { return value, nil }"},
 		{"wrong-function-output", "Wrong", "func Wrong(value string) string { return value }"},
-		{"struct-missing-interface", "Wrong{}", "type Wrong struct{}"},
-		{"struct-wrong-field-type", "Wrong{}", "type Wrong struct{}\nfunc (Wrong) Transform(v int) (int, error) { return v, nil }"},
-		{"struct-wrong-return-type", "Wrong{}", "type Wrong struct{}\nfunc (Wrong) Transform(v string) string { return v }"},
-		{"pointer-receiver-value-used", "Wrong{}", "type Wrong struct{}\nfunc (*Wrong) Transform(v string) (string, error) { return v, nil }"},
+		{"struct-missing-interface", "Wrong", "type Wrong struct{}"},
+		{"struct-wrong-field-type", "Wrong", "type Wrong struct{}\nfunc (Wrong) Transform(v int) (int, error) { return v, nil }"},
+		{"struct-wrong-return-type", "Wrong", "type Wrong struct{}\nfunc (Wrong) Transform(v string) string { return v }"},
+		{"struct-wrong-pointer-method", "Wrong", "type Wrong struct{}\nfunc (*Wrong) Transform(v *string) (string, error) { return *v, nil }"},
 	}
 	workingDir, err := os.Getwd()
 	if err != nil {
@@ -62,6 +62,8 @@ func TestTransformerStructExpressionValidation(t *testing.T) {
 	}{
 		{"constructor-calls", "MakeTransformer()"},
 		{"configured-literal", "Trim{Enabled: true}"},
+		{"struct-instance", "Trim{}"},
+		{"pointer-instance", "&Trim{}"},
 		{"anonymous-struct", "struct{}{}"},
 		{"nil-instance", "nil"},
 		{"function-call", "Trim()"},
