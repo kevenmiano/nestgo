@@ -33,7 +33,7 @@ func WithLimits(limits httpadapter.ServerLimits) Option {
 }
 
 func New(options ...Option) *Adapter {
-	a := &Adapter{keys: map[string]bool{}, literalKeys: map[string]bool{}, limits: httpadapter.DefaultServerLimits()}
+	a := &Adapter{limits: httpadapter.DefaultServerLimits()}
 	for _, option := range options {
 		if option != nil {
 			option(a)
@@ -78,6 +78,12 @@ func (a *Adapter) Register(route httpadapter.Route) error {
 				return errors.New("ambiguous HTTP routes: " + existing.Path + " and " + route.Path)
 			}
 		}
+	}
+	// Empty adapters do not allocate route indexes; allocate both together
+	// after validation, while holding the registration mutex.
+	if a.keys == nil {
+		a.keys = make(map[string]bool)
+		a.literalKeys = make(map[string]bool)
 	}
 	a.keys[key] = true
 	a.routes = append(a.routes, route)

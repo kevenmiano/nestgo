@@ -18,7 +18,7 @@ type Connections struct {
 }
 
 func NewConnections() *Connections {
-	return &Connections{pools: make(map[string]*sql.DB)}
+	return &Connections{}
 }
 
 // Register takes ownership of a connection. Failed registrations leave ownership
@@ -39,6 +39,11 @@ func (c *Connections) Register(name string, db *sql.DB) error {
 		if handle == db {
 			return fmt.Errorf("database: pool already registered as %q", existing)
 		}
+	}
+	// Most HTTP-only services never register a database pool. Allocate the
+	// registry only when its first connection is successfully registered.
+	if c.pools == nil {
+		c.pools = make(map[string]*sql.DB)
 	}
 	c.pools[name] = db
 	return nil

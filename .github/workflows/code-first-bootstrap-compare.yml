@@ -5,7 +5,11 @@ on:
     branches: [main]
     paths:
       - 'runtime/bootstrap_core.go'
+      - 'runtime/application.go'
       - 'runtime/code_first_bootstrap_benchmark_test.go'
+      - 'database/connections.go'
+      - 'config/config.go'
+      - 'platform/fasthttp/adapter.go'
       - '.github/workflows/code-first-bootstrap-compare.yml'
   workflow_dispatch:
 
