@@ -56,8 +56,8 @@ func BenchmarkRegisterLiteralRoutes(b *testing.B) {
 		routes := make([]httpadapter.Route, count)
 		for i := range routes {
 			routes[i] = httpadapter.Route{
-				Method: "GET",
-				Path: fmt.Sprintf("/resource/%d", i),
+				Method:  "GET",
+				Path:    fmt.Sprintf("/resource/%d", i),
 				Handler: handler,
 			}
 		}
