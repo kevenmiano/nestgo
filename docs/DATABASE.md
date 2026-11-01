@@ -70,3 +70,21 @@ Import `github.com/kevenmiano/nestgo/database/sqlx` as `nestgosqlx`; application
 `database.Begin(ctx, db, options)` and `database.WithinTransaction` expose explicit commit and rollback. `database.Native(db)` and `database.New(executor)` wrap caller-owned handles. **`Connections.Register(name, db)` takes ownership on success**; rejected handles remain caller-owned. `runtime.New` owns and closes its opened pools via `Application.Close()`, but does not shut down an externally owned HTTP server.
 
 Quality gates: gofmt, go vet, race tests, generated-code compile, PostgreSQL/MySQL integration and benchmarks (#94).
+
+## Executable SQL repositories: end-to-end example
+
+See [the live PostgreSQL/MySQL example](../database/integration/examples/sql/README.md). The annotated `.mgo` sources demonstrate an `@Module` containing a controller and a service with **explicit** `nestgo:"inject"` fields referencing generated repositories. The integration test executes parameterized CRUD and rollback on both engines and makes HTTP requests through the compiled DI graph.
+
+From the repository root, generate once with the matching dialect for **each** named connection:
+
+```sh
+go run ./cmd/nestgo compile ./database/integration/examples/sql --connection=users:postgres --connection=billing:mysql
+```
+
+Then set `NESTGO_TEST_POSTGRES_DSN` and `NESTGO_TEST_MYSQL_DSN` for disposable local databases, and run:
+
+```sh
+cd database/integration && go test -race -count=1 -v ./...
+```
+
+The `Database integration (real PostgreSQL and MySQL)` workflow generates the example and runs it against live database services on changes to `database/**`, `compiler/**`, `runtime/**` or the NestGo CLI. This is a CI regression gate, **not** an assertion that SQL migrations, custom DTO projections or runtime driver/dialect cross-validation already exist.
