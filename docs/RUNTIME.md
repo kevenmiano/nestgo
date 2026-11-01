@@ -43,6 +43,6 @@ Generated static invokers for eligible zero-argument routes are used by both dis
 
 ## Runtime constraints
 
-There is no complete built-in authentication/authorization, request-scoped injection, global validation/interceptor/filter pipeline, or automatic dependency resource disposal in these runtime paths. Errors during bootstrap are returned. Adapter applications attempt best-effort lifecycle and transport cleanup on failure, but registered adapter routes cannot currently be rolled back. Both HTTP paths now share the field dependency-injection resolver; their bootstrap orchestration and dispatch still differ. Test and harden both HTTP paths before production exposure.
+There is no complete built-in authentication/authorization, request-scoped injection, global validation/interceptor/filter pipeline, or automatic dependency resource disposal in these runtime paths. Errors during bootstrap are returned. Adapter applications attempt best-effort lifecycle and transport cleanup on failure, but registered adapter routes cannot currently be rolled back. Both HTTP paths now use the same bootstrap graph for provider allocation, module visibility, deterministic field injection and controller construction. Their HTTP route validation, dispatch, logging and lifecycle ownership still differ. Test and harden both HTTP paths before production exposure.
 
 See also [HTTP adapters](HTTP_ADAPTERS.md), [architecture](ARCHITECTURE.md) and [lifecycle documentation](../website/docs/fundamentals/lifecycle.md).

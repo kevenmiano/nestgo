@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kevenmiano/nestgo/httpresponse"
 	"github.com/kevenmiano/nestgo/logging"
-	"github.com/kevenmiano/nestgo/metadata"
+	"github.com/kevenmiano/nestgo/httpresponse"
 	"github.com/kevenmiano/nestgo/platform/nethttp"
+	"github.com/kevenmiano/nestgo/metadata"
 	"log/slog"
 	"net/http"
 	"reflect"
@@ -42,49 +42,22 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 			logger.Debug(ctx, component, message, attrs...)
 		}
 	}
-	providers := map[reflect.Type]reflect.Value{}
-	orderedProviders := make([]reflect.Type, 0)
-	controllers := []metadata.Controller{}
-	for _, pkg := range packages {
-		moduleStart := time.Now()
-		for _, p := range pkg.Providers {
-			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
-				return fail(fmt.Errorf("provider must be pointer to struct: %v", p.Type))
-			}
-			if _, exists := providers[p.Type]; exists {
-				return fail(fmt.Errorf("duplicate provider: %v", p.Type))
-			}
-			providers[p.Type] = reflect.New(p.Type.Elem())
-			orderedProviders = append(orderedProviders, p.Type)
-			logDebug("InstanceLoader", "Provider instantiated", slog.String("provider", p.Type.String()))
-		}
-		controllers = append(controllers, pkg.Controllers...)
-		logger.Startup(ctx, "InstanceLoader", "Package providers registered", moduleStart)
-	}
-	visibility, err := moduleVisibility(packages)
+	diStart := time.Now()
+	graph, err := prepareBootstrap(packages, func(typ reflect.Type) {
+		logDebug("InstanceLoader", "Provider instantiated", slog.String("provider", typ.String()))
+	}, func() {
+		logger.Info(ctx, "InstanceLoader", "Package providers registered")
+	})
 	if err != nil {
 		return fail(err)
-	}
-	inject := func(v reflect.Value) error {
-		return injectFields(v, providers, orderedProviders, visibility)
-	}
-	diStart := time.Now()
-	for _, providerType := range orderedProviders {
-		v := providers[providerType]
-		if err := inject(v); err != nil {
-			return fail(err)
-		}
 	}
 	logger.Startup(ctx, "InstanceLoader", "Provider dependencies resolved", diStart)
 	routeStart := time.Now()
 	mux := http.NewServeMux()
 	seen := map[string]bool{}
-	for _, c := range controllers {
-		if c.Type == nil || c.Type.Kind() != reflect.Ptr || c.Type.Elem().Kind() != reflect.Struct {
-			return fail(fmt.Errorf("invalid controller %v", c.Type))
-		}
-		instance := reflect.New(c.Type.Elem())
-		if err := inject(instance); err != nil {
+	for _, c := range graph.controllers {
+		instance, err := graph.newController(c.Type)
+		if err != nil {
 			return fail(err)
 		}
 		logger.Info(ctx, "RoutesResolver", "Controller registered", slog.String("controller", c.Type.String()), slog.String("prefix", c.Prefix))
@@ -94,47 +67,30 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				return fail(fmt.Errorf("missing handler %s.%s", c.Type, route.Handler))
 			}
 			typ := method.Type()
-			if typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem())) {
-				return fail(fmt.Errorf("unsupported signature %s", route.Handler))
+			contract, contractErr := compileRouteContract(c.Prefix, route, typ)
+			if contractErr != nil {
+				return fail(formatRouteContractError(contractErr, true))
 			}
-			path := strings.TrimSuffix(c.Prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
-			if path == "" {
-				path = "/"
-			}
-			key := route.Method + " " + path
+			path := contract.Path
+			key := contract.Key
 			if seen[key] {
 				return fail(fmt.Errorf("duplicate route %s", key))
 			}
 			seen[key] = true
-			bindings := map[int]metadata.Parameter{}
-			for _, p := range route.Parameters {
-				if p.Index < 0 || p.Index >= typ.NumIn() {
-					return fail(fmt.Errorf("invalid parameter index %d", p.Index))
-				}
-				bindings[p.Index] = p
-			}
+			bindings := contract.Bindings
 			explicit, passthrough := false, false
-			for i := 0; i < typ.NumIn(); i++ {
-				if p, ok := bindings[i]; ok {
-					if p.Kind == "Res" || p.Kind == "Response" {
-						if explicit {
-							return fail(fmt.Errorf("multiple @Res arguments for %s", route.Handler))
-						}
-						if !reflect.TypeOf((*httpresponse.Writer)(nil)).AssignableTo(typ.In(i)) {
-							return fail(fmt.Errorf("@Res argument must accept *httpresponse.Writer in %s", route.Handler))
-						}
-						explicit, passthrough = true, p.Name == "passthrough"
-					}
-				} else if typ.In(i).Kind() != reflect.String {
-					return fail(fmt.Errorf("missing decorator for argument %d of %s", i, route.Handler))
+			for _, p := range bindings {
+				if p.Kind == "Res" || p.Kind == "Response" {
+					explicit, passthrough = true, p.Name == "passthrough"
 				}
 			}
 			handler := method
 			spec := route
 			mux.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
-				responseCtx := nethttp.NewContext(w, r)
+				responseCtx := nethttp.NewContext(w,r)
 				writer := httpresponse.NewWriter(responseCtx)
 				routeResponseHeaders(responseCtx, spec)
+				replyRoute := spec
 				args := make([]reflect.Value, typ.NumIn())
 				for i := 0; i < typ.NumIn(); i++ {
 					t := typ.In(i)
@@ -159,10 +115,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 							}
 							v.Elem().SetString(r.URL.Query().Get(p.Name))
 						case "Headers":
-							if t.Kind() != reflect.String {
-								http.Error(w, "header parameter must be string", 500)
-								return
-							}
+							if t.Kind() != reflect.String { http.Error(w, "header parameter must be string", 500); return }
 							v.Elem().SetString(r.Header.Get(p.Name))
 						case "Res", "Response":
 							v.Elem().Set(reflect.ValueOf(writer))
@@ -181,33 +134,35 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 					args[i] = v.Elem()
 				}
 				var result any
-				if spec.StaticInvoke != nil && typ.NumIn() == 0 {
-					value, err := spec.StaticInvoke(instance.Interface())
+				if spec.StaticHTTP != nil {
+					value, status, err := spec.StaticHTTP(instance.Interface(), responseCtx)
 					if err != nil {
-						_ = httpresponse.WriteError(responseCtx, err)
+						if status != 0 { _ = respondError(responseCtx,status,err.Error()) } else { _ = httpresponse.WriteError(responseCtx,err) }
 						return
 					}
 					result = value
 					if handlerError, ok := value.(error); ok && handlerError != nil {
-						_ = httpresponse.WriteError(responseCtx, handlerError)
-						return
+						_ = httpresponse.WriteError(responseCtx, handlerError); return
+					}
+					if status != 0 { replyRoute.Status = status }
+				} else if spec.StaticInvoke != nil && typ.NumIn() == 0 {
+					value, err := spec.StaticInvoke(instance.Interface())
+					if err != nil { _ = httpresponse.WriteError(responseCtx, err); return }
+					result = value
+					if handlerError, ok := value.(error); ok && handlerError != nil {
+						_ = httpresponse.WriteError(responseCtx, handlerError); return
 					}
 				} else {
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
-						_ = httpresponse.WriteError(responseCtx, results[1].Interface().(error))
-						return
+						_ = httpresponse.WriteError(responseCtx, results[1].Interface().(error)); return
 					}
-					if len(results) == 1 && results[0].Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-						if !results[0].IsNil() {
-							_ = httpresponse.WriteError(responseCtx, results[0].Interface().(error))
-							return
-						}
-					} else if len(results) > 0 {
-						result = results[0].Interface()
-					}
+					errType := reflect.TypeOf((*error)(nil)).Elem()
+					if len(results) == 1 && results[0].Type().Implements(errType) {
+						if !results[0].IsNil() { _ = httpresponse.WriteError(responseCtx,results[0].Interface().(error)); return }
+					} else if len(results) > 0 { result = results[0].Interface() }
 				}
-				if err := finishHTTPResponse(responseCtx, spec, result, writer, explicit, passthrough); err != nil {
+				if err := finishHTTPResponse(responseCtx, replyRoute, result, writer, explicit, passthrough); err != nil {
 					_ = httpresponse.WriteError(responseCtx, err)
 				}
 			})

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/kevenmiano/nestgo/httpadapter"
 )
 
 type Parameter struct {
@@ -11,9 +13,10 @@ type Parameter struct {
 	Kind  string
 	Name  string
 }
-type Header struct{ Name, Value string }
+type Header struct { Name, Value string }
 type Route struct {
 	StaticInvoke          func(any) (any, error)
+	StaticHTTP            func(any, httpadapter.Context) (any, int, error)
 	Method, Path, Handler string
 	Status                int
 	Headers               []Header

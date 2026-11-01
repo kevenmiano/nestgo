@@ -31,6 +31,9 @@ type Declaration struct {
 	StaticEligible bool
 	Kind           string
 	Params         []Parameter
+	ParamTypes     []string
+	ResultCount    int
+	ResultError    bool
 }
 type Parameter struct {
 	Index      int
@@ -111,6 +114,21 @@ func Parse(path string, src []byte) (*File, error) {
 			if d.Receiver == "" || !typeNames[d.Receiver] {
 				return nil, Diagnostic{path, line, "route decorator requires local controller method"}
 			}
+			if n.Type.Results != nil {
+				for _, field := range n.Type.Results.List {
+					count := len(field.Names)
+					if count == 0 {
+						count = 1
+					}
+					d.ResultCount += count
+				}
+				if d.ResultCount == 2 {
+					last := n.Type.Results.List[len(n.Type.Results.List)-1]
+					if id, ok := last.Type.(*ast.Ident); ok && id.Name == "error" {
+						d.ResultError = true
+					}
+				}
+			}
 			index := 0
 			if n.Type.Params != nil {
 				lowerBound := fset.Position(n.Type.Params.Opening).Offset
@@ -118,6 +136,13 @@ func Parse(path string, src []byte) (*File, error) {
 					count := len(field.Names)
 					if count == 0 {
 						count = 1
+					}
+					var typeSource bytes.Buffer
+					if err := format.Node(&typeSource, fset, field.Type); err != nil {
+						return nil, err
+					}
+					for j := 0; j < count; j++ {
+						d.ParamTypes = append(d.ParamTypes, typeSource.String())
 					}
 					fieldStart := fset.Position(field.Pos()).Offset
 					// Parameter decorators are stripped from the source before Go parsing.
@@ -153,6 +178,65 @@ func Parse(path string, src []byte) (*File, error) {
 	}
 	return result, nil
 }
+
+// typedHTTPInvoker generates direct Go calls only for fully decorated,
+// locally representable method signatures. Others retain reflection fallback.
+func typedHTTPInvoker(d Declaration) string {
+	if len(d.ParamTypes) == 0 || len(d.Params) != len(d.ParamTypes) {
+		return ""
+	}
+	if d.ResultCount != 1 && !(d.ResultCount == 2 && d.ResultError) {
+		return ""
+	}
+	markers := make(map[int]Parameter, len(d.Params))
+	for _, p := range d.Params {
+		if p.Index < 0 || p.Index >= len(d.ParamTypes) {
+			return ""
+		}
+		if _, exists := markers[p.Index]; exists {
+			return ""
+		}
+		markers[p.Index] = p
+	}
+	var body strings.Builder
+	var args []string
+	for i, typ := range d.ParamTypes {
+		mark, ok := markers[i]
+		if !ok {
+			return ""
+		}
+		identifier := fmt.Sprintf("arg%d", i)
+		args = append(args, identifier)
+		switch mark.Kind {
+		case "Body":
+			// Qualified external types need imports in the generated registry.
+			// Leave them on the safe reflective path until import tracking exists.
+			if !token.IsIdentifier(typ) || typ == "any" || typ == "interface{}" {
+				return ""
+			}
+			fmt.Fprintf(&body, "%s,code,err:=httpadapter.DecodeBody[%s](ctx);if err!=nil{return nil,code,err};", identifier, typ)
+		case "Param", "Query":
+			if typ != "string" {
+				return ""
+			}
+			if mark.Kind == "Param" {
+				fmt.Fprintf(&body, "%s:=ctx.Param(%q);", identifier, mark.Name)
+			} else {
+				fmt.Fprintf(&body, "%s:=ctx.Query(%q);", identifier, mark.Name)
+			}
+		default:
+			return ""
+		}
+	}
+	call := fmt.Sprintf("receiver.(*%s).%s(%s)", d.Receiver, d.Name, strings.Join(args, ","))
+	if d.ResultCount == 2 {
+		fmt.Fprintf(&body, "value,err:=%s;return value,0,err;", call)
+	} else {
+		fmt.Fprintf(&body, "return %s,0,nil;", call)
+	}
+	return fmt.Sprintf(",StaticHTTP:func(receiver any,ctx httpadapter.Context)(any,int,error){%s}", body.String())
+}
+
 func isRoute(s string) bool {
 	switch s {
 	case "Get", "Post", "Put", "Patch", "Delete":
@@ -189,6 +273,7 @@ func Generate(files []*File) ([]byte, error) {
 	moduleContracts := map[string]moduleOptions{}
 	providerNames := map[string]bool{}
 	routes := map[string][]string{}
+	needsHTTPAdapter := false
 	for _, f := range files {
 		for _, d := range f.Declarations {
 			if d.Kind != "type" {
@@ -345,18 +430,12 @@ func Generate(files []*File) ([]byte, error) {
 					status = n
 				case "Header":
 					name, value, err := parseHeaderDecorator(a.Argument)
-					if err != nil {
-						return nil, Diagnostic{f.Path, a.Line, "@Header: " + err.Error()}
-					}
-					headers = append(headers, fmt.Sprintf("{Name:%q,Value:%q}", name, value))
+					if err != nil { return nil, Diagnostic{f.Path,a.Line,"@Header: "+err.Error()} }
+					headers = append(headers, fmt.Sprintf("{Name:%q,Value:%q}",name,value))
 				case "Redirect":
-					if redirectURL != "" {
-						return nil, Diagnostic{f.Path, a.Line, "duplicate @Redirect"}
-					}
+					if redirectURL != "" { return nil, Diagnostic{f.Path,a.Line,"duplicate @Redirect"} }
 					url, code, err := parseRedirectDecorator(a.Argument)
-					if err != nil {
-						return nil, Diagnostic{f.Path, a.Line, "@Redirect: " + err.Error()}
-					}
+					if err != nil { return nil, Diagnostic{f.Path,a.Line,"@Redirect: "+err.Error()} }
 					redirectURL, redirectStatus = url, code
 				}
 			}
@@ -380,6 +459,10 @@ func Generate(files []*File) ([]byte, error) {
 				if d.StaticEligible {
 					staticInvoke = fmt.Sprintf(",StaticInvoke:func(receiver any)(any,error){return receiver.(*%s).%s(),nil}", d.Receiver, d.Name)
 				}
+				if typed := typedHTTPInvoker(d); typed != "" {
+					staticInvoke = typed
+					needsHTTPAdapter = true
+				}
 				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Headers:[]metadata.Header{%s},RedirectURL:%q,RedirectStatus:%d,Parameters:[]metadata.Parameter{%s}%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(headers, ","), redirectURL, redirectStatus, strings.Join(params, ","), staticInvoke))
 			}
 			if routeCount > 1 {
@@ -388,7 +471,11 @@ func Generate(files []*File) ([]byte, error) {
 		}
 	}
 	var out strings.Builder
-	out.WriteString("// Code generated by NestGo compiler. DO NOT EDIT.\npackage " + pkg + "\n\nimport (\n\"reflect\"\n\"github.com/kevenmiano/nestgo/metadata\"\n)\n\n")
+	out.WriteString("// Code generated by NestGo compiler. DO NOT EDIT.\npackage " + pkg + "\n\nimport (\n\"reflect\"\n\"github.com/kevenmiano/nestgo/metadata\"\n")
+	if needsHTTPAdapter {
+		out.WriteString("\"github.com/kevenmiano/nestgo/httpadapter\"\n")
+	}
+	out.WriteString(")\n\n")
 	for _, imported := range qualifiedImports {
 		out.WriteString("import " + imported + "\n")
 	}
