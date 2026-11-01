@@ -262,10 +262,3 @@ func newHandler(options Options, packages ...metadata.Package) (http.Handler, er
 	logger.Startup(ctx, "NestApplication", "Application handler initialized", boot)
 	return mux, nil
 }
-func FromRegistry(names ...string) (http.Handler, error) {
-	pkgs, err := registryImportClosure(names)
-	if err != nil {
-		return nil, err
-	}
-	return newHandler(Options{}, pkgs...)
-}
