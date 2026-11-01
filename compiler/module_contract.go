@@ -36,7 +36,7 @@ func exportModuleContract(files []*File) ([]byte, error) {
 				}
 				result.Modules[declaration.Name] = modulePublic{
 					Providers: append([]string{}, options.Providers...),
-					Exports: append([]string{}, options.Exports...),
+					Exports:   append([]string{}, options.Exports...),
 				}
 			}
 		}
