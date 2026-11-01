@@ -25,7 +25,7 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 	}
 	// Source may contain incomplete application code. Check declarations for
 	// reliable interfaces and implementations without requiring function bodies.
-	cfg := types.Config{Importer: importer.Default(), IgnoreFuncBodies: true}
+	cfg := types.Config{Importer: importer.Default(), IgnoreFuncBodies: true, DisableUnusedImportCheck: true}
 	info := &types.Info{Defs: make(map[*ast.Ident]types.Object), Types: make(map[ast.Expr]types.TypeAndValue)}
 	pkg, err := cfg.Check(files[0].Package, fset, parsed, info)
 	if err != nil {
