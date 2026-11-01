@@ -76,3 +76,22 @@ No manual `NewGeneratedRepositories` call is needed when the module is compiled 
 For a single local `@Module`, compiled repository providers are assigned automatically. With multiple local modules, specify the generated provider type in the owning module's `providers` declaration, for example `@Module({providers:[UsersRepositoryGenerated]})`. A repository owned by zero or multiple modules is a compile error.
 
 **Limits:** database pools still need explicit initialization and must be provided to `runtime.Options.Instances`; decorators do not currently instantiate `DatabaseModule.NewModule(...)` themselves. Only the supported repository `SELECT` subset is emitted. The `@Query` editor autocomplete and full schema/migrations remain separate outstanding issues (#89–#93).
+
+## Unified runtime bootstrap
+
+The runtime also offers `runtime.Bootstrap(ctx, runtime.BootstrapOptions{...}, packages...)` as an opt-in lifecycle owner. It loads validated configuration, creates named database pools, and registers `*config.Service` plus `*database.Connections` in DI before starting the HTTP handler. Repository factories defined by compiled metadata can resolve the named registry during startup.
+
+```go
+app, err := runtime.Bootstrap(ctx, runtime.BootstrapOptions{
+    ConfigOptions: []config.Option{config.WithEnvFile(".env")},
+    DatabaseOptions: []database.Option{
+        database.WithConnection("users", database.WithDriver("postgres"), database.WithDSN(usersDSN)),
+    },
+}, generatedMetadata)
+if err != nil { return err }
+defer app.Close()
+handler := app.Handler
+_ = handler
+```
+
+On an initialization error, opened pools are closed. On success, the caller must invoke `Close()` during shutdown. This API does not start an HTTP listener or parse dynamic constructors inside `@Module({imports:[...]})`; the executable Go bootstrap remains explicit. Neither the repository metadata nor `@Query` offer SQL editor autocomplete yet.
