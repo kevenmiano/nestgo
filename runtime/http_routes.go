@@ -44,44 +44,7 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 		return orderedProviders[i].String() < orderedProviders[j].String()
 	})
 	inject := func(v reflect.Value) error {
-		allowed, scoped := visibility[v.Type()]
-		for i := 0; i < v.Elem().NumField(); i++ {
-			field := v.Elem().Field(i)
-			sf := v.Elem().Type().Field(i)
-			if sf.Anonymous || !field.CanSet() || (field.Kind() != reflect.Ptr && field.Kind() != reflect.Interface) {
-				continue
-			}
-			dep, found := providers[field.Type()]
-			if scoped && !allowed[field.Type()] {
-				found = false
-			}
-			if !found && field.Kind() == reflect.Interface {
-				for _, candidateType := range orderedProviders {
-					if scoped && !allowed[candidateType] {
-						continue
-					}
-					candidate := providers[candidateType]
-					if candidate.Type().Implements(field.Type()) {
-						if found {
-							return fmt.Errorf("ambiguous dependency %s.%s", v.Elem().Type(), sf.Name)
-						}
-						dep = candidate
-						found = true
-					}
-				}
-			}
-			if !found {
-				if sf.Tag.Get("nestgo") == "optional" {
-					continue
-				}
-				return fmt.Errorf("missing required dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
-			}
-			if !dep.IsValid() || (dep.Kind() == reflect.Ptr && dep.IsNil()) {
-				return fmt.Errorf("nil dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
-			}
-			field.Set(dep)
-		}
-		return nil
+		return injectFields(v, providers, orderedProviders, visibility)
 	}
 	for _, providerType := range orderedProviders {
 		if err := inject(providers[providerType]); err != nil {
