@@ -193,10 +193,21 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 					}
 					args[i] = v.Elem()
 				}
-				results := handler.Call(args)
-				if len(results) == 2 && !results[1].IsNil() {
-					http.Error(w, results[1].Interface().(error).Error(), 500)
-					return
+				var result any
+				if spec.StaticInvoke != nil && typ.NumIn() == 0 {
+					value, err := spec.StaticInvoke(instance.Interface())
+					if err != nil {
+						http.Error(w, err.Error(), 500)
+						return
+					}
+					result = value
+				} else {
+					results := handler.Call(args)
+					if len(results) == 2 && !results[1].IsNil() {
+						http.Error(w, results[1].Interface().(error).Error(), 500)
+						return
+					}
+					result = results[0].Interface()
 				}
 				status := spec.Status
 				if status == 0 {
@@ -208,7 +219,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(status)
-				_ = json.NewEncoder(w).Encode(results[0].Interface())
+				_ = json.NewEncoder(w).Encode(result)
 			})
 			logger.Info(ctx, "RouterExplorer", "Mapped route", slog.String("method", route.Method), slog.String("path", path))
 		}
