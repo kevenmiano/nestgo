@@ -17,9 +17,10 @@ func TestIndexedRouterCompatibility(t *testing.T) {
 	}
 	index := compileRoutes(routes)
 	for _, tc := range []struct {
-		method, path string
+		method         string
+		path           string
 		handler, exists bool
-		param           string
+		param          string
 	}{
 		{"GET", "/users/42", true, true, "42"},
 		{"GET", "/users/me", true, true, "me"},
