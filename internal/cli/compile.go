@@ -15,6 +15,7 @@ func newCompileCommand() *cobra.Command {
 	var watch bool
 	var interval time.Duration
 	var format string
+	var connections []string
 	cmd := &cobra.Command{
 		Use:     "compile <directory|file.mgo>",
 		Short:   "Compile .mgo decorators into ordinary Go sources and metadata",
@@ -32,27 +33,40 @@ func newCompileCommand() *cobra.Command {
 			if err != nil {
 				return finishCompilerCommand(cmd, format, "compile", "", err)
 			}
+			dialects, err := parseConnectionDialects(connections)
+			if err != nil {
+				return finishCompilerCommand(cmd, format, "compile", "", err)
+			}
 			if !watch {
 				if cmd.Flags().Changed("poll-interval") {
 					return finishCompilerCommand(cmd, format, "compile", "", fmt.Errorf("--poll-interval requires --watch"))
 				}
-				err := compiler.CompileDir(path)
+				if len(dialects) == 0 {
+					err = compiler.CompileDir(path)
+				} else {
+					err = compiler.CompileDirWithDialects(path, dialects)
+				}
 				return finishCompilerCommand(cmd, format, "compile", "compiled "+path, err)
 			}
 			if interval <= 0 {
 				return fmt.Errorf("--poll-interval must be positive")
 			}
 			cmd.Printf("watching %s (Ctrl+C to stop)\n", path)
-			return compiler.WatchDir(cmd.Context(), path, interval, func(err error) {
+			report := func(err error) {
 				if err != nil {
 					cmd.PrintErrf("compile error: %v\n", err)
 					return
 				}
 				cmd.Printf("compiled %s\n", path)
-			})
+			}
+			if len(dialects) == 0 {
+				return compiler.WatchDir(cmd.Context(), path, interval, report)
+			}
+			return compiler.WatchDirWithDialects(cmd.Context(), path, interval, dialects, report)
 		},
 	}
 	cmd.Flags().StringVar(&format, "format", "text", "diagnostic output format: text or json (single-shot only)")
+	cmd.Flags().StringArrayVar(&connections, "connection", nil, "named SQL dialect, repeatable: name:postgres or name:mysql")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "recompile when top-level .mgo sources change")
 	cmd.Flags().DurationVar(&interval, "poll-interval", 250*time.Millisecond, "source polling interval in watch mode")
 	return cmd

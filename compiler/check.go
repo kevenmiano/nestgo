@@ -60,3 +60,20 @@ func sortedOutdatedArtifacts(artifacts []OutdatedArtifact) []OutdatedArtifact {
 func CheckDir(dir string) error {
 	return compileDirWithDialectPlanMode(dir, sqlgen.PostgreSQL, nil, true)
 }
+
+// CheckDirWithDialects verifies generated artifacts against the same named
+// connection dialects used by CompileDirWithDialects, without writing files.
+func CheckDirWithDialects(dir string, dialects map[string]sqlgen.Dialect) error {
+	if len(dialects) == 0 {
+		return fmt.Errorf("compiler: connection dialect mappings required")
+	}
+	for name, dialect := range dialects {
+		if !schemaIdentifier(name) {
+			return fmt.Errorf("compiler: invalid connection name %q", name)
+		}
+		if dialect != sqlgen.PostgreSQL && dialect != sqlgen.Question {
+			return fmt.Errorf("compiler: invalid SQL dialect for connection %q", name)
+		}
+	}
+	return compileDirWithDialectPlanMode(dir, sqlgen.PostgreSQL, dialects, true)
+}

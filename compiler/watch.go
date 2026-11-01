@@ -18,6 +18,24 @@ import (
 // Diagnostics are reported without stopping the watcher, so fixing invalid
 // source triggers a fresh compilation. Generated .go files are never watched.
 func WatchDir(ctx context.Context, dir string, interval time.Duration, report func(error)) error {
+	return watchDir(ctx, dir, interval, nil, report)
+}
+
+// WatchDirWithDialects retains the named SQL dialect mapping on every incremental
+// recompilation instead of silently switching repositories to PostgreSQL.
+func WatchDirWithDialects(ctx context.Context, dir string, interval time.Duration, dialects map[string]sqlgen.Dialect, report func(error)) error {
+	if len(dialects) == 0 {
+		return fmt.Errorf("compiler: connection dialect mappings required")
+	}
+	for name, dialect := range dialects {
+		if !schemaIdentifier(name) || (dialect != sqlgen.PostgreSQL && dialect != sqlgen.Question) {
+			return fmt.Errorf("compiler: invalid SQL dialect for connection %q", name)
+		}
+	}
+	return watchDir(ctx, dir, interval, dialects, report)
+}
+
+func watchDir(ctx context.Context, dir string, interval time.Duration, dialects map[string]sqlgen.Dialect, report func(error)) error {
 	if interval <= 0 {
 		return fmt.Errorf("watch interval must be positive")
 	}
@@ -34,7 +52,7 @@ func WatchDir(ctx context.Context, dir string, interval time.Duration, report fu
 	}
 	cache := &incrementalCache{}
 	compile := func() error {
-		return compileDirWithCache(dir, sqlgen.PostgreSQL, nil, false, cache)
+		return compileDirWithCache(dir, sqlgen.PostgreSQL, dialects, false, cache)
 	}
 	if report != nil {
 		report(compile())

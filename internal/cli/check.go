@@ -8,6 +8,7 @@ import (
 
 func newCheckCommand() *cobra.Command {
 	var format string
+	var connections []string
 	cmd := &cobra.Command{
 		Use:     "check <directory|file.mgo>",
 		Short:   "Verify generated artifacts without writing to disk",
@@ -22,10 +23,19 @@ func newCheckCommand() *cobra.Command {
 			if err != nil {
 				return finishCompilerCommand(cmd, format, "check", "", err)
 			}
-			err = compiler.CheckDir(dir)
+			dialects, err := parseConnectionDialects(connections)
+			if err != nil {
+				return finishCompilerCommand(cmd, format, "check", "", err)
+			}
+			if len(dialects) == 0 {
+				err = compiler.CheckDir(dir)
+			} else {
+				err = compiler.CheckDirWithDialects(dir, dialects)
+			}
 			return finishCompilerCommand(cmd, format, "check", "checked "+dir+": generated artifacts up to date", err)
 		},
 	}
 	cmd.Flags().StringVar(&format, "format", "text", "diagnostic output format: text or json")
+	cmd.Flags().StringArrayVar(&connections, "connection", nil, "named SQL dialect, repeatable: name:postgres or name:mysql")
 	return cmd
 }

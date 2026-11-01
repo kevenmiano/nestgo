@@ -1,0 +1,28 @@
+package sqlsample
+
+import "context"
+
+// PostgreSQL uses $1, $2... placeholders in generated SQL.
+@Entity({table: "nestgo_sql_example_users"})
+type PostgresUser struct {
+	ID int64
+	Name string
+}
+
+@Repository(PostgresUser, "users")
+type PostgresUsersRepository struct{}
+
+@Query("INSERT INTO nestgo_sql_example_users (id, name) VALUES (:id, :name)")
+func (r *PostgresUsersRepository) Insert(ctx context.Context, id int64, name string) (int64, error) { return 0, nil }
+
+@Query("SELECT name, id FROM nestgo_sql_example_users WHERE id = :id")
+func (r *PostgresUsersRepository) FindByID(ctx context.Context, id int64) (*PostgresUser, error) { return nil, nil }
+
+@Query("SELECT id, name FROM nestgo_sql_example_users ORDER BY id")
+func (r *PostgresUsersRepository) FindAll(ctx context.Context) ([]PostgresUser, error) { return nil, nil }
+
+@Query("UPDATE nestgo_sql_example_users SET name = :name WHERE id = :id")
+func (r *PostgresUsersRepository) UpdateName(ctx context.Context, name string, id int64) (int64, error) { return 0, nil }
+
+@Query("DELETE FROM nestgo_sql_example_users WHERE id = :id")
+func (r *PostgresUsersRepository) Delete(ctx context.Context, id int64) (int64, error) { return 0, nil }
