@@ -34,6 +34,15 @@ func (a *Adapter) Register(route httpadapter.Route) error {
 	if a.keys[key] {
 		return errors.New("duplicate HTTP route: " + key)
 	}
+	for _, existing := range a.routes {
+		if existing.Method != route.Method {
+			continue
+		}
+		overlaps, aMore, bMore := routeOverlap(existing.Path, route.Path)
+		if overlaps && aMore == bMore {
+			return errors.New("ambiguous HTTP routes: " + existing.Path + " and " + route.Path)
+		}
+	}
 	a.keys[key] = true
 	a.routes = append(a.routes, route)
 	return nil
@@ -54,7 +63,7 @@ func (a *Adapter) Serve(listener net.Listener) error {
 		if handler != nil {
 			ctx := &requestContext{r: c, params: params, status: 200}
 			if err := handler(ctx); err != nil && !ctx.wrote {
-				c.Error(err.Error(), 500)
+				c.Error("Internal server error", 500)
 			}
 			return
 		}
