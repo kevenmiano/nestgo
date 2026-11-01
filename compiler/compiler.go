@@ -84,7 +84,7 @@ func Parse(path string, src []byte) (*File, error) {
 			}
 			d := Declaration{Name: spec.Name.Name, Kind: "type", Annotations: ann}
 			for _, a := range ann {
-				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" && a.Name != "Imports" && a.Name != "Exports" {
+				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" && a.Name != "Imports" && a.Name != "Exports" && a.Name != "Entity" && a.Name != "Repository" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a type"}
 				}
 			}
@@ -109,7 +109,7 @@ func Parse(path string, src []byte) (*File, error) {
 				}
 			}
 			if d.Receiver == "" || !typeNames[d.Receiver] {
-				return nil, Diagnostic{path, line, "decorated method requires local receiver type"}
+				return nil, Diagnostic{path, line, "route decorator requires local controller method"}
 			}
 			index := 0
 			if n.Type.Params != nil {
