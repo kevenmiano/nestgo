@@ -92,67 +92,62 @@ registration. The `transform` package also exports
 `PlainToInstance[T]`, `InstanceToPlain[T]`,
 `Marshal[T]` and `Unmarshal[T]` for non-HTTP code.
 
-## Safe custom transformer contracts (functions or structs)
+## Typed transformer contracts and name-only decorators
 
-Custom code must satisfy the **Go field type exactly**. It is **not**
-necessary to define a struct just for a simple function. For reusable,
-state-free struct transformers NestGo exposes a generic interface:
-
-~~~go
-type Transformer[T any] interface {
-    Transform(value T) (T, error)
-}
-~~~
-
-An example with both supported forms:
+For a simple function, use `@TransformInput(NormalizeEmail)`; its
+signature must be `func(T) (T, error)`. For a struct, use its **type name**
+without allocating or casting it inside the decorator:
 
 ~~~go
-// Simple function (no interface implementation needed).
-func NormalizeEmail(value string) (string, error) {
-    return strings.ToLower(strings.TrimSpace(value)), nil
-}
+import (
+    "strings"
+    "github.com/kevenmiano/nestgo/transform"
+)
 
-// Struct with a value receiver satisfying transform.Transformer[string].
 type Trim struct{}
-func (Trim) Transform(value string) (string, error) {
+
+// Compile-time interface assertion. It never constructs a Trim value.
+var _ transform.Transformer[string] = (*Trim)(nil)
+
+func (*Trim) Transform(value string) (string, error) {
     return strings.TrimSpace(value), nil
 }
 
-// Struct with a pointer receiver.
-type Mask struct{}
-func (*Mask) Transform(value string) (string, error) {
-    return "****", nil
-}
-
-type AccountDTO struct {
-    @TransformInput(NormalizeEmail)
-    Email string
-
-    @TransformInput(Trim{})
-    FullName string
-
-    @TransformOutput(&Mask{})
-    Secret string
+type UserDTO struct {
+    @TransformInput(Trim)
+    Name string
 }
 ~~~
 
-The compiler emits calls through
-`transform.ApplyFunc[T](value, Fn)` for functions or
-`transform.Apply[T](value, Struct{})` for structs. This forces the Go
-compiler to verify the argument and return types, including the
-`Transform(T) (T, error)` interface. Incorrect signatures, missing
-methods, or pointer-receiver mismatches fail during **Go build**, not
-during HTTP request dispatch. Struct literals are deliberately limited
-to `Type{}` or `&Type{}`; constructors and dynamic expressions
-are not evaluated by the decorator compiler.
+The declaration-level `var _` assertion is an idiomatic Go compile-time
+contract, and can also be used by libraries that implement transformers
+outside NestGo. The NestGo compiler additionally emits the equivalent typed
+assertion automatically for every decorated field:
 
-A nil function, nil interface, or nil step in
-`transform.Compose` returns `transform.ErrNilTransformer` instead
-of causing a nil-function panic. This guarantee does not prevent
-arbitrary panics explicitly written inside user-provided transformers.
-Transformers should be stateless or concurrency-safe; instance
-injection/configured struct constructors are outside the current
-decorator contract.
+~~~go
+// Representative generated Go (simplified):
+var _ transform.Transformer[string] = (*Trim)(nil)
+value, err := transform.Apply[string](input, new(Trim))
+~~~
+
+This works for both **value receivers** and **pointer receivers**: the
+compiler creates a new, non-nil zero-valued struct for each application.
+Named functions also receive a generated type check, equivalent to
+`var _ transform.Func[string] = NormalizeEmail`.
+
+Custom struct types must be declared in a `.mgo` file in the same Go package,
+or in an ordinary `.go` file in that package. Functions may be local or
+package-qualified, as before. Dynamic constructors or configured instances
+are intentionally not accepted in decorators: `@TransformInput(Trim{})`
+and `@TransformInput(&Trim{})` are rejected. Use a typed function or a
+separate provider-based mechanism when configuration is required.
+
+Incorrect signatures, missing methods, and incompatible field types fail
+during Go compilation, not at the first HTTP request. Nil callbacks or
+composed nil steps return `transform.ErrNilTransformer` rather than
+invoking a nil function. These guarantees do not prevent a panic deliberately
+written in custom transformation code. Implementations should be stateless
+or concurrency-safe.
 
 ## Using existing transformation libraries
 
