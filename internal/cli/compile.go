@@ -17,7 +17,7 @@ func newCompileCommand() *cobra.Command {
 		Long:    "Compile all .mgo files in a package directory. Passing a single .mgo file compiles its containing directory.",
 		Args:    cobra.ExactArgs(1),
 		Example: "  nestgo compile ./examples/shop\n  nestgo compile ./myapp/controllers.mgo",
-		RunE:    func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			path := args[0]
 			info, err := os.Stat(path)
 			if err != nil {
