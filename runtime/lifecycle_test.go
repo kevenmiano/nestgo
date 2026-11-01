@@ -119,3 +119,4 @@ func TestFailedBootstrapReleasesProviders(t *testing.T) {
     if err==nil || !strings.Contains(err.Error(),"startup failed"){ t.Fatalf("expected startup error: %v",err) }
     if rollbackCalls!=1 {t.Fatalf("destroy calls=%d, want 1",rollbackCalls)}
 }
+
