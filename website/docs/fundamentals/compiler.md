@@ -18,3 +18,7 @@ The compiler validates declared module references, local dependency graphs, inte
 Explicit module imports support qualified Go type references. External type resolution and end-to-end cross-package validation remain areas under development. Do not assume all possible external Go provider types are supported by compiler analysis.
 
 For supported syntax and diagnostics, consult the [compiler reference](https://github.com/kevenmiano/nestgo/blob/main/docs/COMPILER.md).
+
+## Property transformations
+
+DTO structs can use `@Expose`, `@Exclude`, `@Transform` and `@Type` on exported fields. Generated `MarshalJSON` and `UnmarshalJSON` methods apply across both HTTP adapters. Read [DTO transformers](./dto-transformers.md) for examples and custom functions.
