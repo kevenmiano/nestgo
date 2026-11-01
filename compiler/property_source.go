@@ -97,7 +97,7 @@ func decoratorOnlyImportAliases(file *File) map[string]bool {
 	for _, dto := range file.DTOs {
 		for _, field := range dto.Fields {
 			for _, ann := range field.Annotations {
-				if ann.Name == "Transform" {
+				if ann.Name == "Transform" || ann.Name == "TransformInput" || ann.Name == "TransformOutput" {
 					fn, err := transformerSpec(ann.Argument)
 					if err == nil {
 						if alias, _, found := strings.Cut(fn, "."); found {
