@@ -29,7 +29,11 @@ func externalProviderExported(sourcePath, qualifier, provider string, imports []
 	if err != nil {
 		return false, err
 	}
-	node, err := parser.ParseFile(token.NewFileSet(), sourcePath, fileSource, parser.ImportsOnly)
+	cleaned, err := Parse(sourcePath, fileSource)
+	if err != nil {
+		return false, err
+	}
+	node, err := parser.ParseFile(token.NewFileSet(), sourcePath, cleaned.Source, parser.ImportsOnly)
 	if err != nil {
 		return false, err
 	}
