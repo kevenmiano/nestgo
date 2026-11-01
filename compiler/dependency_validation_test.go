@@ -6,7 +6,7 @@ import (
 )
 
 func TestMissingDependencyValidation(t *testing.T) {
-	f, err := Parse("missing.mgo", []byte("package demo\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n"))
+	f, err := Parse("missing.mgo", []byte("package demo\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo `nestgo:\"inject\"` }\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestDeclaredDependencyPassesValidation(t *testing.T) {
 }
 
 func TestMissingControllerDependencyValidation(t *testing.T) {
-	f, err := Parse("controller.mgo", []byte("package demo\ntype Repo struct{}\n@Controller(\"/\")\ntype C struct { Repo *Repo }\n"))
+	f, err := Parse("controller.mgo", []byte("package demo\ntype Repo struct{}\n@Controller(\"/\")\ntype C struct { Repo *Repo `nestgo:\"inject\"` }\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
