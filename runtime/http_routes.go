@@ -160,9 +160,12 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 								return err
 							}
 							if status >= 400 && status <= 599 {
-								// An arbitrary handler error is not a public HTTP exception.
-							// Preserve its status but never promote err.Error() to a client-safe message.
-							return httpadapter.NewHTTPException(status, "Bad Request")
+								// A handler's arbitrary error text is never safe to expose.
+							// Preserve established 4xx contracts; redact unexpected 5xx errors.
+							if status >= 500 {
+								return httpadapter.NewHTTPException(status, "Internal server error")
+							}
+							return httpadapter.NewHTTPException(status, err.Error())
 							}
 							// Never accept success or redirect statuses for an exception.
 							return err
