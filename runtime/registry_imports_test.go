@@ -25,15 +25,15 @@ func TestFromRegistryLoadsImportedPackage(t *testing.T) {
 		consumer := reflect.TypeOf((*registryConsumer)(nil))
 		metadata.Register("nestgo-closure-external-test", metadata.Package{
 			Providers: []metadata.Provider{{Type: repo}},
-			Modules: []metadata.Module{{Type: external, Providers: []reflect.Type{repo}, Exports: []reflect.Type{repo}}},
+			Modules:   []metadata.Module{{Type: external, Providers: []reflect.Type{repo}, Exports: []reflect.Type{repo}}},
 		})
 		metadata.Register("nestgo-closure-root-test", metadata.Package{
 			Providers: []metadata.Provider{{Type: consumer}},
-			Modules: []metadata.Module{{Type: reflect.TypeOf((*registryRootModule)(nil)), Providers: []reflect.Type{consumer}, Imports: []reflect.Type{external}}},
+			Modules:   []metadata.Module{{Type: reflect.TypeOf((*registryRootModule)(nil)), Providers: []reflect.Type{consumer}, Imports: []reflect.Type{external}}},
 		})
 		metadata.Register("nestgo-closure-no-import-test", metadata.Package{
 			Providers: []metadata.Provider{{Type: consumer}},
-			Modules: []metadata.Module{{Type: reflect.TypeOf((*registryMissingImportModule)(nil)), Providers: []reflect.Type{consumer}}},
+			Modules:   []metadata.Module{{Type: reflect.TypeOf((*registryMissingImportModule)(nil)), Providers: []reflect.Type{consumer}}},
 		})
 	})
 	if _, err := FromRegistry("nestgo-closure-root-test"); err != nil {
