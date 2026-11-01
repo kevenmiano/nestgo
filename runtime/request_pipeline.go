@@ -146,23 +146,36 @@ func handleHTTPException(err error, exec httpadapter.ExecutionContext, filters [
 	return httpadapter.WriteError(exec.Request, err)
 }
 
-func runMiddleware(ctx httpadapter.Context, middlewares []httpadapter.Middleware, next httpadapter.Next) error {
+// middlewareChain is compiled once per route at bootstrap. Keeping the
+// downstream function outside the request path avoids rebuilding the recursive
+// dispatcher and its closure on every request.
+//
+// Each middleware still gets its own request-local Next closure: sharing or
+// pooling Next would break the exactly-once rule and could leak state between
+// concurrent requests.
+type middlewareChain func(httpadapter.Context, httpadapter.Next) error
+
+func compileMiddlewareChain(middlewares []httpadapter.Middleware) middlewareChain {
 	if len(middlewares) == 0 {
+		return func(_ httpadapter.Context, next httpadapter.Next) error { return next() }
+	}
+
+	var chain middlewareChain = func(_ httpadapter.Context, next httpadapter.Next) error {
 		return next()
 	}
-	var invoke func(int) error
-	invoke = func(index int) error {
-		if index == len(middlewares) {
-			return next()
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		middleware := middlewares[i]
+		downstream := chain
+		chain = func(ctx httpadapter.Context, terminal httpadapter.Next) error {
+			advanced := false
+			return middleware(ctx, func() error {
+				if advanced {
+					return fmt.Errorf("middleware called next more than once")
+				}
+				advanced = true
+				return downstream(ctx, terminal)
+			})
 		}
-		advanced := false
-		return middlewares[index](ctx, func() error {
-			if advanced {
-				return fmt.Errorf("middleware called next more than once")
-			}
-			advanced = true
-			return invoke(index + 1)
-		})
 	}
-	return invoke(0)
+	return chain
 }
