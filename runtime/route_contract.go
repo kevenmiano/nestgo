@@ -83,7 +83,7 @@ func compileRouteContract(prefix string, route metadata.Route, typ reflect.Type)
 			}
 		case "Res", "Response":
 			if reflect.TypeOf((*httpresponse.Writer)(nil)) != typ.In(p.Index) {
-				return routeContract{}, &routeContractError{kind:"response",handler:route.Handler,index:p.Index}
+				return routeContract{}, &routeContractError{kind: "response", handler: route.Handler, index: p.Index}
 			}
 		default:
 			return routeContract{}, &routeContractError{kind: "decorator", handler: route.Handler, index: p.Index}
@@ -93,7 +93,9 @@ func compileRouteContract(prefix string, route metadata.Route, typ reflect.Type)
 	explicit := false
 	for i := 0; i < typ.NumIn(); i++ {
 		if p, ok := bindings[i]; ok && (p.Kind == "Res" || p.Kind == "Response") {
-			if explicit { return routeContract{}, &routeContractError{kind:"response",handler:route.Handler,index:i} }
+			if explicit {
+				return routeContract{}, &routeContractError{kind: "response", handler: route.Handler, index: i}
+			}
 			explicit = true
 		} else if !ok && typ.In(i).Kind() != reflect.String {
 			return routeContract{}, &routeContractError{kind: "missing", handler: route.Handler, index: i}
