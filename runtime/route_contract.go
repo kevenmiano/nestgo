@@ -92,3 +92,20 @@ func compileRouteContract(prefix string, route metadata.Route, typ reflect.Type)
 	}
 	return routeContract{Path: path, Key: route.Method + " " + path, Bindings: bindings}, nil
 }
+
+// reflectedHandlerError handles valid Go error implementations whose concrete
+// type is not nil-able (such as a named string or struct). Reflect.Value.IsNil
+// panics for these kinds, even though they implement the error interface.
+func reflectedHandlerError(value reflect.Value) error {
+	if !value.IsValid() {
+		return nil
+	}
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		if value.IsNil() {
+			return nil
+		}
+	}
+	err, _ := value.Interface().(error)
+	return err
+}
