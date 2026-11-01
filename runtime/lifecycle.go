@@ -35,6 +35,9 @@ type lifecycleRegistry struct {
 
 func (r *lifecycleRegistry) initialize(ctx context.Context) error {
 	for _, instance := range r.instances {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if h, ok := instance.(OnModuleInit); ok {
 			if err := h.OnModuleInit(ctx); err != nil {
 				return fmt.Errorf("OnModuleInit %T: %w", instance, err)
@@ -42,13 +45,16 @@ func (r *lifecycleRegistry) initialize(ctx context.Context) error {
 		}
 	}
 	for _, instance := range r.instances {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if h, ok := instance.(OnApplicationBootstrap); ok {
 			if err := h.OnApplicationBootstrap(ctx); err != nil {
 				return fmt.Errorf("OnApplicationBootstrap %T: %w", instance, err)
 			}
 		}
 	}
-	return nil
+	return ctx.Err()
 }
 
 func (r *lifecycleRegistry) shutdown(ctx context.Context, closeAdapter func(context.Context) error) error {

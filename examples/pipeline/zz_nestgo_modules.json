@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "modules": {
+    "UsersModule": {
+      "providers": [
+        "ApiKeyGuard",
+        "BadRequestFilter",
+        "RequiredPipe",
+        "TrimPipe"
+      ],
+      "exports": []
+    }
+  }
+}

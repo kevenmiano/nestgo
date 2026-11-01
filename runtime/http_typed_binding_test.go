@@ -75,8 +75,8 @@ func TestTypedHTTPDispatchAndErrors(t *testing.T) {
 		{"path", "GET /typed/path/{id}", "", "", "Ada", "\"Ada\"\n", 200},
 		{"query", "GET /typed/query", "Grace", "", "", "\"Grace\"\n", 200},
 		{"body", "POST /typed/body", "", `{"name":"Ada"}`, "", "\"Ada\"\n", 201},
-		{"invalid_json", "POST /typed/body", "", "{", "", "invalid JSON:", 400},
-		{"large_body", "POST /typed/body", "", string(make([]byte, 1<<20+1)), "", "request body too large\n", 413},
+		{"invalid_json", "POST /typed/body", "", "{", "", `{"statusCode":400,"message":"invalid JSON:`, 400},
+		{"large_body", "POST /typed/body", "", string(make([]byte, 1<<20+1)), "", `{"statusCode":413,"message":"request body too large"}` + "\n", 413},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -40,6 +40,11 @@ log.Fatal(app.Listen(":8080"))
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
+| `WithMiddleware(...)` | Register global matched-route middleware |
+| `WithRouteMiddleware(method,path,...)` | Exact-route middleware |
+| `WithGuards(...)` | Global guards |
+| `WithPipes(...)` | Global argument pipes |
+| `WithFilters(...)` | Global exception filters |
 | `WithContext(ctx)` | Supply a cancellable bootstrap context |
 | `WithDebug(true)` | Enable detailed per-provider diagnostics |
 | `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
@@ -56,7 +61,8 @@ flowchart TD
   Closure --> Graph["Validate module scopes and imports"]
   Direct --> Graph
   Graph --> Providers["Instantiate and inject providers"]
-  Providers --> Controllers["Instantiate and inject controllers"]
+  Providers --> Order["Dependency-first lifecycle order; module imports before dependents"]
+  Order --> Controllers["Instantiate and inject controllers"]
   Controllers --> Routes["Validate and register HTTP routes"]
   New --> Raw["WithRoutes: predeclared Go handlers"]
   Routes --> Registration["Register direct routes in same adapter"]
@@ -65,11 +71,11 @@ flowchart TD
   Hooks --> Application["Application ready"]
 ```
 
-Providers are initialized in stable type-name order and controllers follow metadata order. Field injection supports exported pointer and interface fields. The `nestgo:"optional"` tag permits missing optional dependencies; module scopes control imports and exports.
+Providers initialize in dependency-first topological order using their actually resolved, explicitly tagged injections. Imported modules precede their importers when providers are independent; controllers run after providers. Self and multi-provider cycles fail bootstrap as `*runtime.InjectionError` with code `dependency_cycle` and a field-aware cycle path. A missing optional dependency creates no ordering edge; external provider instances and generated factories remain injectable. Module scopes control visibility. Generated factory callbacks can resolve arbitrary types dynamically; if their lifecycle depends on another service, declare an explicit injectable field to make the dependency visible to the ordering graph. Factory-only resolver calls cannot be inferred as lifecycle ordering edges.
 
 Direct Go handlers execute without reflective controller dispatch. For decorator-generated controllers, generated invokers can bypass reflective calls, while other handlers use reflection as needed. Both native `platform/fasthttp` and `platform/nethttp` use the same route namespace and lifecycle. Conflicts between direct and controller-generated routes are rejected at bootstrap.
 
-`app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup, but registered adapter routes are not transactionally rolled back. The caller owns OS signal handling and deadlines.
+`app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup of successfully constructed provider factories and external services, including cancellation via a bounded independent cleanup context. Registered adapter routes are not transactionally rolled back, but an application that fails construction is never served. The caller owns OS signal handling and deadlines.
 
 ## Observability and constraints
 
@@ -78,3 +84,5 @@ Use `WithBootstrapMetrics` for route registration, lifecycle initialization and 
 Constructor injection, request scopes, automatic OS signals, universal filters/guards/interceptors and arbitrary resource disposal are not implemented. Successful application construction does not mean the HTTP port is bound.
 
 See [HTTP adapters](HTTP_ADAPTERS.md) and [lifecycle guide](../website/docs/fundamentals/lifecycle.md).
+
+See [the request pipeline](REQUEST_PIPELINE.md) for middleware, guard, pipe, and exception filter contracts.

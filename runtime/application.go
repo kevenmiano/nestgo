@@ -33,6 +33,7 @@ type applicationConfig struct {
 	instances        []any
 	context          context.Context
 	contextSet       bool
+	pipeline         requestPipelineConfig
 }
 
 // WithPackages supplies already-generated metadata to the application.
@@ -92,6 +93,34 @@ func WithContext(ctx context.Context) Option {
 // WithBootstrapMetrics registers an observer invoked after successful bootstrap.
 func WithBootstrapMetrics(observer func(BootstrapMetrics)) Option {
 	return func(c *applicationConfig) { c.onBootstrap = observer }
+}
+
+// WithMiddleware installs global HTTP middleware in registration order.
+func WithMiddleware(middlewares ...httpadapter.Middleware) Option {
+	return func(c *applicationConfig) { c.pipeline.middleware = append(c.pipeline.middleware, middlewares...) }
+}
+
+// WithRouteMiddleware adds middleware to a specific registered method and path.
+func WithRouteMiddleware(method, path string, middlewares ...httpadapter.Middleware) Option {
+	return func(c *applicationConfig) {
+		if c.pipeline.routeMiddleware == nil {
+			c.pipeline.routeMiddleware = make(map[string][]httpadapter.Middleware)
+		}
+		key := method + " " + path
+		c.pipeline.routeMiddleware[key] = append(c.pipeline.routeMiddleware[key], middlewares...)
+	}
+}
+
+func WithGuards(guards ...httpadapter.Guard) Option {
+	return func(c *applicationConfig) { c.pipeline.guards = append(c.pipeline.guards, guards...) }
+}
+
+func WithPipes(pipes ...httpadapter.Pipe) Option {
+	return func(c *applicationConfig) { c.pipeline.pipes = append(c.pipeline.pipes, pipes...) }
+}
+
+func WithFilters(filters ...httpadapter.ExceptionFilter) Option {
+	return func(c *applicationConfig) { c.pipeline.filters = append(c.pipeline.filters, filters...) }
 }
 
 // Application owns one HTTP adapter and the lifecycle of its providers.
@@ -166,7 +195,11 @@ func New(options ...Option) (*Application, error) {
 		if logger != nil {
 			logger.Error(ctx, "NestFactory", "Bootstrap failed", slog.String("error", err.Error()))
 		}
-		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
+		// Do not skip resource cleanup when the bootstrap context is canceled.
+		// Limit rollback separately from the caller's canceled context.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		return nil, errors.Join(err, registry.shutdown(cleanupCtx, adapter.Shutdown))
 	}
 	// No environment scan or SQL connection planning for applications that
 	// have not configured these features. Both services remain injectable.
@@ -196,7 +229,10 @@ func New(options ...Option) (*Application, error) {
 		instances = append([]any{settings, connections}, cfg.instances...)
 	}
 	registrationStarted := time.Now()
-	if err := registerRoutesWithLifecycleAndInstances(adapter, packages, registry, instances, cfg.routes...); err != nil {
+	if err := validatePipeline(cfg.pipeline); err != nil {
+		return fail(err)
+	}
+	if err := registerRoutesWithPipeline(adapter, packages, registry, cfg.pipeline, instances, cfg.routes...); err != nil {
 		return fail(err)
 	}
 	registrationDuration := time.Since(registrationStarted)
