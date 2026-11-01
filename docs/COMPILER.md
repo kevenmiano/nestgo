@@ -18,6 +18,7 @@ For every input `name.mgo`, the compiler writes `name_generated.go`. It also wri
 | --- | --- | --- |
 | `@Controller("/prefix")` | Struct declaration | Defines an HTTP controller and its URL prefix |
 | `@Injectable()` | Struct declaration | Registers a provider |
+| `@Dto()` | Struct declaration | Opts a DTO into test scaffolding (no runtime registration) |
 | `@Module("name")` | Struct declaration | Adds module metadata |
 | `@Get("/path")` | Controller method | Registers a GET route |
 | `@Post("/path")` | Controller method | Registers a POST route |
@@ -75,6 +76,26 @@ func TestUsersController_FindAll(t *testing.T) {
     t.Skip("TODO: add assertions for TestUsersController_FindAll")
 }
 ```
+
+
+### Watch mode
+
+Run `nestgo compile --watch ./myapp` (or `nestgo compile ./myapp --watch`) to compile immediately and recompile whenever a top-level `.mgo` file is added, renamed, removed or edited. The watcher checks source contents every 250 ms, including same-size edits; it intentionally ignores generated outputs to avoid self-triggering loops. Source diagnostics are printed but the watcher keeps running. Ctrl+C stops it. Watch mode does **not** automatically run `go test`.
+
+### DTO scaffolding
+
+Use `@Dto()` to opt in to DTO-specific test stubs:
+
+```go
+@Dto()
+type CreateUserDTO struct {
+    Name string // json:"name" validate:"required" (use a Go struct tag in your code)
+}
+```
+
+The compiler creates `TestCreateUserDTO_Serialization` and `TestCreateUserDTO_Deserialization` TODOs. It creates `TestCreateUserDTO_Validation` only when at least one DTO field has a nonempty `validate` struct tag. Plain undecorated Go structs do not receive DTO stubs.
+
+A `validate` tag is a contract hint: it does not enable validation in the runtime. Generated tests explicitly use `t.Skip`, so add real fixtures, validators and assertions before treating them as behavioral coverage. DTO property-transformer code is being built separately in PR #132; specialized transformation scaffolding is not yet integrated.
 
 **Boundary:** The generated assertion checks *compiled registry consistency*, not full runtime dependency construction or correct application behavior. The editable unit stubs do not automatically create mocks, start servers, or execute HTTP requests. Add dependency fakes and assertions as needed. Test generation adds no cost to a production binary because all generated tests live in `*_test.go` files.
 
