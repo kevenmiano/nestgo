@@ -104,6 +104,7 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 			filters = append(filters, pipeline.filters...)
 			middlewares := append([]httpadapter.Middleware(nil), pipeline.middleware...)
 			middlewares = append(middlewares, pipeline.routeMiddleware[key]...)
+			middleware := compileMiddlewareChain(middlewares)
 
 			bindings := contract.Bindings
 			handler := method
@@ -221,7 +222,7 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 				}
 				// A middleware failure is intentionally handled by global filters
 				// only, as in NestJS.
-				return handleHTTPException(runMiddleware(ctx, middlewares, managedExecution), exec, pipeline.filters)
+				return handleHTTPException(middleware(ctx, managedExecution), exec, pipeline.filters)
 			}}
 			if err := adapter.Register(registered); err != nil {
 				return fmt.Errorf("register %s: %w", key, err)
@@ -243,6 +244,7 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 		seen[key] = true
 		middleware := append([]httpadapter.Middleware(nil), pipeline.middleware...)
 		middleware = append(middleware, pipeline.routeMiddleware[key]...)
+		chain := compileMiddlewareChain(middleware)
 		handler := route.Handler
 		wrapped := httpadapter.Route{Method: route.Method, Path: route.Path, Handler: func(ctx httpadapter.Context) error {
 			exec := httpadapter.ExecutionContext{Request: ctx, Handler: key}
@@ -262,7 +264,7 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 				}
 				return handleHTTPException(handler(bound), exec, pipeline.filters)
 			}
-			return handleHTTPException(runMiddleware(ctx, middleware, managed), exec, pipeline.filters)
+			return handleHTTPException(chain(ctx, managed), exec, pipeline.filters)
 		}}
 		if err := adapter.Register(wrapped); err != nil {
 			return fmt.Errorf("register %s: %w", key, err)
