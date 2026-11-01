@@ -90,20 +90,21 @@ func (a *Adapter) Serve(listener net.Listener) error {
 			c.Error("Bad Request", 400)
 		},
 		Handler: func(c *fast.RequestCtx) {
-		handler, params, foundPath := routes.lookup(string(c.Method()), string(c.Path()))
-		if handler != nil {
-			ctx := &requestContext{r: c, params: params, status: 200}
-			if err := handler(ctx); err != nil && !ctx.wrote {
-				c.Error("Internal server error", 500)
+			handler, params, foundPath := routes.lookup(string(c.Method()), string(c.Path()))
+			if handler != nil {
+				ctx := &requestContext{r: c, params: params, status: 200}
+				if err := handler(ctx); err != nil && !ctx.wrote {
+					c.Error("Internal server error", 500)
+				}
+				return
 			}
-			return
-		}
-		if foundPath {
-			c.Error("Method Not Allowed", 405)
-		} else {
-			c.Error("Not Found", 404)
-		}
-	}}
+			if foundPath {
+				c.Error("Method Not Allowed", 405)
+			} else {
+				c.Error("Not Found", 404)
+			}
+		},
+	}
 	a.server = server
 	a.mu.Unlock()
 	return server.Serve(listener)
