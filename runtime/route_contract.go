@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/kevenmiano/nestgo/http"
 	"github.com/kevenmiano/nestgo/metadata"
 )
 
@@ -17,9 +18,7 @@ type routeContract struct {
 
 func compileRouteContract(prefix string, route metadata.Route, method reflect.Type) (routeContract, error) {
 	errType := reflect.TypeOf((*error)(nil)).Elem()
-	if method.NumOut() < 1 || method.NumOut() > 2 ||
-		(method.NumOut() == 1 && method.Out(0).Implements(errType)) ||
-		(method.NumOut() == 2 && method.Out(1) != errType) {
+	if method.NumOut() > 2 || (method.NumOut() == 2 && method.Out(1) != errType) {
 		return routeContract{}, fmt.Errorf("invalid signature %s", route.Handler)
 	}
 	path := strings.TrimSuffix(prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
@@ -33,19 +32,36 @@ func compileRouteContract(prefix string, route metadata.Route, method reflect.Ty
 		}
 		switch p.Kind {
 		case "Body":
-		case "Param", "Query":
+		case "Param", "Query", "Headers":
 			if method.In(p.Index).Kind() != reflect.String {
-				return routeContract{}, fmt.Errorf("parameter %d of %s requires a string for Param/Query", p.Index, route.Handler)
+				return routeContract{}, fmt.Errorf("parameter %d of %s requires a string for Param/Query/Headers", p.Index, route.Handler)
+			}
+		case "Res", "Response":
+			if method.In(p.Index) != reflect.TypeOf((*http.Writer)(nil)) {
+				return routeContract{}, fmt.Errorf("@Res parameter %d of %s must be *http.Writer", p.Index, route.Handler)
 			}
 		default:
 			return routeContract{}, fmt.Errorf("unsupported parameter decorator at index %d of %s", p.Index, route.Handler)
 		}
 		bindings[p.Index] = p
 	}
+	explicit := false
 	for i := 0; i < method.NumIn(); i++ {
-		if _, ok := bindings[i]; !ok && method.In(i).Kind() != reflect.String {
+		if p, ok := bindings[i]; ok && (p.Kind == "Res" || p.Kind == "Response") {
+			if explicit {
+				return routeContract{}, fmt.Errorf("multiple @Res parameters in %s", route.Handler)
+			}
+			explicit = true
+		} else if !ok && method.In(i).Kind() != reflect.String {
 			return routeContract{}, fmt.Errorf("missing parameter decorator for %s", route.Handler)
 		}
+	}
+	if method.NumOut() == 0 && !explicit {
+		return routeContract{}, fmt.Errorf("invalid signature %s", route.Handler)
+	}
+	if method.NumOut() == 1 && method.Out(0).Implements(errType) &&
+		(!explicit || method.Out(0) != errType) {
+		return routeContract{}, fmt.Errorf("invalid signature %s", route.Handler)
 	}
 	return routeContract{Path: path, Key: route.Method + " " + path, Bindings: bindings}, nil
 }

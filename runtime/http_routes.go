@@ -2,8 +2,8 @@ package runtime
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/kevenmiano/nestgo/http"
 	"github.com/kevenmiano/nestgo/httpadapter"
 	"github.com/kevenmiano/nestgo/metadata"
 	"reflect"
@@ -63,26 +63,39 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			rt := route
 			params := bindings
 			methodType := typ
+			explicit, passthrough := false, false
+			for _, p := range bindings {
+				if p.Kind == "Res" || p.Kind == "Response" {
+					explicit, passthrough = true, p.Name == "passthrough"
+				}
+			}
 			registrationErr := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
+				writer := http.NewWriter(ctx)
+				routeResponseHeaders(ctx, rt)
 				var result any
+				var resultStatus int
 				if rt.StaticHTTP != nil {
 					value, status, err := rt.StaticHTTP(instance.Interface(), ctx)
 					if err != nil {
-						if status < 400 || status > 599 {
-							status = 500
+						if status >= 400 && status <= 599 {
+							return respondError(ctx, status, err.Error())
 						}
-						if status >= 500 {
-							return respondError(ctx, status, "Internal server error")
-						}
-						return respondError(ctx, status, err.Error())
+						// Never accept success or redirect statuses for an exception.
+						return http.WriteError(ctx, err)
 					}
-					result = value
+					result, resultStatus = value, status
+					if handlerError, ok := value.(error); ok && handlerError != nil {
+						return http.WriteError(ctx, handlerError)
+					}
 				} else if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
 					value, err := rt.StaticInvoke(instance.Interface())
 					if err != nil {
-						return respondError(ctx, 500, "Internal server error")
+						return http.WriteError(ctx, err)
 					}
 					result = value
+					if handlerError, ok := value.(error); ok && handlerError != nil {
+						return http.WriteError(ctx, handlerError)
+					}
 				} else {
 					args := make([]reflect.Value, methodType.NumIn())
 					for i := 0; i < methodType.NumIn(); i++ {
@@ -108,6 +121,13 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 									return respondError(ctx, 500, "query parameter must be string")
 								}
 								v.Elem().SetString(ctx.Query(p.Name))
+							case "Headers":
+								if t.Kind() != reflect.String {
+									return respondError(ctx, 500, "header parameter must be string")
+								}
+								v.Elem().SetString(ctx.Header(p.Name))
+							case "Res", "Response":
+								v.Elem().Set(reflect.ValueOf(writer))
 							default:
 								return respondError(ctx, 500, "unsupported parameter decorator")
 							}
@@ -123,25 +143,22 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 					}
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
-						return respondError(ctx, 500, "Internal server error")
+						return http.WriteError(ctx, results[1].Interface().(error))
 					}
-					result = results[0].Interface()
-				}
-				status := rt.Status
-				if status == 0 {
-					if rt.Method == "POST" {
-						status = 201
-					} else {
-						status = 200
+					errType := reflect.TypeOf((*error)(nil)).Elem()
+					if len(results) == 1 && results[0].Type().Implements(errType) {
+						if !results[0].IsNil() {
+							return http.WriteError(ctx, results[0].Interface().(error))
+						}
+					} else if len(results) > 0 {
+						result = results[0].Interface()
 					}
 				}
-				ctx.Status(status)
-				ctx.SetHeader("Content-Type", "application/json")
-				data, err := json.Marshal(result)
-				if err != nil {
-					return errors.New("failed to encode HTTP response: " + err.Error())
+				replyRoute := rt
+				if resultStatus != 0 {
+					replyRoute.Status = resultStatus
 				}
-				return ctx.Write(append(data, '\n'))
+				return finishHTTPResponse(ctx, replyRoute, result, writer, explicit, passthrough)
 			}})
 			if registrationErr != nil {
 				return fmt.Errorf("register %s: %w", key, registrationErr)

@@ -135,6 +135,7 @@ func (c *requestContext) Header(n string) string { return c.r.Header.Get(n) }
 func (c *requestContext) Body() []byte           { return c.body }
 func (c *requestContext) Status(code int)        { c.status = code }
 func (c *requestContext) SetHeader(k, v string)  { c.w.Header().Set(k, v) }
+func (c *requestContext) AddHeader(k, v string)  { c.w.Header().Add(k, v) }
 func (c *requestContext) Write(p []byte) (intErr error) {
 	if !c.wrote {
 		c.w.WriteHeader(c.status)

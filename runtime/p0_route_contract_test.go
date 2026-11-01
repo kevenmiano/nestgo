@@ -33,7 +33,7 @@ func TestP0RejectUnsafeHandlerContractBeforeServing(t *testing.T) {
 		{name: "concrete error return", handler: "ConcreteError", want: "invalid signature"},
 		{name: "invalid path binding type", handler: "Parameter", parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "n"}}, want: "requires a string"},
 		{name: "duplicate argument binding", handler: "Valid", parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "id"}, {Index: 0, Kind: "Query", Name: "q"}}, want: "duplicate parameter index"},
-		{name: "unsupported decorator", handler: "Valid", parameters: []metadata.Parameter{{Index: 0, Kind: "Headers", Name: "x"}}, want: "unsupported parameter decorator"},
+		{name: "unsupported decorator", handler: "Valid", parameters: []metadata.Parameter{{Index: 0, Kind: "Unknown", Name: "x"}}, want: "unsupported parameter decorator"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

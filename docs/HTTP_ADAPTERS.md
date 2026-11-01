@@ -66,3 +66,10 @@ All fields are positive-only overrides: zero or negative values retain the defau
 The generated JSON binder also applies a 1 MiB safety ceiling. Raising `MaxBodyBytes` beyond 1 MiB does not override that application-layer ceiling for generated JSON endpoints. Direct `WithRoutes` handlers can accept up to the configured adapter limit.
 
 For Internet-facing production deployments, enforce equivalent or stricter ingress/reverse-proxy limits (headers, body size, requests per connection, idle timeouts). Proxy configuration and the application must agree on request framing to avoid request smuggling. Tightening read deadlines may reject legitimate slow uploads; adjust positive limits for the deployment and validate with the actual reverse proxy. Test suites exercise incomplete headers, chunked oversized requests, concurrent requests and graceful shutdown on a loopback listener.
+
+## Engine-independent responses
+
+Import `github.com/kevenmiano/nestgo/http` for transport-independent response helpers.
+Controllers may return ordinary DTOs, `http.Response[DTO]` for typed response metadata,
+or `http.Result` for untyped response contracts. HTTP errors and status constants
+also live in this package; see [HTTP responses](HTTP_RESPONSES.md).
