@@ -76,6 +76,38 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 					if fieldType == nil {
 						continue
 					}
+					// For explicitly scoped modules, external concrete pointers require
+					// an import of a module from the same Go source package.
+					if ptr, ok := types.Unalias(fieldType).(*types.Pointer); ok {
+						if named, ok := types.Unalias(ptr.Elem()).(*types.Named); ok && named.Obj().Pkg() != nil && named.Obj().Pkg().Path() != pkg.Path() {
+							if star, ok := field.Type.(*ast.StarExpr); ok {
+								if selector, ok := star.X.(*ast.SelectorExpr); ok {
+									if qualifier, ok := selector.X.(*ast.Ident); ok {
+										for _, moduleName := range sortedModuleContracts(modules) {
+											mod := modules[moduleName]
+											if (!mod.Defined["controllers"] && !mod.Defined["providers"]) || (!containsModuleType(mod.Controllers, typ.Name.Name) && !containsModuleType(mod.Providers, typ.Name.Name)) {
+												continue
+											}
+											visible := false
+											for _, imported := range mod.Imports {
+												if strings.HasPrefix(imported, qualifier.Name+".") {
+													visible = true
+													break
+												}
+											}
+											if !visible {
+												fieldName := selector.Sel.Name
+												if len(field.Names) > 0 {
+													fieldName = field.Names[0].Name
+												}
+												return Diagnostic{File: fset.Position(field.Pos()).Filename, Line: fset.Position(field.Pos()).Line, Message: fmt.Sprintf("module %s: %s.%s requires external concrete provider %s (missing module import)", moduleName, typ.Name.Name, fieldName, named.Obj().Name())}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
 					iface, ok := types.Unalias(fieldType).Underlying().(*types.Interface)
 					if !ok {
 						continue
