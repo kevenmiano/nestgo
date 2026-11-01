@@ -103,5 +103,11 @@ jobs:
             _ = runtime.New
           }
           GO
+          # A standalone consumer must resolve and record the transitive
+          # checksums of the newly required packages before testing. The
+          # downloaded NestGo module itself is still verified via GOPROXY
+          # and the public checksum database (no local replace directive).
+          go mod tidy
+          go mod verify
           go test ./...
           echo "Packages are importable from the released module $RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
