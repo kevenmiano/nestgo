@@ -21,14 +21,14 @@
 
 </div>
 
-**NestGo Compiler v3** is an experimental Go source-to-source compiler and HTTP runtime inspired by NestJS decorators. Write annotated `.mgo` files, generate standard Go source and route metadata, and serve requests with Go's `net/http`.
+**NestGo Compiler v3** is an experimental Go source-to-source compiler and HTTP runtime inspired by NestJS decorators. Write annotated `.mgo` files, generate standard Go source and route metadata, and serve requests through pluggable HTTP adapters. The legacy `runtime.New`/`FromRegistry` API still returns a `net/http` handler.
 
 > **Status:** Experimental proof of concept, not production-ready. NestGo is not a drop-in replacement for NestJS.
 
 ## Requirements
 
 - Go 1.23 or newer
-- No external runtime dependencies
+- Go module dependencies are managed by `go.mod`/`go.sum` (including `fasthttp` for the native adapter).
 
 ## Install the CLI and runtime
 
@@ -120,6 +120,26 @@ func main() {
 
 The example includes tests for `GET /users/`, `GET /users/{id}`, and `POST /users/`.
 
+## HTTP platform selection
+
+`runtime.NewApplication` accepts an adapter implementation; a nil adapter defaults to native fasthttp. The legacy `runtime.New` and `runtime.FromRegistry` continue to return `http.Handler` for standard-library interoperability.
+
+```go
+app, err := runtime.NewApplication(runtime.ApplicationOptions{
+    Adapter: nethttp.New(),
+}, registeredPackage)
+if err != nil {
+    log.Fatal(err)
+}
+log.Fatal(app.Listen(":8080"))
+```
+
+Import `github.com/kevenmiano/nestgo/platform/nethttp` as `nethttp` and `log` from the standard library. Choose an adapter at bootstrap; these are distinct APIs and the application adapter cannot be hot-swapped after routes have been registered. See [HTTP adapter documentation](docs/HTTP_ADAPTERS.md).
+
+## Modules and visibility
+
+`@Module({imports: [...], providers: [...], controllers: [...], exports: [...]})` records module contracts. Providers are injectable inside their declaring module and through explicitly imported modules that export them. `FromRegistry` discovers registered imported module packages transitively. Missing, duplicate, ambiguous or cyclic metadata dependencies fail during validation. Cross-package compilation and advanced provider lifecycles remain experimental.
+
 ## Supported decorators
 
 | Area | Decorators |
@@ -147,10 +167,13 @@ Compiler validation + metadata generation
         metadata.Register
                 |
                 v
-        runtime.FromRegistry
+        runtime.FromRegistry (legacy net/http)
+          OR runtime.NewApplication
                 |
                 v
-          net/http ServeMux
+       httpadapter.Adapter
+          /          \\
+    fasthttp       net/http
 ```
 
 | Directory | Responsibility |
@@ -158,7 +181,10 @@ Compiler validation + metadata generation
 | `cmd/modforge/` | Compiler command-line entry point |
 | `compiler/` | Lexer, AST validation, source and metadata generation |
 | `metadata/` | Process-wide metadata registry and descriptors |
-| `runtime/` | Routing, request binding, reflection-based handler calls, field injection |
+| `runtime/` | Module visibility, dependency injection, request binding, reflection fallback and optional compiled invokers |
+| `httpadapter/` | HTTP adapter contracts independent of the selected server |
+| `platform/fasthttp/` | Native fasthttp adapter (default for `NewApplication`) |
+| `platform/nethttp/` | Standard-library HTTP adapter |
 | `examples/shop/` | Sample annotated source, generated Go and HTTP tests |
 | `docs/` | Detailed compiler, runtime, architecture and development references |
 
@@ -174,7 +200,7 @@ Open `diagnostics-output/report.html` locally. The example is a labelled built-i
 
 ## Documentation
 
-The Docusaurus portal is published to [GitHub Pages](https://kevenmiano.github.io/nestgo/) automatically **when a GitHub Release is published with a semantic version tag from `main`**, once GitHub Pages is configured to use GitHub Actions. The hosted URL is only available after a successful deployment. See [release publishing setup](docs/DOCS_SITE.md#release-tag-publishing-pipeline).
+The Docusaurus portal is published to [GitHub Pages](https://kevenmiano.github.io/nestgo/) automatically **when a GitHub Release is published with a semantic version tag from `main`**, once GitHub Pages is configured to use GitHub Actions. A merge to `main` does **not** publish the website: `docs-site.yml` validates site builds for website changes, whereas `docs-release.yml` deploys the tagged release. The hosted URL is only available after a successful deployment. See [release publishing setup](docs/DOCS_SITE.md#release-tag-publishing-pipeline).
 
 
 - [Architecture and design](docs/ARCHITECTURE.md)
@@ -185,7 +211,7 @@ The Docusaurus portal is published to [GitHub Pages](https://kevenmiano.github.i
 
 ## Limitations
 
-NestGo currently provides basic reflection-based field injection, JSON body binding and method routing. It does **not** implement constructor injection, request-scoped providers, guards, pipes, interceptors, dynamic modules, a language server, or full NestJS compatibility. Generated metadata and public APIs may change.
+NestGo currently provides module-scoped field injection for declared providers, JSON body binding, method routing, native fasthttp and net/http adapters, and a conservative static invocation fast path for eligible zero-argument handlers with reflection fallback. `runtime.New`/`FromRegistry` remain the legacy `http.Handler` entry points. It does **not** implement constructor injection, request-scoped providers, guards, pipes, interceptors, dynamic modules, a language server, or full NestJS compatibility. Generated metadata and public APIs may change.
 
 ## License
 

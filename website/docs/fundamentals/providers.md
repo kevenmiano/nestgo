@@ -3,18 +3,25 @@ title: Providers and modules
 ---
 # Providers and modules
 
-NestGo recognizes `@Injectable` and `@Module` annotations and currently supports basic reflection-based field injection.
+NestGo supports `@Injectable`, `@Controller` and declarative `@Module` metadata. Explicit module contracts control the visibility of registered providers.
 
 ```go
 @Injectable()
 type UsersService struct{}
 
-@Module("users")
+@Module({providers: [UsersService], exports: [UsersService]})
 type UsersModule struct{}
+
+@Module({imports: [UsersModule], controllers: [UsersController]})
+type AppModule struct{}
 ```
 
-:::caution Not yet implemented
-Constructor injection, provider scopes, module imports/exports and lifecycle hooks are roadmap items, not stable features.
+A provider is available within its declaring module. A consuming module can inject it when it imports a module that exports that provider. External module references can use qualified Go types in `imports` when their package aliases are declared in the `.mgo` source.
+
+At bootstrap, the runtime validates missing imports, duplicate ownership, invalid exports, import cycles and unavailable required dependencies. `runtime.FromRegistry("root")` discovers the registered metadata packages of imported modules transitively. Those Go packages must still be linked into the binary so their `init` registration runs.
+
+:::caution Experimental limitations
+Field injection is supported; constructor injection, request-scoped providers, complete cross-package compiler type validation and advanced lifecycle hooks are not stable features. An import does not automatically export all providers.
 :::
 
-See [the core architecture roadmap](../roadmap.md).
+See the [architecture guide](./architecture.md) and [roadmap](../roadmap.md).
