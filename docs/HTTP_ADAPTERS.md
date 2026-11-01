@@ -31,12 +31,7 @@ without `fasthttpadaptor`; the standard-library platform uses
 `http.ServeMux`. The initial fasthttp path matcher is linear in route count;
 it must be replaced with an indexed router and benchmarked before release.
 
-**Backward compatibility:** `runtime.New` and `runtime.FromRegistry`
-continue to return `http.Handler`; these legacy APIs remain on net/http.
-The application-level API uses adapters. Not all net/http-specific middleware
-can operate unchanged on fasthttp; use platform-aware integration when needed.
-
-## Open verification work
+**Migration status:** The canonical application lifecycle is `runtime.NewApp(ctx, With...)`. The earlier `runtime.New`, `runtime.NewWithOptions` and `runtime.FromRegistry` entrypoints were removed. The legacy adapter-specific `Application` API is still isolated pending consolidation into `NewApp` (#103). Do not introduce new dependencies on that API; it will be removed before the first stable release. HTTP engine switching must retain parity for provider factories, route handlers, and shutdown semantics.\n\n## Open verification work
 
 - Produce and commit `go.sum` with `go mod tidy` (network-enabled CI).
 - Run `go test ./...` and `go vet ./...` on Go 1.23.
