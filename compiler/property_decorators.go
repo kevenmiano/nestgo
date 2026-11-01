@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/format"
+	"go/parser"
 	"go/token"
 	"reflect"
 	"strconv"
@@ -58,8 +59,7 @@ func collectDTOs(path string, file *ast.File, fset *token.FileSet, marks []marke
 				anns := []Annotation{}
 				for _, mark := range marks {
 					if mark.Offset > last && mark.Offset < start {
-						anns = append(anns, Annotation{Name: mark.Name, Argument: mark.Argument, Line: fset.Position(token.Pos(0)).Line})
-						anns[len(anns)-1].Line = lineOfOffset(fset, file, mark.Offset)
+						anns = append(anns, Annotation{Name: mark.Name, Argument: mark.Argument, Line: lineOfOffset(fset, file, mark.Offset)})
 					}
 				}
 				if len(field.Names) == 0 {
