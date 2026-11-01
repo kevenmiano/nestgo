@@ -156,7 +156,13 @@ flowchart TD
   Net --> Done
 ```
 
-NestGo does **not** automatically register OS signal handlers or invoke provider shutdown hooks. The application owner must orchestrate signal handling, deadline, and termination.
+NestGo does **not** automatically register OS signal handlers. The adapter-based Application API now invokes provider and controller shutdown hooks when implemented; legacy http.Handler entry points do not. The application owner must orchestrate signal handling, deadline, and termination.
+
+## Lifecycle hooks in the adapter-based API
+
+Provider and controller instances may implement the optional interfaces `OnModuleInit(context.Context) error`, `OnApplicationBootstrap(context.Context) error`, `BeforeApplicationShutdown(context.Context) error`, `OnModuleDestroy(context.Context) error`, and `OnApplicationShutdown(context.Context) error`. The application initializes hooks after routes are registered. Initialization runs providers in stable type-name order, followed by controllers in metadata order. Shutdown runs these instances in reverse order. Shutdown hooks run around the adapter shutdown, collecting errors with `errors.Join`, and repeated calls return the same outcome.
+
+These hooks currently exist only in `NewApplication` / `ApplicationFromRegistry`, not the legacy net/http handler constructor. There is no automatic signal handling or full rollback after an initialization failure.
 
 ## Comparison with NestJS: implemented vs proposed
 
@@ -165,16 +171,16 @@ NestGo does **not** automatically register OS signal handlers or invoke provider
 | Module imports / providers / controllers / exports | Implemented in generated module metadata and runtime visibility |
 | Singleton-style bootstrap provider instances | Implemented for registered provider types |
 | Injectable constructor factories, request/transient scopes | Not implemented in these runtime paths |
-| `OnModuleInit` | Not implemented |
-| `OnApplicationBootstrap` | Not implemented |
-| `BeforeApplicationShutdown` | Not implemented |
-| `OnModuleDestroy` | Not implemented |
-| `OnApplicationShutdown` | Not implemented |
+| `OnModuleInit` | Implemented for adapter-based applications |
+| `OnApplicationBootstrap` | Implemented for adapter-based applications |
+| `BeforeApplicationShutdown` | Implemented for adapter-based applications |
+| `OnModuleDestroy` | Implemented for adapter-based applications |
+| `OnApplicationShutdown` | Implemented for adapter-based applications |
 | Explicit application shutdown via adapter | Implemented |
 | Automatic shutdown signals | Not implemented |
 | Unified bootstrap across both HTTP APIs | Not implemented |
 
-### Proposed lifecycle (design target, not current behavior)
+### Proposed unified lifecycle (design target; currently only the adapter path has hooks)
 
 ```mermaid
 stateDiagram-v2
