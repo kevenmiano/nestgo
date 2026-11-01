@@ -18,53 +18,17 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 }
 
 func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
-	providers := map[reflect.Type]reflect.Value{}
-	controllers := []metadata.Controller{}
-	for _, pkg := range packages {
-		for _, p := range pkg.Providers {
-			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
-				return fmt.Errorf("invalid provider %v", p.Type)
-			}
-			if _, ok := providers[p.Type]; ok {
-				return fmt.Errorf("duplicate provider %v", p.Type)
-			}
-			providers[p.Type] = reflect.New(p.Type.Elem())
-		}
-		controllers = append(controllers, pkg.Controllers...)
-	}
-	visibility, err := moduleVisibility(packages)
-	if err != nil {
-		return err
-	}
-	orderedProviders := make([]reflect.Type, 0, len(providers))
-	for providerType := range providers {
-		orderedProviders = append(orderedProviders, providerType)
-	}
-	sort.Slice(orderedProviders, func(i, j int) bool {
-		return orderedProviders[i].String() < orderedProviders[j].String()
-	})
-	inject := func(v reflect.Value) error {
-		return injectFields(v, providers, orderedProviders, visibility)
-	}
-	for _, providerType := range orderedProviders {
-		if err := inject(providers[providerType]); err != nil {
-			return err
-		}
-	}
+	graph, err := prepareBootstrap(packages, nil, nil)
+	if err != nil { return err }
 	if lifecycle != nil {
-		for _, typ := range orderedProviders {
-			lifecycle.instances = append(lifecycle.instances, providers[typ].Interface())
+		for _, typ := range graph.orderedProviders {
+			lifecycle.instances = append(lifecycle.instances, graph.providers[typ].Interface())
 		}
 	}
 	seen := map[string]bool{}
-	for _, controller := range controllers {
-		if controller.Type == nil || controller.Type.Kind() != reflect.Ptr || controller.Type.Elem().Kind() != reflect.Struct {
-			return fmt.Errorf("invalid controller %v", controller.Type)
-		}
-		instance := reflect.New(controller.Type.Elem())
-		if err := inject(instance); err != nil {
-			return err
-		}
+	for _, controller := range graph.controllers {
+		instance, err := graph.newController(controller.Type)
+		if err != nil { return err }
 		if lifecycle != nil {
 			lifecycle.instances = append(lifecycle.instances, instance.Interface())
 		}
