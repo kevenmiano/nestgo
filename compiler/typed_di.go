@@ -34,9 +34,13 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 	// against the real generated method set rather than inferred by name.
 	for _, repository := range repositories {
 		generated, err := GenerateRepository(repository)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		node, err := parser.ParseFile(fset, repository.Name+"_repository_generated.go", generated, 0)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		parsed = append(parsed, node)
 	}
 	// Source may contain incomplete application code. Check declarations for
