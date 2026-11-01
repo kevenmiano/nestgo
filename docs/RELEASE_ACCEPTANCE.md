@@ -1,100 +1,56 @@
-# NestGo production-readiness acceptance matrix
+# NestGo Core v1.0 — release acceptance matrix
 
-Tracking issue: [#70](https://github.com/kevenmiano/nestgo/issues/70).
+Tracking gate: [#70](https://github.com/kevenmiano/nestgo/issues/70) · [execution roadmap](../.planning/ROADMAP.md).
 
-**Status: experimental / not yet production certified.** A passing PR test suite
-does not constitute a release sign-off. All P0 evidence must refer to the exact
-immutable release commit and Go toolchain. Record the final tag, SHA, owner,
-date, CI run and corresponding artifact before checking off a gate.
+**Current classification: experimental, not yet signed off for production.** The matrix below records implementation and remaining evidence, not certification. The current source can evolve while a test executes; only a single immutable candidate SHA with complete passing runs may be approved. Collect the release tag, SHA, toolchain, environment, owner, date, CI URLs and artifacts before marking a release criterion complete.
 
-## Supported MVP API
+## Supported Core v1.0 target
 
-- Single application factory: `runtime.New(runtime.With...)` and one lifecycle
-  owner, with `Listen`, `Serve`, `Shutdown(ctx)` and `Close()`.
-- Transport switch: `runtime.WithAdapter(fasthttp.New())` (default) or
-  `runtime.WithAdapter(nethttp.New())`.
-- Direct Go routes via `WithRoutes`, optionally combined with generated
-  `@Module`/`@Controller`/`@Injectable` metadata via `WithRegistry`.
-- Singleton provider and controller **field** DI only when explicitly tagged
-  `nestgo:"inject"` (required) or `nestgo:"optional"`.
-- HTTP methods, path/query/body binding, JSON responses, explicit status and
-  typed error handling for supported signatures.
+- Exactly one factory: `runtime.New(runtime.With...)`, plus `Listen`, `Serve`, `Shutdown(ctx)` and `Close()`; no legacy factories.
+- Native `fasthttp` and `net/http` adapters. Both are supported only after their same-SHA parity and reverse-proxy tests pass.
+- Compiler-free `WithRoutes` and optional deterministic `.mgo` metadata compilation for modules, controllers, routes and explicit singleton DI.
+- Typed `http.Response[T]`, `http.Result`, JSON request/response, status, headers and safe HTTP errors.
+- Minimum pipeline: middleware, guards, validation pipes and exception filters with stable, documented ordering. A draft PR is **not** an implemented guarantee.
+- Operational defaults: bounded HTTP reads/headers/body, deadlines, unexpected-error/panic redaction, structured logs, readiness/liveness and graceful in-flight SIGTERM handling.
 
-**Not in MVP:** request-scoped providers, constructor injection, websocket,
-GraphQL, persistence connectors, or arbitrary legacy factories. Runtime
-`NewApplication`/`NewApp` are not supported; `New` is canonical.
+Excluded from the core support contract: ORM/SQL code generation, config providers beyond simple validated Go configuration, GraphQL, OpenAPI generation, queues, WebSockets, gRPC transport, request/transient-scoped DI, constructor injection, interceptors and advanced DTO strategies. These may ship as optional packages with separate quality gates.
 
-## Acceptance evidence
+## Release evidence matrix
 
-| Gate | Evidence | Status |
-| --- | --- | --- |
-| Single runtime and bootstrap | #110, #121, #128 | Implemented and tested |
-| Explicit DI and startup validation | #125, #131, #141 | Implemented and tested |
-| Handler signature safety and race | #108, #109, #116, #117 | Implemented and tested |
-| Generated example is deterministic | `go-quality.yml` generated shop check | CI gate; repeat on release SHA |
-| Both adapters use real listeners | `runtime/http_adapter_integration_test.go` | CI gate; expand operational matrix |
-| SIGTERM, health, error redaction | #145; [successful CI](https://github.com/kevenmiano/nestgo/actions/runs/41339632513) | Verified smoke; in-flight follow-up #151 pending |
-| External consumer using current SHA | #147; [source-mode CI](https://github.com/kevenmiano/nestgo/actions/runs/41339678113) | Verified source checkout only |
-| Tagged consumer through public proxy and checksum DB | #147, release-mode workflow | **Not yet verified for release tag** |
-| Race, vet, static checks, module integrity | `go-quality.yml`, `runtime-race-gates.yml` | CI gates; repeat on release SHA |
-| Route/bootstrap throughput regressions | #150; [p95/p99 scale CI](https://github.com/kevenmiano/nestgo/actions/runs/41340172375) | Baseline measured at 1/10/100/1000; regression thresholds pending |
-| SIGTERM under in-flight load and timeout | #151 (in-flight request test) | Pending latest CI and overload/timeout evidence |
-| GoReleaser, tags, docs publication | Release workflow evidence | Pending exact tag sign-off |
-| Security handling and disclosure | `SECURITY.md`, error-redaction tests | Guidance available; audit pending |
+| Area / evidence | Existing implementation or work | Remaining acceptance | Release gate |
+| --- | --- | --- | --- |
+| Compiler + DI | Module graph, cross-package tests, explicit field injection and structured errors in core | Golden positive/negative cases; missing/ambiguous/cyclic dependencies; deterministic regeneration on **candidate SHA** | P0 — #4 #10 #35 #36 |
+| Lifecycle | Hooks and partial rollback exist | Dependency-topological init/teardown, cancellation, idempotent concurrent shutdown; #119 regression suite | P0 — #119 |
+| HTTP + typed responses | PR #107 merged; adapters and server limits on main | Real-listener parity on candidate SHA incl. 404/405, JSON, headers/cookies, status/error handling, timeouts and request limits | P0 — #70 |
+| Request pipeline | PR #122 is draft | Middleware/guards/validation pipes/filters, reject/transform cases, ordering, fail-closed defaults, code-first/generation, both adapters | P0 bounded — #13 #14 #15 |
+| Unexpected errors and panics | Safe 5xx regression coverage already exists | Unified panic/recovery and redaction behavior through reflective/static/direct routes and both adapters; request correlation/logging | P0 — #112 |
+| HTTP boundaries and proxy | #113 and #115 closed; PR #140 merged with local Nginx tests | Rerun with actual Nginx/proxy and malicious framing/slow header/resource ceilings on candidate SHA | P0 — #70 |
+| Shutdown | Process SIGTERM smoke from PR #145 merged | PR #151 in-flight request completes or fails only by explicit deadline, no half-writes; both adapters | P0 — #151 |
+| Operations | `logging/slog` and bootstrap diagnostics available | Health/live and health/ready, readiness flips before draining, config validation, safe request logs; external runnable example | P0 bounded — #16 |
+| Static/race/security | `go-quality.yml` and `runtime-race-gates.yml` include tests, race, govulncheck, vet, formatting and module verification | All checks pass on candidate SHA; fuzz of metadata/parsing; no known reproducible panic, race or vulnerable supported dependency | P0 — #25 #70 |
+| Scale and benchmarks | Router/bootstrap comparison, profiling, release-scale fixtures | Record reproducible 1/10/100/1000 provider/route samples, p95/p99, allocs, runner/toolchain, thresholds and regression decision | P0 — #37 #55 #70 |
+| External release | External-consumer source and tagged proxy workflows, GoReleaser and docs exist | External Go project installs **approved immutable tag** from `proxy.golang.org` with `sum.golang.org`, without `replace`; build/sample/CLI/docs releases pass | P0 — #70 |
+| Stability and security policy | `SECURITY.md`, upgrade notes, Go semantic release automation | API/version policy, exclusions, rollback, owner sign-off, exact SHA/tag links; do **not** merge release PR #73 until approved | P0 — #70 |
 
-Do not turn the above **pending** cells into accepted claims without their
-specific successful workflow runs and artifacts.
+Rows with code merged are **not automatically accepted**; no checkboxes are marked complete here without fresh independent evidence.
 
-## Measured HTTP baseline (2026-11-01)
+## Mandatory final sign-off
 
-[Workflow and artifact](https://github.com/kevenmiano/nestgo/actions/runs/41340172375),
-Go runner with `GOMAXPROCS=2`; median of three repetitions per
-configuration, loopback HTTP/1.1 and one handler with explicit 200 response.
+1. Record immutable **candidate main SHA**, `go version`, `go env`, runner environment, owner and date.
+2. Run `go mod tidy -diff`, `go mod verify`, `govulncheck ./...`, `go test ./... -count=1`, `go test -race ./... -count=1`, `go vet ./...`, gofmt and generated-output/idempotency checks; retain artifacts.
+3. Run multi-package external fixture from candidate SHA with successful and rejected modules/DI, malformed decorators, handler signatures and generated code. Verify both compiler-first and `WithRoutes` code-first use.
+4. Test real TCP listeners for FastHTTP/net/http, matched-route pipeline, error/panic redaction, 400/403/404/405/413/429/500, JSON body limits, timeouts, headers and graceful shutdown. Repeat proxy-security tests through actual Nginx.
+5. Demonstrate readiness before, during and after SIGTERM; active requests complete or hit an explicit deadline, provider cleanup runs once, resources close, no data leaks or hangs.
+6. Reproduce startup, p95/p99/throughput and allocations for 1/10/100/1000 providers/routes; archive raw samples, environmental metadata and thresholds, not unsupported production SLAs.
+7. Publish only after the release candidate is approved, with **immutable semver tag** and previous-tag rollback plan. Verify full external consumer via `GOPROXY=https://proxy.golang.org`, `GOSUMDB=sum.golang.org`, no local `replace`, published GoReleaser binaries/checksums and docs.
+8. Capture links to every green run/artifact and record reviewers' sign-off in #70. If any requirement is not evidenced, leave #70 open and keep Core v1.0 unreleased.
 
-| Routes / providers | Engine | Requests/s | p95 (ms) | p99 (ms) |
-| --- | --- | ---: | ---: | ---: |
-| 1 / 1 | fasthttp | 33,377 | 0.104 | 0.132 |
-| 1 / 1 | net/http | 30,347 | 0.109 | 0.154 |
-| 10 / 10 | fasthttp | 31,901 | 0.114 | 0.164 |
-| 10 / 10 | net/http | 30,396 | 0.109 | 0.155 |
-| 100 / 100 | fasthttp | 33,658 | 0.103 | 0.146 |
-| 100 / 100 | net/http | 29,078 | 0.113 | 0.208 |
-| 1000 / 1000 | fasthttp | 28,125 | 0.123 | 0.224 |
-| 1000 / 1000 | net/http | 28,424 | 0.128 | 0.251 |
+## Public API and rollback
 
-These are baseline samples, **not** production SLAs. They do not include
-database calls, multi-node communication, external network latency or
-long-duration sustained workloads. Establish explicit regression thresholds
-and retest on the exact candidate release SHA.
+Production users opt into only the tested HTTP core contract. Dynamic/request DI scopes, broad NestJS parity and optional integrations are experimental/not included until independently released. A Go application may supply its own `database/sql`, config library or authentication middleware without NestGo requiring an ORM.
 
-## Release checklist
+**Breaking change:** DI requires explicit `nestgo:"inject"` / `nestgo:"optional"`; `runtime.New(...Option)` is the only supported factory. Remove old factories and deprecated implicit injection from consumer code before upgrading.
 
-1. Create a candidate commit on `main`; record full SHA, Go version, operating
-   system and architecture. No mutable version tags.
-2. Execute `go test ./... -count=1`, `go test -race ./... -count=1`,
-   `go vet ./...`, gofmt checks, deterministic generated artifacts,
-   `go mod verify` and external-consumer **source** mode on the SHA.
-3. Verify both HTTP adapters on real TCP listeners, including error redaction,
-   route precedence, headers, JSON, body/header limits, startup and SIGTERM.
-4. Record controlled 1/10/100/1000 route/provider throughput, p95/p99,
-   startup, CPU and heap baselines. State environment and regression thresholds.
-5. Create an immutable semver tag pointing to the approved SHA; configure tag
-   protection and run published-tag workflows with `GOPROXY=https://proxy.golang.org`
-   and `GOSUMDB=sum.golang.org`. Verify the exact version and checksum.
-6. Confirm GoReleaser artifacts, checksums, docs publication and the external
-   consumer work **without a local replace directive**.
-7. Document breaking changes (strict explicit DI), rollback to previous
-   immutable tag, exclusions and sign-off. Keep #70 open if any gate is missing.
+Rollback by deploying a previously **verified immutable tag** with its corresponding configuration and binaries. Never retag a version; verify external DB migration compatibility separately.
 
-## Upgrade and rollback notes
-
-The current DI contract intentionally breaks legacy implicit pointer/interface
-injection. Add `nestgo:"inject"` to every required field and
-`nestgo:"optional"` to optional fields before upgrading. Untagged fields are
-ordinary application state and will not be filled automatically. The canonical
-application entrypoint is `runtime.New(options...)`.
-
-For a rollback, deploy the previous **verified immutable** tag and its matching
-configuration/artifacts. Do not force-move or overwrite a published tag. Verify
-external consumers and DB compatibility independently when introducing
-non-MVP adapters. Experimental v0 releases may still change APIs before v1.
+References: [semantic releases](SEMANTIC_RELEASES.md), [distribution](DISTRIBUTION.md), [security](../SECURITY.md).
