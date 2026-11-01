@@ -456,6 +456,11 @@ func sortStrings(a []string) {
 	}
 }
 func CompileDir(dir string) error {
+	return CompileDirWithDialect(dir, sqlgen.PostgreSQL)
+}
+
+// CompileDirWithDialect compiles decorated repositories for a selected SQL dialect.
+func CompileDirWithDialect(dir string, dialect sqlgen.Dialect) error {
 	paths, err := filepath.Glob(filepath.Join(dir, "*.mgo"))
 	if err != nil {
 		return err
@@ -484,7 +489,7 @@ func CompileDir(dir string) error {
 			}
 		}
 		if hasRepo {
-			def, err := RepositoryFromMGO(file, sqlgen.PostgreSQL)
+			def, err := RepositoryFromMGO(file, dialect)
 			if err != nil { return err }
 			generated, err := GenerateRepository(def)
 			if err != nil { return err }
