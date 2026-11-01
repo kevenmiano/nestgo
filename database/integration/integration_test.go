@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	nestdb "github.com/kevenmiano/nestgo/database"
 	"github.com/kevenmiano/nestgo/database/sqlgen"
 	nestsqlx "github.com/kevenmiano/nestgo/database/sqlx"
-	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
 
