@@ -41,33 +41,22 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				return fmt.Errorf("handler %s not found", route.Handler)
 			}
 			typ := method.Type()
-			errType := reflect.TypeOf((*error)(nil)).Elem()
-			if typ.NumOut() < 1 || typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(errType)) {
-				return fmt.Errorf("invalid signature %s", route.Handler)
+			contract, contractErr := compileRouteContract(controller.Prefix, route, typ)
+			if contractErr != nil {
+				return formatRouteContractError(contractErr, false)
 			}
-			path := strings.TrimSuffix(controller.Prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
-			key := route.Method + " " + path
+			path := contract.Path
+			key := contract.Key
 			if seen[key] {
 				return fmt.Errorf("duplicate route %s", key)
 			}
 			seen[key] = true
-			bindings := map[int]metadata.Parameter{}
-			for _, p := range route.Parameters {
-				if p.Index < 0 || p.Index >= typ.NumIn() {
-					return fmt.Errorf("invalid parameter index %d", p.Index)
-				}
-				bindings[p.Index] = p
-			}
-			for i := 0; i < typ.NumIn(); i++ {
-				if _, ok := bindings[i]; !ok && typ.In(i).Kind() != reflect.String {
-					return fmt.Errorf("missing parameter decorator for %s", route.Handler)
-				}
-			}
+			bindings := contract.Bindings
 			handler := method
 			rt := route
 			params := bindings
 			methodType := typ
-			err := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
+			registrationErr := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
 				var result any
 				if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
 					value, err := rt.StaticInvoke(instance.Interface())
@@ -135,8 +124,8 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				}
 				return ctx.Write(append(data, '\n'))
 			}})
-			if err != nil {
-				return fmt.Errorf("register %s: %w", key, err)
+			if registrationErr != nil {
+				return fmt.Errorf("register %s: %w", key, registrationErr)
 			}
 		}
 	}
