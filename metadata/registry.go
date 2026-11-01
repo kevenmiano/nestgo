@@ -12,7 +12,7 @@ type Parameter struct {
 	Name  string
 }
 type Route struct {
-	StaticInvoke func(any) (any, error)
+	StaticInvoke          func(any) (any, error)
 	Method, Path, Handler string
 	Status                int
 	Parameters            []Parameter
