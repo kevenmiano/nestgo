@@ -57,11 +57,16 @@ func (*responseTestController) Failure() (string, error) {
 func (*responseTestController) GenericFailure() (string, error) { return "", errors.New("secret") }
 func (*responseTestController) BuiltinError(code string) (any, error) {
 	switch code {
-	case "405": return nil, http.MethodNotAllowed()
-	case "421": return nil, http.Misdirected()
-	case "429": return nil, http.TooManyRequests("rate limit")
-	case "503": return nil, http.ServiceUnavailable()
-	default: return nil, http.BadRequest("unknown code")
+	case "405":
+		return nil, http.MethodNotAllowed()
+	case "421":
+		return nil, http.Misdirected()
+	case "429":
+		return nil, http.TooManyRequests("rate limit")
+	case "503":
+		return nil, http.ServiceUnavailable()
+	default:
+		return nil, http.BadRequest("unknown code")
 	}
 }
 

@@ -6,29 +6,37 @@ import stdhttp "net/http"
 // Cause is available via errors.Unwrap, but is never serialized to clients.
 type HTTPError struct {
 	StatusCode int
-	Message string
-	Cause error
+	Message    string
+	Cause      error
 }
 
 func (e *HTTPError) Error() string {
-	if e == nil { return "Internal server error" }
-	if e.Message != "" { return e.Message }
-	if reason := stdhttp.StatusText(e.StatusCode); reason != "" { return reason }
+	if e == nil {
+		return "Internal server error"
+	}
+	if e.Message != "" {
+		return e.Message
+	}
+	if reason := stdhttp.StatusText(e.StatusCode); reason != "" {
+		return reason
+	}
 	return "HTTP error"
 }
 func (e *HTTPError) Unwrap() error {
-	if e == nil { return nil }
+	if e == nil {
+		return nil
+	}
 	return e.Cause
 }
 
 // NewHTTPError creates an arbitrary typed HTTP error, including codes not
 // represented by convenience helpers.
 func NewHTTPError(status int, message string) *HTTPError {
-	return &HTTPError{StatusCode:status,Message:message}
+	return &HTTPError{StatusCode: status, Message: message}
 }
 
 func newStatusError(status int, message []string) *HTTPError {
-	if len(message)==0 || message[0]=="" {
+	if len(message) == 0 || message[0] == "" {
 		return NewHTTPError(status, stdhttp.StatusText(status))
 	}
 	return NewHTTPError(status, message[0])
@@ -143,4 +151,3 @@ func GatewayTimeout(message ...string) *HTTPError {
 func HTTPVersionNotSupported(message ...string) *HTTPError {
 	return newStatusError(StatusHTTPVersionNotSupported, message)
 }
-
