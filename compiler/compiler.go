@@ -45,7 +45,7 @@ type File struct {
 	DTOs                  []DTO
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Expose": true, "Exclude": true, "Transform": true, "Type": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Expose": true, "Exclude": true, "ExcludeInput": true, "ExcludeOutput": true, "Transform": true, "TransformInput": true, "TransformOutput": true, "Type": true}
 
 func Parse(path string, src []byte) (*File, error) {
 	source, annotations, paramMarkers, propertyMarkers, err := lexDecorators(path, src)
