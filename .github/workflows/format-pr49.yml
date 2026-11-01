@@ -1,0 +1,29 @@
+name: Format HTTP adapters once
+on:
+  push:
+    branches: [feat/pluggable-http-engines]
+    paths:
+      - .github/workflows/format-pr49.yml
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/pluggable-http-engines
+          persist-credentials: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Format and commit Go sources
+        run: |
+          gofmt -w httpadapter platform runtime/application.go runtime/application_test.go runtime/http_adapter_integration_test.go runtime/http_routes.go
+          if test -n "$(git status --porcelain -- '*.go')"; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add httpadapter platform runtime/application.go runtime/application_test.go runtime/http_adapter_integration_test.go runtime/http_routes.go
+            git commit -m 'style: format HTTP adapter implementations and tests'
+            git push origin HEAD:feat/pluggable-http-engines
+          fi
