@@ -46,7 +46,7 @@ func (a *Adapter) register(pattern string, handler httpadapter.Handler) (err err
 	a.mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		ctx := &requestContext{w: w, r: r, status: 200}
 		if e := handler(ctx); e != nil && !ctx.wrote {
-			http.Error(w, e.Error(), 500)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
 	})
 	return nil
