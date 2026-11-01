@@ -22,6 +22,16 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Resolve dependency lockfile (temporary #115 review)
+        shell: bash
+        run: |
+          go mod tidy
+          echo '===NESTGO-RESOLVED-MOD-START==='
+          cat go.mod
+          echo '===NESTGO-RESOLVED-MOD-END==='
+          echo '===NESTGO-RESOLVED-SUM-START==='
+          cat go.sum
+          echo '===NESTGO-RESOLVED-SUM-END==='
       - name: Unit and integration tests
         run: go test ./...
       - name: Static analysis
