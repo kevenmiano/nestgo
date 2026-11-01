@@ -1,0 +1,33 @@
+name: Temporary DTO gofmt on PR branch
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'feat/dto-property-transformers'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Format DTO change set
+        shell: bash
+        run: |
+          set -euo pipefail
+          gofmt -w compiler/compiler.go compiler/lexer.go compiler/generated_source.go compiler/property_decorators.go compiler/property_source.go compiler/property_decorators_test.go transform/transform.go transform/transform_test.go
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add compiler transform
+          if ! git diff --cached --quiet; then
+            git commit -m "style(dto): gofmt property transformer implementation"
+            git push origin HEAD:feat/dto-property-transformers
+          fi
