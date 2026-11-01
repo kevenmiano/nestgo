@@ -79,5 +79,8 @@ func compileRouteContract(prefix string, route metadata.Route, typ reflect.Type)
 			return routeContract{}, &routeContractError{kind: "missing", handler: route.Handler, index: i}
 		}
 	}
+	if typ.NumOut() == 0 && !explicit {
+		return routeContract{}, &routeContractError{kind: "signature", handler: route.Handler}
+	}
 	return routeContract{Path: path, Key: route.Method + " " + path, Bindings: bindings}, nil
 }

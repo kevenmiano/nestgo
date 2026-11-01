@@ -42,7 +42,7 @@ func (*responseTestController) Failure() (string, error) {
 	return "", httpresponse.NotFound("user missing")
 }
 func (*responseTestController) GenericFailure() (string, error)     { return "", errors.New("secret") }
-func (*responseTestController) Void()                               {}
+
 func (*responseTestController) MissingWrite(w *httpresponse.Writer) {}
 func responseTestPackage() metadata.Package {
 	return metadata.Package{Controllers: []metadata.Controller{{
@@ -58,7 +58,6 @@ func responseTestPackage() metadata.Package {
 			{Method: "GET", Path: "/cookies", Handler: "Cookies"},
 			{Method: "GET", Path: "/error", Handler: "Failure"},
 			{Method: "GET", Path: "/generic-error", Handler: "GenericFailure"},
-			{Method: "GET", Path: "/void", Handler: "Void"},
 			{Method: "GET", Path: "/missing-write", Handler: "MissingWrite", Parameters: []metadata.Parameter{{Index: 0, Kind: "Res"}}},
 		},
 	}}}
@@ -131,7 +130,6 @@ func checkResponseCases(t *testing.T, base string) {
 		{"cookies", "/cookies", "", 200, `"cookie"` + "\n", "", "", "", 2},
 		{"error", "/error", "", 404, `{"statusCode":404,"message":"user missing"}` + "\n", "", "", "", 0},
 		{"generic", "/generic-error", "", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n", "", "", "", 0},
-		{"void", "/void", "", 200, "null\n", "", "", "", 0},
 		{"missing-write", "/missing-write", "", 500, `{"statusCode":500,"message":"explicit @Res() handler did not write a response"}` + "\n", "", "", "", 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
