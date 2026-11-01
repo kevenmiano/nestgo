@@ -1,0 +1,43 @@
+package sqlsample
+
+import (
+	"context"
+	"strconv"
+)
+
+// A service receives generated repositories through explicit field injection.
+@Injectable()
+type SQLUsersService struct {
+	Postgres *PostgresUsersRepositoryGenerated `nestgo:"inject"`
+	MySQL *MySQLUsersRepositoryGenerated `nestgo:"inject"`
+}
+
+func (s *SQLUsersService) FindPostgres(id int64) (*PostgresUser, error) {
+	return s.Postgres.FindByID(context.Background(), id)
+}
+
+func (s *SQLUsersService) FindMySQL(id int64) (*MySQLUser, error) {
+	return s.MySQL.FindByID(context.Background(), id)
+}
+
+@Controller("/sql-users")
+type SQLUsersController struct {
+	Service *SQLUsersService `nestgo:"inject"`
+}
+
+@Get("/postgres/{id}")
+func (c *SQLUsersController) GetPostgres(@Param("id") id string) (*PostgresUser, error) {
+	parsed, err := strconv.ParseInt(id, 10, 64)
+	if err != nil { return nil, err }
+	return c.Service.FindPostgres(parsed)
+}
+
+@Get("/mysql/{id}")
+func (c *SQLUsersController) GetMySQL(@Param("id") id string) (*MySQLUser, error) {
+	parsed, err := strconv.ParseInt(id, 10, 64)
+	if err != nil { return nil, err }
+	return c.Service.FindMySQL(parsed)
+}
+
+@Module({controllers: [SQLUsersController], providers: [SQLUsersService]})
+type SQLModule struct{}
