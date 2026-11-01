@@ -162,7 +162,7 @@ NestGo does **not** automatically register OS signal handlers. The adapter-based
 
 Provider and controller instances may implement the optional interfaces `OnModuleInit(context.Context) error`, `OnApplicationBootstrap(context.Context) error`, `BeforeApplicationShutdown(context.Context) error`, `OnModuleDestroy(context.Context) error`, and `OnApplicationShutdown(context.Context) error`. The application initializes hooks after routes are registered. Initialization runs providers in stable type-name order, followed by controllers in metadata order. Shutdown runs these instances in reverse order. Shutdown hooks run around the adapter shutdown, collecting errors with `errors.Join`, and repeated calls return the same outcome.
 
-These hooks currently exist only in `NewApplication` / `ApplicationFromRegistry`, not the legacy net/http handler constructor. There is no automatic signal handling or full rollback after an initialization failure.
+These hooks currently exist only in `NewApplication` / `ApplicationFromRegistry`, not the legacy net/http handler constructor. There is no automatic signal handling. If bootstrap or initialization fails, the adapter-based factory attempts best-effort shutdown hooks and adapter shutdown, joining cleanup errors with the original failure. Previously registered adapter routes cannot currently be transactionally undone.
 
 ## Comparison with NestJS: implemented vs proposed
 
