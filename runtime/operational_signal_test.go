@@ -138,9 +138,9 @@ func TestOperationalSIGTERMRealProcess(t *testing.T) {
 			}
 			client := &http.Client{Timeout: 3 * time.Second}
 			for _, tc := range []struct {
-				path string
+				path   string
 				status int
-				body string
+				body   string
 			}{
 				{"/health/live", 200, "alive"},
 				{"/health/ready", 200, "ready"},
