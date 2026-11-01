@@ -11,16 +11,16 @@ import (
 	"github.com/kevenmiano/nestgo/compiler"
 	"github.com/kevenmiano/nestgo/httpadapter"
 	"github.com/kevenmiano/nestgo/metadata"
-	"github.com/kevenmiano/nestgo/runtime"
 	fastadapter "github.com/kevenmiano/nestgo/platform/fasthttp"
 	netadapter "github.com/kevenmiano/nestgo/platform/nethttp"
+	"github.com/kevenmiano/nestgo/runtime"
 )
 
 func TestExternalConsumerCanImportAndServe(t *testing.T) {
 	_ = compiler.Parse
 	_ = metadata.Lookup
 	for _, tc := range []struct {
-		name string
+		name       string
 		newAdapter func() httpadapter.Adapter
 	}{
 		{"fasthttp", func() httpadapter.Adapter { return fastadapter.New() }},
