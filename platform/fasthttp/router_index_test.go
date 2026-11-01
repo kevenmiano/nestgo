@@ -19,7 +19,7 @@ func TestIndexedRouterCompatibility(t *testing.T) {
 	for _, tc := range []struct {
 		method, path string
 		handler, exists bool
-		param string
+		param           string
 	}{
 		{"GET", "/users/42", true, true, "42"},
 		{"GET", "/users/me", true, true, "me"},
@@ -56,7 +56,9 @@ func BenchmarkRouteLookup(b *testing.B) {
 			{"linear", func() bool {
 				for _, route := range routes {
 					_, ok := match(route.Path, target)
-					if ok && route.Method == "GET" { return true }
+					if ok && route.Method == "GET" {
+						return true
+					}
 				}
 				return false
 			}},
@@ -68,7 +70,9 @@ func BenchmarkRouteLookup(b *testing.B) {
 			b.Run(fmt.Sprintf("routes_%d/%s", count, benchmark.name), func(b *testing.B) {
 				b.ReportAllocs()
 				for i := 0; i < b.N; i++ {
-					if !benchmark.run() { b.Fatal("route missing") }
+					if !benchmark.run() {
+						b.Fatal("route missing")
+					}
 				}
 			})
 		}
