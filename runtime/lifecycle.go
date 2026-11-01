@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 )
 
@@ -24,6 +25,9 @@ type OnModuleDestroy interface{ OnModuleDestroy(context.Context) error }
 type OnApplicationShutdown interface{ OnApplicationShutdown(context.Context) error }
 
 type lifecycleRegistry struct {
+	onProvider   func(reflect.Type)
+	onController func(reflect.Type, string)
+	onRoute      func(string, string)
 	instances    []any
 	shutdownOnce sync.Once
 	shutdownErr  error

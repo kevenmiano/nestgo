@@ -37,7 +37,7 @@ func TestModuleProviderVisibility(t *testing.T) {
 				target.Imports = []reflect.Type{a}
 			}
 			pkg := metadata.Package{Providers: []metadata.Provider{{Type: repo}, {Type: consumer}}, Modules: []metadata.Module{source, target}}
-			_, err := newHandler(handlerOptions{}, pkg)
+			_, err := New(WithPackages(pkg))
 			if tc.want == "" && err != nil {
 				t.Fatal(err)
 			}

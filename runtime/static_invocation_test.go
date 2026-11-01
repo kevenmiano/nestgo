@@ -1,8 +1,7 @@
 package runtime
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"context"
 	"reflect"
 	"testing"
 
@@ -27,18 +26,25 @@ func TestStaticInvocationAndDynamicFallback(t *testing.T) {
 			{Method: "GET", Path: "/echo/{id}", Handler: "Echo", Parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "id"}}},
 		},
 	}}}
-	h, err := newHandler(handlerOptions{}, pkg)
+	adapter := &capturedAdapter{}
+	app, err := New(WithAdapter(adapter), WithPackages(pkg))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tc := range []struct{ path, want string }{
-		{"/test/ready", "\"ready\"\n"},
-		{"/test/echo/hello", "\"hello\"\n"},
+	defer app.Shutdown(context.Background())
+	for _, tc := range []struct {
+		path, want string
+		params     map[string]string
+	}{
+		{"/test/ready", "\"ready\"\n", nil},
+		{"/test/echo/{id}", "\"hello\"\n", map[string]string{"id": "hello"}},
 	} {
-		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))
-		if w.Code != 200 || w.Body.String() != tc.want {
-			t.Fatalf("%s: status=%d body=%q", tc.path, w.Code, w.Body.String())
+		ctx := &capturedContext{params: tc.params}
+		if err := adapter.routes["GET "+tc.path](ctx); err != nil {
+			t.Fatal(err)
+		}
+		if ctx.status != 200 || ctx.body != tc.want {
+			t.Fatalf("%s: status=%d body=%q", tc.path, ctx.status, ctx.body)
 		}
 	}
 	if calls != 1 {

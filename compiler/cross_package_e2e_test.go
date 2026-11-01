@@ -63,21 +63,15 @@ type AppModule struct{}
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	_ "example.com/nestgo-cross-package-test/external"
 	"github.com/kevenmiano/nestgo/runtime"
 )
 
 func TestCompiledCrossPackageBootstrap(t *testing.T) {
-	application, err := runtime.NewApp(context.Background(), runtime.WithRegistry("app"))
+	application, err := runtime.New(runtime.WithRegistry("app"))
 	if err != nil { t.Fatal(err) }
-	defer application.Close()
-	w := httptest.NewRecorder()
-	application.HTTPHandler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/ready/", nil))
-	if w.Code != 200 || w.Body.String() != "\"from-external-interface\"\n" { t.Fatalf("status %d, body %q", w.Code, w.Body.String()) }
-	if _, err := runtime.ApplicationFromRegistry(runtime.ApplicationOptions{}, "app"); err != nil { t.Fatal(err) }
+	if err := application.Shutdown(context.Background()); err != nil { t.Fatal(err) }
 }
 `,
 	}

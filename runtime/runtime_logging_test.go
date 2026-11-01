@@ -22,7 +22,7 @@ func lifecyclePackage() metadata.Package {
 func TestBootstrapLifecycle(t *testing.T) {
 	var b bytes.Buffer
 	l := logging.New(logging.Config{Logger: logging.NewPretty(&b, false), MinLevel: logging.LevelDebug})
-	if _, err := newHandler(handlerOptions{Logger: l, Debug: true}, lifecyclePackage()); err != nil {
+	if _, err := New(WithLogger(l), WithDebug(true), WithPackages(lifecyclePackage())); err != nil {
 		t.Fatal(err)
 	}
 	out := b.String()
@@ -39,7 +39,7 @@ func TestDuplicateProviderLogging(t *testing.T) {
 	var b bytes.Buffer
 	l := logging.New(logging.Config{Logger: logging.Slog{Logger: slog.New(slog.NewJSONHandler(&b, nil))}})
 	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*lifecycleA)(nil))}, {Type: reflect.TypeOf((*lifecycleA)(nil))}}}
-	_, err := newHandler(handlerOptions{Logger: l}, p)
+	_, err := New(WithLogger(l), WithPackages(p))
 	if err == nil || !strings.Contains(err.Error(), "duplicate provider") || !strings.Contains(b.String(), "Bootstrap failed") {
 		t.Fatalf("expected logged duplicate: %v %s", err, b.String())
 	}
@@ -48,7 +48,7 @@ func TestMissingRouteHandlerLogging(t *testing.T) {
 	var b bytes.Buffer
 	l := logging.New(logging.Config{Logger: logging.NewPretty(&b, false)})
 	p := metadata.Package{Controllers: []metadata.Controller{{Type: reflect.TypeOf((*lifecycleController)(nil)), Routes: []metadata.Route{{Handler: "Unknown", Method: "GET", Path: "/"}}}}}
-	_, err := newHandler(handlerOptions{Logger: l}, p)
+	_, err := New(WithLogger(l), WithPackages(p))
 	if err == nil || !strings.Contains(b.String(), "Bootstrap failed") {
 		t.Fatalf("expected logged error: %v %s", err, b.String())
 	}
@@ -56,7 +56,7 @@ func TestMissingRouteHandlerLogging(t *testing.T) {
 func TestDebugDisabled(t *testing.T) {
 	var b bytes.Buffer
 	l := logging.New(logging.Config{Logger: logging.NewPretty(&b, false), MinLevel: logging.LevelDebug})
-	if _, err := newHandler(handlerOptions{Logger: l}, lifecyclePackage()); err != nil {
+	if _, err := New(WithLogger(l), WithPackages(lifecyclePackage())); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(b.String(), "Provider instantiated") {
@@ -77,7 +77,7 @@ func BenchmarkBootstrapLogging(b *testing.B) {
 			l := logging.New(logging.Config{Logger: logging.NewPretty(&bytes.Buffer{}, false), MinLevel: mode.min})
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				if _, err := newHandler(handlerOptions{Logger: l, Debug: mode.debug}, lifecyclePackage()); err != nil {
+				if _, err := New(WithLogger(l), WithDebug(mode.debug), WithPackages(lifecyclePackage())); err != nil {
 					b.Fatal(err)
 				}
 			}
@@ -94,19 +94,19 @@ type missingInterfaceProvider struct{ Dependency missingInterface }
 
 func TestMissingRequiredDependencyBlocksBootstrap(t *testing.T) {
 	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*missingRequired)(nil))}}}
-	if _, err := newHandler(handlerOptions{}, p); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+	if _, err := New(WithPackages(p)); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
 		t.Fatalf("expected missing dependency, got %v", err)
 	}
 }
 func TestOptionalDependencyAllowed(t *testing.T) {
 	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*optionalRequired)(nil))}}}
-	if _, err := newHandler(handlerOptions{}, p); err != nil {
+	if _, err := New(WithPackages(p)); err != nil {
 		t.Fatal(err)
 	}
 }
 func TestMissingInterfaceBlocksBootstrap(t *testing.T) {
 	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*missingInterfaceProvider)(nil))}}}
-	if _, err := newHandler(handlerOptions{}, p); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+	if _, err := New(WithPackages(p)); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
 		t.Fatalf("expected missing interface, got %v", err)
 	}
 }
@@ -116,7 +116,7 @@ func TestNilMetadataDoesNotPanic(t *testing.T) {
 		{Controllers: []metadata.Controller{{Type: nil}}},
 	}
 	for _, p := range cases {
-		if _, err := newHandler(handlerOptions{}, p); err == nil {
+		if _, err := New(WithPackages(p)); err == nil {
 			t.Fatal("expected nil metadata error")
 		}
 	}

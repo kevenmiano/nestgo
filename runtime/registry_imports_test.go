@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"context"
 	"reflect"
 	"strings"
 	"sync"
@@ -37,16 +36,16 @@ func TestFromRegistryLoadsImportedPackage(t *testing.T) {
 			Modules:   []metadata.Module{{Type: reflect.TypeOf((*registryMissingImportModule)(nil)), Providers: []reflect.Type{consumer}}},
 		})
 	})
-	if _, err := NewApp(context.Background(), WithRegistry("nestgo-closure-root-test")); err != nil {
+	if _, err := New(WithRegistry("nestgo-closure-root-test")); err != nil {
 		t.Fatalf("root module must load imported provider metadata automatically: %v", err)
 	}
-	if _, err := ApplicationFromRegistry(ApplicationOptions{}, "nestgo-closure-root-test"); err != nil {
+	if _, err := New(WithRegistry("nestgo-closure-root-test")); err != nil {
 		t.Fatalf("application must resolve imported provider packages: %v", err)
 	}
-	if _, err := NewApp(context.Background(), WithRegistry("nestgo-closure-no-import-test")); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+	if _, err := New(WithRegistry("nestgo-closure-no-import-test")); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
 		t.Fatalf("unimported provider must remain inaccessible: %v", err)
 	}
-	if _, err := ApplicationFromRegistry(ApplicationOptions{}, "nestgo-closure-no-import-test"); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+	if _, err := New(WithRegistry("nestgo-closure-no-import-test")); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
 		t.Fatalf("adapter bootstrap must reject missing imported provider: %v", err)
 	}
 }
@@ -72,7 +71,7 @@ func TestApplicationFromRegistryRejectsInvalidImportedPackage(t *testing.T) {
 			}},
 		})
 	})
-	if _, err := ApplicationFromRegistry(ApplicationOptions{}, "nestgo-app-import-root-test"); err == nil || !strings.Contains(err.Error(), "invalid provider") {
+	if _, err := New(WithRegistry("nestgo-app-import-root-test")); err == nil || !strings.Contains(err.Error(), "invalid provider") {
 		t.Fatalf("invalid imported package must fail at application bootstrap: %v", err)
 	}
 }

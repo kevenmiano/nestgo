@@ -42,16 +42,40 @@ Applications can be organized into focused modules with explicit imports and exp
 
 ## Getting started
 
-Install the CLI with Go 1.23 or newer:
-
-```bash
-go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
-```
-
-In your application's Go module, add the framework and compile your annotated source:
+The server is an ordinary Go library. To use it, add the dependency:
 
 ```bash
 go get github.com/kevenmiano/nestgo@latest
+```
+
+No NestGo compiler or `.mgo` files are required for plain Go HTTP routes. Use the same application constructor as gRPC-style server libraries: configure, register handlers, and start serving.
+
+```go
+package main
+
+import (
+    "log"
+    "github.com/kevenmiano/nestgo/runtime"
+)
+
+func main() {
+    app, err := runtime.New(runtime.WithRoutes(runtime.Route{
+        Method: "GET",
+        Path: "/health",
+        Handler: func(ctx runtime.Context) error {
+            ctx.Status(200)
+            return ctx.Write([]byte("OK"))
+        },
+    }))
+    if err != nil { log.Fatal(err) }
+    log.Fatal(app.Listen(":8080"))
+}
+```
+
+For optional NestJS-inspired decorators, install the compiler and generate Go metadata once during development/build:
+
+```bash
+go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
 nestgo compile ./myapp
 ```
 
@@ -64,7 +88,7 @@ go run ./cmd/nestgo compile ./examples/shop
 go test ./...
 ```
 
-## Example
+## Optional: decorators and modules
 
 NestGo's decorators are written in `.mgo` files and compiled into regular Go source:
 
@@ -92,24 +116,21 @@ type UsersModule struct{}
 Use the generated metadata with the application runtime. For example, after importing your generated package for registration:
 
 ```go
-app, err := runtime.NewApp(
-    context.Background(),
-    runtime.WithRegistry("shop"),
-)
+app, err := runtime.New(runtime.WithRegistry("shop")) // native fasthttp by default
 if err != nil {
     log.Fatal(err)
 }
-defer app.Close()
-log.Fatal(http.ListenAndServe(":8080", app.HTTPHandler()))
+log.Fatal(app.Listen(":8080"))
 ```
 
-`NewApp(ctx, With...)` is the canonical runtime initialization API. HTTP adapter unification is tracked separately while the legacy adapter-based entrypoint is being migrated.
+Pass `runtime.WithAdapter(nethttp.New())` to switch to the Go standard-library HTTP engine. You can mix `WithRoutes(...)` with registered controllers; duplicate routes are rejected during bootstrap. Both adapters use the same bootstrap and lifecycle. See [HTTP adapters](docs/HTTP_ADAPTERS.md).
 
 ## Features
 
 - **Modular architecture:** declare controllers, providers, module imports and exports.
 - **Dependency injection:** resolve dependencies and validate module visibility at bootstrap.
-- **Decorator compiler:** generate standard Go files and metadata from `.mgo` sources.
+- **Compiler-free HTTP:** register ordinary Go functions with `runtime.WithRoutes(...)`.
+- **Optional decorator compiler:** generate standard Go files and metadata from `.mgo` sources.
 - **HTTP adapters:** use native fasthttp or net/http through a platform interface.
 - **Hybrid invocation:** statically invoke eligible handlers while retaining reflection for other cases.
 - **Diagnostics:** inspect module graphs and collect startup measurements.
