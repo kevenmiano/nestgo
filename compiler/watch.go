@@ -10,12 +10,26 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/kevenmiano/nestgo/database/sqlgen"
 )
 
 // WatchDir compiles immediately and again when top-level .mgo files change.
 // Diagnostics are reported without stopping the watcher, so fixing invalid
 // source triggers a fresh compilation. Generated .go files are never watched.
 func WatchDir(ctx context.Context, dir string, interval time.Duration, report func(error)) error {
+	return watchDir(ctx, dir, interval, report, CompileDir)
+}
+
+// WatchDirWithDialects retains the named per-connection SQL dialect mapping on
+// every recompile, instead of falling back silently to PostgreSQL.
+func WatchDirWithDialects(ctx context.Context, dir string, interval time.Duration, dialects map[string]sqlgen.Dialect, report func(error)) error {
+	return watchDir(ctx, dir, interval, report, func(dir string) error {
+		return CompileDirWithDialects(dir, dialects)
+	})
+}
+
+func watchDir(ctx context.Context, dir string, interval time.Duration, report func(error), compile func(string) error) error {
 	if interval <= 0 {
 		return fmt.Errorf("watch interval must be positive")
 	}
@@ -31,8 +45,8 @@ func WatchDir(ctx context.Context, dir string, interval time.Duration, report fu
 		return err
 	}
 	if report != nil {
-		report(CompileDir(dir))
-	} else if err := CompileDir(dir); err != nil {
+		report(compile(dir))
+	} else if err := compile(dir); err != nil {
 		return err
 	}
 	ticker := time.NewTicker(interval)
@@ -53,7 +67,7 @@ func WatchDir(ctx context.Context, dir string, interval time.Duration, report fu
 				continue
 			}
 			current = next
-			if err := CompileDir(dir); report != nil {
+			if err := compile(dir); report != nil {
 				report(err)
 			} else if err != nil {
 				return err
