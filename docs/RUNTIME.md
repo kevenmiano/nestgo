@@ -24,7 +24,8 @@ The `runtime` package is a regular Go dependency: no prebuilt runtime binary, Ne
 ### Optional generated modules
 
 ```go
-// Import the generated package to register its metadata.
+// The compiled package must be imported somewhere in the binary.
+// import _ "example.com/yourapp/internal/app"
 app, err := runtime.New()
 if err != nil { log.Fatal(err) }
 defer app.Shutdown(context.Background())
@@ -36,7 +37,6 @@ log.Fatal(app.Listen(":8080"))
 | Option | Function |
 | --- | --- |
 | `WithRoutes(routes...)` | Register Go HTTP functions directly (no codegen) |
-| `Compiled imports` | Resolve the linked application root and its transitive module imports automatically |
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
