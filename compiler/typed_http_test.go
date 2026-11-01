@@ -32,9 +32,9 @@ type CreateDTO struct { Name string }
 	for _, expected := range []string{
 		"github.com/kevenmiano/nestgo/httpadapter",
 		"StaticHTTP:",
-		"ctx.Query(\"q\")",
-		"ctx.Param(\"id\")",
-		"httpadapter.DecodeBody[CreateDTO](ctx)",
+		"httpadapter.BindQuery(ctx, \"q\", 0)",
+		"httpadapter.BindParam(ctx, \"id\", 0)",
+		"httpadapter.DecodeBodyAt[CreateDTO](ctx, 0)",
 		"return value, 0, err",
 	} {
 		if !strings.Contains(string(generated), expected) {
