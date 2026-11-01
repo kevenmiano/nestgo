@@ -12,10 +12,11 @@ type marker struct {
 	Name, Argument string
 }
 
-func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []marker, error) {
+func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []marker, []marker, error) {
 	out := append([]byte(nil), src...)
 	annotations := map[int][]Annotation{}
 	params := []marker{}
+	properties := []marker{}
 	pending := []Annotation{}
 	line := 1
 	state := byte(0)
@@ -91,7 +92,7 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 			}
 			name := string(src[begin:i])
 			if !supported[name] {
-				return "", nil, nil, Diagnostic{path, startLine, "unknown decorator @" + name}
+				return "", nil, nil, nil, Diagnostic{path, startLine, "unknown decorator @" + name}
 			}
 			for i < len(src) && (src[i] == ' ' || src[i] == '\t') {
 				i++
@@ -126,7 +127,7 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 					i++
 				}
 				if depth != 0 {
-					return "", nil, nil, Diagnostic{path, startLine, "unclosed decorator argument"}
+					return "", nil, nil, nil, Diagnostic{path, startLine, "unclosed decorator argument"}
 				}
 				argument = strings.TrimSpace(string(src[argStart : i-1]))
 			}
@@ -138,7 +139,7 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 			if name == "Body" || name == "Param" || name == "Headers" || name == "Res" || name == "Response" || (name == "Query" && strings.TrimSpace(string(src[lineBeginning(src, start):start])) != "") {
 				if name == "Res" || name == "Response" {
 					if argument != "" && argument != "{passthrough:true}" {
-						return "", nil, nil, Diagnostic{path, startLine, "@Res expects no argument or {passthrough:true}"}
+						return "", nil, nil, nil, Diagnostic{path, startLine, "@Res expects no argument or {passthrough:true}"}
 					}
 					if argument != "" {
 						argument = "passthrough"
@@ -146,11 +147,19 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 				} else if argument != "" {
 					v, e := strconv.Unquote(argument)
 					if e != nil {
-						return "", nil, nil, Diagnostic{path, startLine, "parameter decorator expects quoted string"}
+						return "", nil, nil, nil, Diagnostic{path, startLine, "parameter decorator expects quoted string"}
 					}
 					argument = v
 				}
 				params = append(params, marker{start, name, argument})
+			} else if name == "Expose" || name == "Exclude" || name == "ExcludeInput" || name == "ExcludeOutput" || name == "Transform" || name == "TransformInput" || name == "TransformOutput" || name == "Type" || isDTOValidator(name) {
+				lineStart := lineBeginning(src, start)
+				lineEnd := i
+				for lineEnd < len(src) && src[lineEnd] != '\n' { lineEnd++ }
+				if strings.TrimSpace(string(src[lineStart:start])) != "" || strings.TrimSpace(string(src[i:lineEnd])) != "" {
+					return "", nil, nil, nil, Diagnostic{path, startLine, "property decorator must be on its own line"}
+				}
+				properties = append(properties, marker{start, name, argument})
 			} else {
 				lineStart := start
 				for lineStart > 0 && src[lineStart-1] != '\n' {
@@ -161,7 +170,7 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 					lineEnd++
 				}
 				if strings.TrimSpace(string(src[lineStart:start])) != "" || strings.TrimSpace(string(src[i:lineEnd])) != "" {
-					return "", nil, nil, Diagnostic{path, startLine, "declaration decorator must be on its own line"}
+					return "", nil, nil, nil, Diagnostic{path, startLine, "declaration decorator must be on its own line"}
 				}
 				pending = append(pending, Annotation{name, argument, startLine})
 			}
@@ -176,12 +185,12 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 		i++
 	}
 	if len(pending) > 0 {
-		return "", nil, nil, Diagnostic{path, pending[0].Line, "dangling decorator"}
+		return "", nil, nil, nil, Diagnostic{path, pending[0].Line, "dangling decorator"}
 	}
 	if len(out) != len(src) {
 		panic(fmt.Sprintf("offset drift %d != %d", len(out), len(src)))
 	}
-	return string(out), annotations, params, nil
+	return string(out), annotations, params, properties, nil
 }
 
 // lineBeginning returns the start of the source line containing a decorator.

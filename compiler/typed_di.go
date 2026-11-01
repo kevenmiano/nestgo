@@ -171,7 +171,7 @@ func sortedProviderNames(providers map[string]bool) []string {
 // go/importer.Default cannot resolve Go module replace directives or local modules.
 func moduleAwareImporter(fset *token.FileSet, dir string) types.Importer {
 	return importer.ForCompiler(fset, "gc", func(path string) (io.ReadCloser, error) {
-		cmd := exec.Command("go", "list", "-export", "-f", "{{.Export}}", path)
+		cmd := exec.Command("go", "list", "-mod=mod", "-export", "-f", "{{.Export}}", path)
 		cmd.Dir = dir
 		output, err := cmd.CombinedOutput()
 		if err != nil {

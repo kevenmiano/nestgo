@@ -1,0 +1,57 @@
+name: DTO compiler and transformations
+
+on:
+  push:
+    paths:
+      - 'compiler/**'
+      - 'transform/**'
+      - 'validation/**'
+      - 'httpadapter/**'
+      - 'runtime/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/dto-transformers.yml'
+  pull_request:
+    paths:
+      - 'compiler/**'
+      - 'transform/**'
+      - 'validation/**'
+      - 'httpadapter/**'
+      - 'runtime/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/dto-transformers.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Compile, test, vet and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Verify Go formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$(gofmt -l compiler/compiler.go compiler/lexer.go compiler/property_decorators.go compiler/property_decorators_test.go compiler/property_source.go transform/transform.go transform/transform_test.go transform/mapcodec/*.go compiler/validation_decorators.go compiler/validation_decorators_test.go validation/*.go httpadapter/binding.go httpadapter/binding_test.go runtime/http_routes.go runtime/http_validation_test.go)"
+          if [[ -n "$output" ]]; then
+            echo "$output"
+            exit 1
+          fi
+      - name: Run entire test suite
+        run: go test ./... -count=1
+      - name: Run static analysis
+        run: go vet ./...
+      - name: Check deterministic generated examples
+        run: |
+          go run ./cmd/nestgo compile ./examples/shop
+          git diff --exit-code -- examples/shop
+      - name: DTO decode and generated code benchmark smoke tests
+        run: go test ./transform/... ./validation/... -run '^$' -bench 'Benchmark' -benchtime=100x

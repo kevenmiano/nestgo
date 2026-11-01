@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kevenmiano/nestgo/http"
+	"github.com/kevenmiano/nestgo/validation"
 	"reflect"
 
 	"github.com/kevenmiano/nestgo/httpadapter"
@@ -145,6 +146,8 @@ func handleHTTPException(err error, exec httpadapter.ExecutionContext, filters [
 			return nil
 		}
 	}
+	var validationErrors validation.Errors
+	if errors.As(err, &validationErrors) { return respondValidationError(exec.Request, err) }
 	var pipelineError *httpadapter.HTTPException
 	if errors.As(err, &pipelineError) && pipelineError != nil {
 		message := pipelineError.Message

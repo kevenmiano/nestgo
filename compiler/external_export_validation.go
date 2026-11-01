@@ -54,7 +54,7 @@ func externalProviderExported(sourcePath, qualifier, provider string, imports []
 	if importPath == "" {
 		return false, fmt.Errorf("missing Go import for %s", qualifier)
 	}
-	cmd := exec.Command("go", "list", "-f", "{{.Dir}}", importPath)
+	cmd := exec.Command("go", "list", "-mod=mod", "-f", "{{.Dir}}", importPath)
 	cmd.Dir = filepath.Dir(sourcePath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
