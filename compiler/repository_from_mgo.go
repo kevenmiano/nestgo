@@ -23,6 +23,7 @@ func RepositoryFromMGO(file *File, dialect sqlgen.Dialect) (RepositoryDefinition
 	var result RepositoryDefinition
 	entities := make(map[string]*ast.StructType)
 	repositoryTypes := make(map[string]string)
+	connectionNames := make(map[string]string)
 	for _, declaration := range node.Decls {
 		gen, ok := declaration.(*ast.GenDecl)
 		if !ok || gen.Tok != token.TYPE {
@@ -43,10 +44,12 @@ func RepositoryFromMGO(file *File, dialect sqlgen.Dialect) (RepositoryDefinition
 			if annotation.Name != "Repository" {
 				continue
 			}
-			if declaration.Kind != "type" || !schemaIdentifier(annotation.Argument) {
+			entityName, connectionName, parseErr := parseRepositoryBinding(annotation.Argument)
+			if declaration.Kind != "type" || parseErr != nil {
 				return RepositoryDefinition{}, fmt.Errorf("repository: expected @Repository(Entity) on a struct")
 			}
-			repositoryTypes[declaration.Name] = annotation.Argument
+			repositoryTypes[declaration.Name] = entityName
+			connectionNames[declaration.Name] = connectionName
 		}
 	}
 	if len(repositoryTypes) != 1 {
@@ -56,7 +59,7 @@ func RepositoryFromMGO(file *File, dialect sqlgen.Dialect) (RepositoryDefinition
 		if entities[entity] == nil {
 			return RepositoryDefinition{}, fmt.Errorf("repository: entity %s must be a local struct", entity)
 		}
-		result = RepositoryDefinition{Package: file.Package, Name: name, Entity: entity, Dialect: dialect}
+		result = RepositoryDefinition{Package: file.Package, Name: name, Entity: entity, Connection: connectionNames[name], Dialect: dialect}
 		for _, field := range entities[entity].Fields.List {
 			for _, id := range field.Names {
 				if !id.IsExported() {
@@ -149,4 +152,25 @@ func RepositoryFromMGO(file *File, dialect sqlgen.Dialect) (RepositoryDefinition
 		return RepositoryDefinition{}, fmt.Errorf("repository: no @Query methods for %s", result.Name)
 	}
 	return result, nil
+}
+
+// parseRepositoryBinding accepts @Repository(Entity) and
+// @Repository(Entity, "connection"). The connection name is static at compile time.
+func parseRepositoryBinding(argument string) (string, string, error) {
+	parts := strings.Split(argument, ",")
+	if len(parts) < 1 || len(parts) > 2 {
+		return "", "", fmt.Errorf("repository: expected entity and optional connection name")
+	}
+	entity := strings.TrimSpace(parts[0])
+	if !schemaIdentifier(entity) {
+		return "", "", fmt.Errorf("repository: invalid entity name")
+	}
+	if len(parts) == 1 {
+		return entity, "", nil
+	}
+	name, err := strconv.Unquote(strings.TrimSpace(parts[1]))
+	if err != nil || !schemaIdentifier(name) {
+		return "", "", fmt.Errorf("repository: connection must be a quoted identifier")
+	}
+	return entity, name, nil
 }
