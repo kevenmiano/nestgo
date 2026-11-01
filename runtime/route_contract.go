@@ -17,7 +17,9 @@ type routeContract struct {
 
 func compileRouteContract(prefix string, route metadata.Route, method reflect.Type) (routeContract, error) {
 	errType := reflect.TypeOf((*error)(nil)).Elem()
-	if method.NumOut() < 1 || method.NumOut() > 2 || (method.NumOut() == 2 && !method.Out(1).Implements(errType)) {
+	if method.NumOut() < 1 || method.NumOut() > 2 ||
+		(method.NumOut() == 1 && method.Out(0).Implements(errType)) ||
+		(method.NumOut() == 2 && method.Out(1) != errType) {
 		return routeContract{}, fmt.Errorf("invalid signature %s", route.Handler)
 	}
 	path := strings.TrimSuffix(prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
@@ -25,6 +27,18 @@ func compileRouteContract(prefix string, route metadata.Route, method reflect.Ty
 	for _, p := range route.Parameters {
 		if p.Index < 0 || p.Index >= method.NumIn() {
 			return routeContract{}, fmt.Errorf("invalid parameter index %d", p.Index)
+		}
+		if _, duplicate := bindings[p.Index]; duplicate {
+			return routeContract{}, fmt.Errorf("duplicate parameter index %d in %s", p.Index, route.Handler)
+		}
+		switch p.Kind {
+		case "Body":
+		case "Param", "Query":
+			if method.In(p.Index).Kind() != reflect.String {
+				return routeContract{}, fmt.Errorf("parameter %d of %s requires a string for Param/Query", p.Index, route.Handler)
+			}
+		default:
+			return routeContract{}, fmt.Errorf("unsupported parameter decorator at index %d of %s", p.Index, route.Handler)
 		}
 		bindings[p.Index] = p
 	}
