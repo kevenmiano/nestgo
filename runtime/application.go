@@ -15,8 +15,8 @@ type ApplicationOptions struct {
 }
 
 type Application struct {
-	adapter httpadapter.Adapter
-    lifecycle *lifecycleRegistry
+	adapter   httpadapter.Adapter
+	lifecycle *lifecycleRegistry
 }
 
 // NewApplication resolves modules and registers controller routes at bootstrap.
@@ -26,11 +26,13 @@ func NewApplication(options ApplicationOptions, packages ...metadata.Package) (*
 		adapter = fastadapter.New()
 	}
 	registry := &lifecycleRegistry{}
-    if err := registerRoutesWithLifecycle(adapter, packages, registry); err != nil {
+	if err := registerRoutesWithLifecycle(adapter, packages, registry); err != nil {
 		return nil, err
 	}
-	if err := registry.initialize(context.Background()); err != nil { return nil, err }
-    return &Application{adapter: adapter, lifecycle: registry}, nil
+	if err := registry.initialize(context.Background()); err != nil {
+		return nil, err
+	}
+	return &Application{adapter: adapter, lifecycle: registry}, nil
 }
 
 func ApplicationFromRegistry(options ApplicationOptions, names ...string) (*Application, error) {
@@ -55,6 +57,8 @@ func (a *Application) Shutdown(ctx context.Context) error {
 	if a == nil || a.adapter == nil {
 		return errors.New("application is not initialized")
 	}
-	if a.lifecycle == nil { return a.adapter.Shutdown(ctx) }
-    return a.lifecycle.shutdown(ctx, a.adapter.Shutdown)
+	if a.lifecycle == nil {
+		return a.adapter.Shutdown(ctx)
+	}
+	return a.lifecycle.shutdown(ctx, a.adapter.Shutdown)
 }

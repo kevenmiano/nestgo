@@ -14,7 +14,7 @@ import (
 // registerRoutes resolves injectable fields once during bootstrap and registers
 // engine-independent handlers. Generated static invokers can replace reflect.Call.
 func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) error {
-    return registerRoutesWithLifecycle(adapter, packages, nil)
+	return registerRoutesWithLifecycle(adapter, packages, nil)
 }
 
 func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
@@ -88,9 +88,11 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			return err
 		}
 	}
-    if lifecycle != nil {
-        for _, providerType := range orderedProviders { lifecycle.instances = append(lifecycle.instances, providers[providerType].Interface()) }
-    }
+	if lifecycle != nil {
+		for _, providerType := range orderedProviders {
+			lifecycle.instances = append(lifecycle.instances, providers[providerType].Interface())
+		}
+	}
 	seen := map[string]bool{}
 	for _, controller := range controllers {
 		if controller.Type == nil || controller.Type.Kind() != reflect.Ptr || controller.Type.Elem().Kind() != reflect.Struct {
@@ -100,7 +102,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 		if err := inject(instance); err != nil {
 			return err
 		}
-        if lifecycle != nil { lifecycle.instances = append(lifecycle.instances, instance.Interface()) }
+		if lifecycle != nil {
+			lifecycle.instances = append(lifecycle.instances, instance.Interface())
+		}
 		for _, route := range controller.Routes {
 			method := instance.MethodByName(route.Handler)
 			if !method.IsValid() {
@@ -172,17 +176,19 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 					args[i] = v.Elem()
 				}
 				var result any
-                if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
-                    value, err := rt.StaticInvoke(instance.Interface())
-                    if err != nil { return respondError(ctx, 500, err.Error()) }
-                    result = value
-                } else {
-                    results := handler.Call(args)
-                    if len(results) == 2 && !results[1].IsNil() {
-                        return respondError(ctx, 500, results[1].Interface().(error).Error())
-                    }
-                    result = results[0].Interface()
-                }
+				if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
+					value, err := rt.StaticInvoke(instance.Interface())
+					if err != nil {
+						return respondError(ctx, 500, err.Error())
+					}
+					result = value
+				} else {
+					results := handler.Call(args)
+					if len(results) == 2 && !results[1].IsNil() {
+						return respondError(ctx, 500, results[1].Interface().(error).Error())
+					}
+					result = results[0].Interface()
+				}
 				status := rt.Status
 				if status == 0 {
 					if rt.Method == "POST" {
