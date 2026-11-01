@@ -94,3 +94,26 @@ func FuzzBind(f *testing.F) {
 		}
 	})
 }
+
+
+func TestEscapedSQLLiteralsAndComments(t *testing.T) {
+	for _, tc := range []struct {
+		name, query, want string
+		dialect Dialect
+	}{
+		{"postgres E-string", `SELECT E'it\'s :hidden', :id`, `SELECT E'it\'s :hidden', $1`, PostgreSQL},
+		{"mysql single quote", `SELECT 'it\'s :hidden', :id`, `SELECT 'it\'s :hidden', ?`, Question},
+		{"mysql hash comment", `SELECT :id # :ignored`, `SELECT ? # :ignored`, Question},
+		{"postgres plain quotes", `SELECT 'it''s :hidden', :id`, `SELECT 'it''s :hidden', $1`, PostgreSQL},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			query, args, err := Bind(tc.query, map[string]any{"id": 17}, tc.dialect)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if query != tc.want || !reflect.DeepEqual(args, []any{17}) {
+				t.Fatalf("query=%q, args=%v, want %q", query, args, tc.want)
+			}
+		})
+	}
+}
