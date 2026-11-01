@@ -55,12 +55,7 @@ func TestCrossPackageInterfaceNegativeDiagnostics(t *testing.T) {
 			source := "package app\nimport \"example.com/nestgo-di-negative/external\"\n" + tc.providers +
 				"@Controller(\"/test\")\ntype Consumer struct { " + tc.field + " }\n" +
 				"@Get(\"/\")\nfunc (*Consumer) Read() string { return \"ok\" }\n" +
-				"@Module({controllers:[Consumer]" + func() string {
-					if providers != "" {
-						return ",providers:[" + providers + "]"
-					}
-					return ""
-				}() + "})\ntype AppModule struct{}\n"
+				"@Module({controllers:[Consumer]" + providerOption(providers) + "})\ntype AppModule struct{}\n"
 			if err := os.WriteFile(filepath.Join(app, "module.mgo"), []byte(source), 0600); err != nil {
 				t.Fatal(err)
 			}
@@ -75,4 +70,11 @@ func TestCrossPackageInterfaceNegativeDiagnostics(t *testing.T) {
 			}
 		})
 	}
+}
+
+func providerOption(providers string) string {
+	if providers == "" {
+		return ""
+	}
+	return ",providers:[" + providers + "]"
 }
