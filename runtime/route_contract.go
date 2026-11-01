@@ -40,6 +40,12 @@ func formatRouteContractError(err error, legacy bool) error {
 		return fmt.Errorf("invalid signature %s", e.handler)
 	case "index":
 		return fmt.Errorf("invalid parameter index %d", e.index)
+	case "duplicate":
+		return fmt.Errorf("duplicate parameter index %d in %s", e.index, e.handler)
+	case "type":
+		return fmt.Errorf("parameter %d of %s requires a string for Param/Query", e.index, e.handler)
+	case "decorator":
+		return fmt.Errorf("unsupported parameter decorator at index %d of %s", e.index, e.handler)
 	case "missing":
 		if legacy {
 			return fmt.Errorf("missing decorator for argument %d of %s", e.index, e.handler)
@@ -51,7 +57,12 @@ func formatRouteContractError(err error, legacy bool) error {
 
 func compileRouteContract(prefix string, route metadata.Route, typ reflect.Type) (routeContract, error) {
 	errType := reflect.TypeOf((*error)(nil)).Elem()
-	if typ.NumOut() < 1 || typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(errType)) {
+	// Only (T) and (T, error) are safe to invoke with the dynamic handler.
+	// A lone error would be incorrectly encoded as a successful JSON result,
+	// while concrete error return types can panic at reflect.Value.IsNil.
+	if typ.NumOut() < 1 || typ.NumOut() > 2 ||
+		(typ.NumOut() == 1 && typ.Out(0).Implements(errType)) ||
+		(typ.NumOut() == 2 && typ.Out(1) != errType) {
 		return routeContract{}, &routeContractError{kind: "signature", handler: route.Handler}
 	}
 	path := strings.TrimSuffix(prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
@@ -59,6 +70,18 @@ func compileRouteContract(prefix string, route metadata.Route, typ reflect.Type)
 	for _, p := range route.Parameters {
 		if p.Index < 0 || p.Index >= typ.NumIn() {
 			return routeContract{}, &routeContractError{kind: "index", handler: route.Handler, index: p.Index}
+		}
+		if _, duplicate := bindings[p.Index]; duplicate {
+			return routeContract{}, &routeContractError{kind: "duplicate", handler: route.Handler, index: p.Index}
+		}
+		switch p.Kind {
+		case "Body":
+		case "Param", "Query":
+			if typ.In(p.Index).Kind() != reflect.String {
+				return routeContract{}, &routeContractError{kind: "type", handler: route.Handler, index: p.Index}
+			}
+		default:
+			return routeContract{}, &routeContractError{kind: "decorator", handler: route.Handler, index: p.Index}
 		}
 		bindings[p.Index] = p
 	}
