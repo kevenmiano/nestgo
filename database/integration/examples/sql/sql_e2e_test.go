@@ -55,10 +55,27 @@ func TestCompiledSQLRepositoriesEndToEnd(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	myDB, err := app.Connections.Get("billing")
 	if err != nil { t.Fatal(err) }
+	serveDone := make(chan error, 1)
+	serveStarted := false
+	defer func() {
+		for _, db := range []*sql.DB{pgDB, myDB} {
+			if _, err := db.ExecContext(context.Background(), "DELETE FROM nestgo_sql_example_users"); err != nil {
+				t.Errorf("cleanup SQL test table: %v", err)
+			}
+		}
+		if serveStarted {
+			stopCtx, cancelStop := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancelStop()
+			if err := app.Shutdown(stopCtx); err != nil { t.Errorf("shutdown: %v", err) }
+			select {
+			case <-serveDone:
+			case <-time.After(3*time.Second): t.Error("HTTP server did not stop")
+			}
+		}
+	}()
 	for _, db := range []*sql.DB{pgDB, myDB} {
 		if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS nestgo_sql_example_users (id BIGINT PRIMARY KEY, name VARCHAR(255) NOT NULL)"); err != nil { t.Fatal(err) }
 		if _, err := db.ExecContext(ctx, "DELETE FROM nestgo_sql_example_users"); err != nil { t.Fatal(err) }
-		defer db.ExecContext(context.Background(), "DELETE FROM nestgo_sql_example_users")
 	}
 
 	pg, err := NewPostgresUsersRepositoryGeneratedFromConnections(app.Connections)
@@ -88,7 +105,7 @@ func TestCompiledSQLRepositoriesEndToEnd(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil { t.Fatal(err) }
 	defer listener.Close()
-	serveDone := make(chan error, 1)
+	serveStarted = true
 	go func() { serveDone <- app.Serve(listener) }()
 	client := &http.Client{Timeout: 3*time.Second}
 	for _, path := range []string{"/sql-users/postgres/101", "/sql-users/mysql/202"} {
@@ -100,13 +117,6 @@ func TestCompiledSQLRepositoriesEndToEnd(t *testing.T) {
 		if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), "DROP TABLE") {
 			t.Fatalf("%s: status=%d body=%s", path, resp.StatusCode, body)
 		}
-	}
-	stopCtx, stopCancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer stopCancel()
-	if err := app.Shutdown(stopCtx); err != nil { t.Fatalf("shutdown: %v", err) }
-	select {
-	case <-serveDone:
-	case <-time.After(3*time.Second): t.Fatal("HTTP server did not stop")
 	}
 
 	// Generated repositories accept a sql.Tx executor and do not bypass it.
