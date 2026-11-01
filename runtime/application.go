@@ -32,6 +32,7 @@ type applicationConfig struct {
 	databaseOptions  []database.Option
 	instances        []any
 	context          context.Context
+	contextSet       bool
 }
 
 // WithPackages supplies already-generated metadata to the application.
@@ -85,7 +86,7 @@ func WithProvider(instance any) Option {
 
 // WithContext supplies a cancellable bootstrap context; it does not control HTTP shutdown.
 func WithContext(ctx context.Context) Option {
-	return func(c *applicationConfig) { c.context = ctx }
+	return func(c *applicationConfig) { c.context = ctx; c.contextSet = true }
 }
 
 // WithBootstrapMetrics registers an observer invoked after successful bootstrap.
@@ -111,6 +112,9 @@ func New(options ...Option) (*Application, error) {
 			return nil, fmt.Errorf("nil application option at index %d", i)
 		}
 		option(&cfg)
+	}
+	if cfg.contextSet && cfg.context == nil {
+		return nil, errors.New("nil bootstrap context")
 	}
 	if cfg.loggerConfigured && cfg.logger == nil {
 		return nil, errors.New("runtime: nil logger")
