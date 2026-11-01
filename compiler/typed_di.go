@@ -18,7 +18,7 @@ import (
 
 // validateTypedInterfaceDependencies resolves local interfaces using go/types.
 // Cross-package/dynamic provider registration is not inferred from untrusted names.
-func validateTypedInterfaceDependencies(files []*File, modules map[string]moduleOptions, providers map[string]bool, controllers map[string]string) error {
+func validateTypedInterfaceDependencies(files []*File, modules map[string]moduleOptions, providers map[string]bool, controllers map[string]string, repositories ...RepositoryDefinition) error {
 	fset := token.NewFileSet()
 	parsed := make([]*ast.File, 0, len(files))
 	for _, file := range files {
@@ -26,6 +26,17 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 		if err != nil {
 			return err
 		}
+		parsed = append(parsed, node)
+	}
+	// Generated repositories are legitimate providers even though their Go types
+	// do not exist in the annotated source yet. Include their declarations in
+	// the static type-check graph so concrete and interface injection is checked
+	// against the real generated method set rather than inferred by name.
+	for _, repository := range repositories {
+		generated, err := GenerateRepository(repository)
+		if err != nil { return err }
+		node, err := parser.ParseFile(fset, repository.Name+"_repository_generated.go", generated, 0)
+		if err != nil { return err }
 		parsed = append(parsed, node)
 	}
 	// Source may contain incomplete application code. Check declarations for
