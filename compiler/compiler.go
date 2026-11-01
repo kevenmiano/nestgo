@@ -481,6 +481,7 @@ func CompileDirWithDialect(dir string, dialect sqlgen.Dialect) error {
 		files = append(files, file)
 	}
 	repositoryFiles := make(map[string][]byte)
+	var repositoryDefinitions []RepositoryDefinition
 	for _, file := range files {
 		hasRepo := false
 		for _, declaration := range file.Declarations {
@@ -514,8 +515,14 @@ func CompileDirWithDialect(dir string, dialect sqlgen.Dialect) error {
 			if err != nil { return err }
 			generated, err := GenerateRepository(def)
 			if err != nil { return err }
+			repositoryDefinitions = append(repositoryDefinitions, def)
 			repositoryFiles[strings.TrimSuffix(file.Path, ".mgo")+"_repository_generated.go"] = generated
 		}
+	}
+	if len(repositoryDefinitions) > 0 {
+		providers, err := GenerateRepositoryProviders(files[0].Package, repositoryDefinitions)
+		if err != nil { return err }
+		repositoryFiles[filepath.Join(dir, "zz_modforge_repositories.go")] = providers
 	}
 	registry, err := generateMetadata(files, true)
 	if err != nil {
