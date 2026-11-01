@@ -16,12 +16,12 @@ import (
 type AppOption func(*appOptions) error
 
 type appOptions struct {
-	config []config.Option
-	database []database.Option
-	packages []metadata.Package
+	config    []config.Option
+	database  []database.Option
+	packages  []metadata.Package
 	instances []any
-	logger *logging.Service
-	debug bool
+	logger    *logging.Service
+	debug     bool
 }
 
 // App owns the initialized HTTP handler and its database connections.
@@ -42,9 +42,9 @@ func NewApp(ctx context.Context, options ...AppOption) (*App, error) {
 		}
 	}
 	boot, err := Bootstrap(ctx, BootstrapOptions{
-		ConfigOptions: opts.config,
+		ConfigOptions:   opts.config,
 		DatabaseOptions: opts.database,
-		Runtime: Options{Logger: opts.logger, Debug: opts.debug, Instances: opts.instances},
+		Runtime:         Options{Logger: opts.logger, Debug: opts.debug, Instances: opts.instances},
 	}, opts.packages...)
 	if err != nil {
 		return nil, err
