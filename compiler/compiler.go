@@ -44,7 +44,7 @@ type File struct {
 	Declarations          []Declaration
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Dto": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true}
 
 func Parse(path string, src []byte) (*File, error) {
 	source, annotations, paramMarkers, err := lexDecorators(path, src)
@@ -86,8 +86,15 @@ func Parse(path string, src []byte) (*File, error) {
 				return nil, Diagnostic{path, line, "decorated type must be a struct"}
 			}
 			d := Declaration{Name: spec.Name.Name, Kind: "type", Annotations: ann}
+			dtoCount := 0
 			for _, a := range ann {
-				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" && a.Name != "Imports" && a.Name != "Exports" {
+				if a.Name == "Dto" {
+					dtoCount++
+					if a.Argument != "" || dtoCount > 1 {
+						return nil, Diagnostic{path, a.Line, "@Dto accepts no options and must occur only once"}
+					}
+				}
+				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" && a.Name != "Dto" && a.Name != "Imports" && a.Name != "Exports" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a type"}
 				}
 			}
