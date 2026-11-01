@@ -235,6 +235,9 @@ func (field DTOField) jsonName() string {
 	if tag == "" {
 		return field.Name
 	}
+	if strings.HasPrefix(tag, ",") {
+		return field.Name + tag
+	}
 	return tag
 }
 
