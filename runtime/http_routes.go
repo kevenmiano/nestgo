@@ -17,11 +17,17 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 }
 
 func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, direct ...httpadapter.Route) error {
+	return registerRoutesWithLifecycleAndInstances(adapter, packages, lifecycle, nil, direct...)
+}
+
+// registerRoutesWithLifecycleAndInstances shares the transport-independent HTTP
+// dispatch path while supplying connection and configuration providers to DI.
+func registerRoutesWithLifecycleAndInstances(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, instances []any, direct ...httpadapter.Route) error {
 	var onProvider func(reflect.Type)
 	if lifecycle != nil {
 		onProvider = lifecycle.onProvider
 	}
-	graph, err := prepareBootstrap(packages, onProvider, nil)
+	graph, err := prepareBootstrapWithInstances(packages, instances, onProvider, nil)
 	if err != nil {
 		return err
 	}

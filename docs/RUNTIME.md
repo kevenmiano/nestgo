@@ -24,8 +24,9 @@ The `runtime` package is a regular Go dependency: no prebuilt runtime binary, Ne
 ### Optional generated modules
 
 ```go
-// Import the generated package to register its metadata.
-app, err := runtime.New(runtime.WithRegistry("shop"))
+// The compiled package must be imported somewhere in the binary.
+// import _ "example.com/yourapp/internal/app"
+app, err := runtime.New()
 if err != nil { log.Fatal(err) }
 defer app.Shutdown(context.Background())
 log.Fatal(app.Listen(":8080"))
@@ -36,27 +37,26 @@ log.Fatal(app.Listen(":8080"))
 | Option | Function |
 | --- | --- |
 | `WithRoutes(routes...)` | Register Go HTTP functions directly (no codegen) |
-| `WithRegistry(names...)` | Resolve registered packages and transitive module imports |
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
-| `WithContext(ctx)` | Pass a cancellable context to bootstrap lifecycle hooks |
+| `WithContext(ctx)` | Supply a cancellable bootstrap context |
 | `WithDebug(true)` | Enable detailed per-provider diagnostics |
 | `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
 
-Do not combine `WithRegistry` and `WithPackages`. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown(ctx)`, `Close()` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
+`WithPackages` is reserved for explicit metadata fixtures and advanced embedding. Generated modules are loaded automatically when linked. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown(ctx)`, `Close()` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
 
 ## Lifecycle
 
 ```mermaid
 flowchart TD
   New["runtime.New"] --> Packages{"Metadata source"}
-  Packages -->|"WithRegistry"| Closure["Registered package import closure"]
+  Packages -->|"auto-discovery"| Closure["Registered package import closure"]
   Packages -->|"WithPackages"| Direct["Explicit metadata"]
   Closure --> Graph["Validate module scopes and imports"]
   Direct --> Graph
   Graph --> Providers["Instantiate and inject providers"]
-  Providers --> Order["Order providers by injected dependencies and module imports"]
+  Providers --> Order["Dependency-first lifecycle order; module imports before dependents"]
   Order --> Controllers["Instantiate and inject controllers"]
   Controllers --> Routes["Validate and register HTTP routes"]
   New --> Raw["WithRoutes: predeclared Go handlers"]
@@ -66,13 +66,11 @@ flowchart TD
   Hooks --> Application["Application ready"]
 ```
 
-Providers initialize in dependency-first topological order using their actually resolved, explicitly tagged injections. Imported modules precede their importing modules when providers are independent; controllers run after providers in module-aware stable order. Self and multi-provider cycles fail bootstrap with a typed `InjectionError` (code `dependency_cycle`) naming the fields involved. Optional missing dependencies add no graph edge. Field injection supports exported pointer and interface fields. The supported explicit markers are `nestgo:"inject"` (required), `nestgo:"optional"` (missing provider is permitted), and `nestgo:"-"` (exclude a field from injection even if a provider exists). Invalid tags, tagged unexported fields, tagged non-pointer fields, ambiguous interface matches, and nil providers fail at bootstrap. These failures return `*runtime.InjectionError` with stable `Code`, `Target`, `Field` and `Dependency` fields for programmatic checks through `errors.As`; messages remain descriptive for logs. Dependencies for each object are validated before writing any field, preventing partially injected objects after validation failure. Module scopes control imports and exports.
-
-**Breaking change:** untagged pointer and interface fields are ordinary user state and are **never** injected, even if a compatible provider exists. Add `nestgo:"inject"` to every required dependency and `nestgo:"optional"` to every optional dependency in .mgo definitions and ordinary Go structs. `nestgo:"-"` explicitly documents intentionally ignored fields. The compiler validates missing local concrete providers only for `inject`-tagged fields. No legacy implicit-injection compatibility mode is retained.
+Providers initialize in dependency-first topological order using their actually resolved, explicitly tagged injections. Imported modules precede their importers when providers are independent; controllers run after providers. Self and multi-provider cycles fail bootstrap as `*runtime.InjectionError` with code `dependency_cycle` and a field-aware cycle path. A missing optional dependency creates no ordering edge; external provider instances and generated factories remain injectable. Module scopes control visibility.
 
 Direct Go handlers execute without reflective controller dispatch. For decorator-generated controllers, generated invokers can bypass reflective calls, while other handlers use reflection as needed. Both native `platform/fasthttp` and `platform/nethttp` use the same route namespace and lifecycle. Conflicts between direct and controller-generated routes are rejected at bootstrap.
 
-`app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup (including cancellation, using a bounded independent cleanup context), but registered adapter routes are not transactionally rolled back. Inactive partially registered routes are never served because `runtime.New` fails. Hooks are not invoked before all dependency and route signatures have been validated. The caller owns OS signal handling and deadlines. `Close()` delegates to `Shutdown(context.Background())`; use `Shutdown(ctx)` when a timeout or cancellation deadline is required. `WithContext` applies only to bootstrap lifecycle hooks and does not implicitly cancel serving requests or shut down an already started application.
+`app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup, including cancellation via a bounded independent cleanup context. Registered adapter routes are not transactionally rolled back, but an application that fails construction is never served. The caller owns OS signal handling and deadlines.
 
 ## Observability and constraints
 

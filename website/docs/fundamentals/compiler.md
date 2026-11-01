@@ -9,7 +9,7 @@ The NestGo compiler translates decorator-annotated `.mgo` files into ordinary Go
 go run ./cmd/nestgo compile ./examples/shop
 ```
 
-The legacy `cmd/modforge` entry point remains available. Compilation produces `*_generated.go` files and `zz_modforge_metadata.go`; generation is deterministic and checked by CI against the committed `shop` example.
+Use the [NestGo CLI guide](../cli/overview.md) for usage, supported commands, flags, and troubleshooting. Compilation produces `*_generated.go` files and `zz_modforge_metadata.go`; generation is deterministic and checked by CI against the committed `shop` example.
 
 ## Validation and invocation
 
