@@ -349,6 +349,20 @@ func generateMetadata(files []*File, allowPersistence bool, repositories ...Repo
 			}
 		}
 	}
+	if len(moduleNames) > 1 {
+		for _, repository := range repositories {
+			generated := repository.Name + "Generated"
+			owners := 0
+			for _, contract := range moduleContracts {
+				for _, provider := range contract.Providers {
+					if provider == generated { owners++ }
+				}
+			}
+			if owners != 1 {
+				return nil, fmt.Errorf("repository %s: expected exactly one owning @Module provider, got %d", generated, owners)
+			}
+		}
+	}
 	if err := validateModuleCycles(moduleEdges, moduleLocations); err != nil {
 		return nil, err
 	}
