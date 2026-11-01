@@ -14,7 +14,7 @@ import (
 // generatedPropertySource emits strongly typed JSON methods for DTOs containing
 // property decorators. No DTO field reflection or dynamic decorator registry
 // is required on the HTTP request/response path.
-func generatedPropertySource(file *File) ([]byte, error) {
+func generatedPropertySource(file *File, structTypes map[string]bool) ([]byte, error) {
 	if len(file.DTOs) == 0 {
 		return nil, nil
 	}
@@ -57,6 +57,11 @@ func generatedPropertySource(file *File) ([]byte, error) {
 				return true
 			})
 			for _, ann := range field.Annotations {
+				if (ann.Name == "Transform" && field.excluded("input") && field.excluded("output")) ||
+					(ann.Name == "TransformInput" && field.excluded("input")) ||
+					(ann.Name == "TransformOutput" && field.excluded("output")) {
+					continue
+				}
 				if ann.Name != "Transform" && ann.Name != "TransformInput" && ann.Name != "TransformOutput" {
 					continue
 				}
@@ -90,7 +95,38 @@ func generatedPropertySource(file *File) ([]byte, error) {
 		fmt.Fprintf(&out, "%s %s\n", alias, strconv.Quote(required[alias]))
 	}
 	out.WriteString(")\n")
-	out.WriteString(propertyMethods(file))
+	// Compile-time assertions are generated for every active transformer.
+	// They guarantee that both function signatures and struct method sets
+	// match the target DTO field. No type casting or runtime reflection.
+	for _, dto := range file.DTOs {
+		for _, field := range dto.Fields {
+			for _, annotation := range field.Annotations {
+				switch annotation.Name {
+				case "Transform":
+					if field.excluded("input") && field.excluded("output") {
+						continue
+					}
+				case "TransformInput":
+					if field.excluded("input") {
+						continue
+					}
+				case "TransformOutput":
+					if field.excluded("output") {
+						continue
+					}
+				default:
+					continue
+				}
+				name, _ := transformerSpec(annotation.Argument)
+				if structTypes[name] {
+					fmt.Fprintf(&out, "var _ __nestgo_transform.Transformer[%s] = (*%s)(nil)\n", field.Type, name)
+				} else {
+					fmt.Fprintf(&out, "var _ __nestgo_transform.Func[%s] = %s\n", field.Type, name)
+				}
+			}
+		}
+	}
+	out.WriteString(propertyMethods(file, structTypes))
 	return format.Source([]byte(out.String()))
 }
 
