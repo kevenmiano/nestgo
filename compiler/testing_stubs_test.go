@@ -156,3 +156,21 @@ func TestCompileDirRejectsInvalidUserTestBeforeAppend(t *testing.T) {
 		t.Fatal("expected malformed existing test to be reported")
 	}
 }
+
+func TestCompileDirStubsForUnexportedTypes(t *testing.T) {
+	dir := t.TempDir()
+	source := "package example\n@Injectable()\ntype repository struct{}\n"
+	if err := os.WriteFile(filepath.Join(dir, "repo.mgo"), []byte(source), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompileDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	stubs, err := os.ReadFile(filepath.Join(dir, "zz_nestgo_stubs_test.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(stubs), "func TestNestGo_repository(") {
+		t.Fatalf("unexported type generated an undiscoverable Go test: %s", stubs)
+	}
+}
