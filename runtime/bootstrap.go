@@ -12,15 +12,15 @@ import (
 
 // BootstrapOptions configures the owned resources for a single runtime.
 type BootstrapOptions struct {
-	ConfigOptions []config.Option
+	ConfigOptions   []config.Option
 	DatabaseOptions []database.Option
-	Runtime Options
+	Runtime         Options
 }
 
 // Bootstrapped owns initialized services and must be closed after use.
 type Bootstrapped struct {
-	Handler http.Handler
-	Config *config.Service
+	Handler     http.Handler
+	Config      *config.Service
 	Connections *database.Connections
 }
 
