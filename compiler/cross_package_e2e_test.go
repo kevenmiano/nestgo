@@ -49,6 +49,7 @@ func (g *GreeterService) Greet() string { return "from-external-interface" }
 @Controller("/ready")
 type AppController struct {
     Greeter external.Greeter
+    Repository *external.Repository
     Optional external.Unused NESTGO_OPTIONAL_TAG
 }
 
@@ -73,9 +74,8 @@ func TestCompiledCrossPackageBootstrap(t *testing.T) {
 	application, err := runtime.NewApp(context.Background(), runtime.WithRegistry("app"))
 	if err != nil { t.Fatal(err) }
 	defer application.Close()
-	h := application.HTTPHandler()
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/ready/", nil))
+	application.HTTPHandler().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/ready/", nil))
 	if w.Code != 200 || w.Body.String() != "\"from-external-interface\"\n" { t.Fatalf("status %d, body %q", w.Code, w.Body.String()) }
 	if _, err := runtime.ApplicationFromRegistry(runtime.ApplicationOptions{}, "app"); err != nil { t.Fatal(err) }
 }
@@ -97,5 +97,49 @@ func TestCompiledCrossPackageBootstrap(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("compiled external modules must build and bootstrap: %v\n%s", err, strings.TrimSpace(string(output)))
+	}
+	// Verify the published-style package without the original .mgo sources.
+	externalSource := filepath.Join(external, "module.mgo")
+	if err := os.Remove(externalSource); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompileDir(app); err != nil {
+		t.Fatalf("module contract must resolve external concrete provider without mgo: %v", err)
+	}
+	// Reject unavailable export contracts rather than permitting implicit DI.
+	contractPath := filepath.Join(external, moduleContractFile)
+	contractBytes, err := os.ReadFile(contractPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(contractPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompileDir(app); err == nil || !strings.Contains(err.Error(), "module export contract unavailable") {
+		t.Fatalf("missing external contract must fail closed: %v", err)
+	}
+	if err := os.WriteFile(contractPath, contractBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(externalSource, []byte(files[externalSource]), 0600); err != nil {
+		t.Fatal(err)
+	}
+	// A module import alone must not authorize a private concrete provider.
+	privateSource := strings.ReplaceAll(files[filepath.Join(external, "module.mgo")], "exports:[Repository]", "exports:[]")
+	if err := os.WriteFile(filepath.Join(external, "module.mgo"), []byte(privateSource), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, generated := range []string{"module_generated.go", "zz_modforge_metadata.go"} {
+		if err := os.Remove(filepath.Join(app, generated)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := CompileDir(app); err == nil || !strings.Contains(err.Error(), "external concrete provider") {
+		t.Fatalf("private cross-package provider should fail compilation: %v", err)
+	}
+	for _, generated := range []string{"module_generated.go", "zz_modforge_metadata.go"} {
+		if _, err := os.Stat(filepath.Join(app, generated)); !os.IsNotExist(err) {
+			t.Fatalf("failed compilation generated %s: %v", generated, err)
+		}
 	}
 }
