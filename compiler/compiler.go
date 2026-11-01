@@ -580,7 +580,21 @@ func CompileDir(dir string) error {
 	if err := writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry); err != nil {
 		return err
 	}
-	return writeIfChanged(filepath.Join(dir, moduleContractFile), append(contract, '\n'))
+	if err := writeIfChanged(filepath.Join(dir, moduleContractFile), append(contract, '\n')); err != nil {
+		return err
+	}
+	wiring, err := wiringTestSource(files)
+	if err != nil {
+		return err
+	}
+	if err := writeIfChanged(filepath.Join(dir, "zz_nestgo_wiring_generated_test.go"), wiring); err != nil {
+		return err
+	}
+	stubs, err := editableStubs(files)
+	if err != nil {
+		return err
+	}
+	return appendMissingTestStubs(dir, files[0].Package, stubs)
 }
 func writeIfChanged(path string, content []byte) error {
 	old, err := os.ReadFile(path)
