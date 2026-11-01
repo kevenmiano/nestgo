@@ -36,6 +36,8 @@ func generatedPropertySource(file *File, structTypes map[string]bool) ([]byte, e
 	}
 	required := map[string]string{}
 	needsTransform := false
+	needsValidate := anyDTOValidators(file)
+	needsRegexp := hasRegexValidators(file)
 	for _, dto := range file.DTOs {
 		for _, field := range dto.Fields {
 			parsedType, parseErr := parser.ParseExpr(field.Type)
@@ -57,6 +59,14 @@ func generatedPropertySource(file *File, structTypes map[string]bool) ([]byte, e
 				return true
 			})
 			for _, ann := range field.Annotations {
+				if ann.Name == "Validate" {
+					fn, _ := transformerSpec(ann.Argument)
+					if alias := transformerQualifier(fn); alias != "" {
+						uri, ok := imports[alias]
+						if !ok { return nil, Diagnostic{file.Path, ann.Line, "unknown validator package " + alias} }
+						required[alias] = uri
+					}
+				}
 				if (ann.Name == "Transform" && field.excluded("input") && field.excluded("output")) ||
 					(ann.Name == "TransformInput" && field.excluded("input")) ||
 					(ann.Name == "TransformOutput" && field.excluded("output")) {
@@ -85,6 +95,12 @@ func generatedPropertySource(file *File, structTypes map[string]bool) ([]byte, e
 	fmt.Fprintf(&out, "package %s\n\nimport (\n__nestgo_json \"encoding/json\"\n__nestgo_fmt \"fmt\"\n", file.Package)
 	if needsTransform {
 		out.WriteString("__nestgo_transform \"github.com/kevenmiano/nestgo/transform\"\n")
+	}
+	if needsValidate {
+		out.WriteString("__nestgo_validation \"github.com/kevenmiano/nestgo/validation\"\n")
+	}
+	if needsRegexp {
+		out.WriteString("__nestgo_regexp \"regexp\"\n")
 	}
 	aliases := make([]string, 0, len(required))
 	for alias := range required {
@@ -126,7 +142,9 @@ func generatedPropertySource(file *File, structTypes map[string]bool) ([]byte, e
 			}
 		}
 	}
+	out.WriteString(generatedRegexDeclarations(file))
 	out.WriteString(propertyMethods(file, structTypes))
+	out.WriteString(generatedDTOValidation(file))
 	return format.Source([]byte(out.String()))
 }
 
@@ -138,7 +156,7 @@ func decoratorOnlyImportAliases(file *File) map[string]bool {
 	for _, dto := range file.DTOs {
 		for _, field := range dto.Fields {
 			for _, ann := range field.Annotations {
-				if ann.Name == "Transform" || ann.Name == "TransformInput" || ann.Name == "TransformOutput" {
+				if ann.Name == "Transform" || ann.Name == "TransformInput" || ann.Name == "TransformOutput" || ann.Name == "Validate" {
 					fn, err := transformerSpec(ann.Argument)
 					if err == nil {
 						if alias := transformerQualifier(fn); alias != "" {
