@@ -134,43 +134,43 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 					}
 					result = value
 				} else {
-				args := make([]reflect.Value, methodType.NumIn())
-				for i := 0; i < methodType.NumIn(); i++ {
-					t := methodType.In(i)
-					v := reflect.New(t)
-					if p, ok := params[i]; ok {
-						switch p.Kind {
-						case "Body":
-							body := ctx.Body()
-							if len(body) > 1<<20 {
-								return respondError(ctx, 413, "request body too large")
+					args := make([]reflect.Value, methodType.NumIn())
+					for i := 0; i < methodType.NumIn(); i++ {
+						t := methodType.In(i)
+						v := reflect.New(t)
+						if p, ok := params[i]; ok {
+							switch p.Kind {
+							case "Body":
+								body := ctx.Body()
+								if len(body) > 1<<20 {
+									return respondError(ctx, 413, "request body too large")
+								}
+								if err := json.Unmarshal(body, v.Interface()); err != nil {
+									return respondError(ctx, 400, "invalid JSON: "+err.Error())
+								}
+							case "Param":
+								if t.Kind() != reflect.String {
+									return respondError(ctx, 500, "path parameter must be string")
+								}
+								v.Elem().SetString(ctx.Param(p.Name))
+							case "Query":
+								if t.Kind() != reflect.String {
+									return respondError(ctx, 500, "query parameter must be string")
+								}
+								v.Elem().SetString(ctx.Query(p.Name))
+							default:
+								return respondError(ctx, 500, "unsupported parameter decorator")
 							}
-							if err := json.Unmarshal(body, v.Interface()); err != nil {
-								return respondError(ctx, 400, "invalid JSON: "+err.Error())
+						} else {
+							for _, part := range strings.Split(rt.Path, "/") {
+								if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+									v.Elem().SetString(ctx.Param(strings.Trim(part, "{}")))
+									break
+								}
 							}
-						case "Param":
-							if t.Kind() != reflect.String {
-								return respondError(ctx, 500, "path parameter must be string")
-							}
-							v.Elem().SetString(ctx.Param(p.Name))
-						case "Query":
-							if t.Kind() != reflect.String {
-								return respondError(ctx, 500, "query parameter must be string")
-							}
-							v.Elem().SetString(ctx.Query(p.Name))
-						default:
-							return respondError(ctx, 500, "unsupported parameter decorator")
 						}
-					} else {
-						for _, part := range strings.Split(rt.Path, "/") {
-							if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
-								v.Elem().SetString(ctx.Param(strings.Trim(part, "{}")))
-								break
-							}
-						}
+						args[i] = v.Elem()
 					}
-					args[i] = v.Elem()
-				}
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
 						return respondError(ctx, 500, results[1].Interface().(error).Error())
