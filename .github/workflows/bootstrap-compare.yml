@@ -1,0 +1,76 @@
+name: Compare bootstrap overhead
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/bootstrap*'
+      - 'runtime/runtime.go'
+      - 'runtime/http_routes.go'
+      - '.github/workflows/bootstrap-compare.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Baseline versus candidate startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          path: baseline
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: candidate/go.mod
+          cache: false
+      - name: Measure identical startup workloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p benchmark-results
+          go version | tee benchmark-results/environment.txt
+          for variant in baseline candidate; do
+            (
+              cd "$variant"
+              GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkApplicationBootstrapProviders$' -benchtime=200ms -count=5 -benchmem -timeout=10m
+            ) | tee "benchmark-results/$variant.txt"
+          done
+      - name: Summarize median ns/op and allocation changes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, statistics
+          base = pathlib.Path('benchmark-results')
+          pattern = re.compile(r'^BenchmarkApplicationBootstrapProviders/(providers_\d+)-\d+\s+\d+\s+([\d.]+) ns/op\s+(\d+) B/op\s+(\d+) allocs/op')
+          def read(name):
+              found = {}
+              for line in (base / (name + '.txt')).read_text().splitlines():
+                  match = pattern.match(line)
+                  if match:
+                      found.setdefault(match[1], []).append(tuple(float(x) for x in match.groups()[1:]))
+              return {key: tuple(statistics.median(row[i] for row in values) for i in range(3)) for key, values in found.items()}
+          baseline, candidate = read('baseline'), read('candidate')
+          with (base / 'comparison.md').open('w') as output:
+              print('| Providers | main ns/op | PR ns/op | Δ time | main B/op | PR B/op | main allocs | PR allocs |', file=output)
+              print('|---|---:|---:|---:|---:|---:|---:|---:|', file=output)
+              for case in ['providers_1', 'providers_10', 'providers_100']:
+                  if case not in baseline or case not in candidate:
+                      raise SystemExit('missing benchmark: '+case)
+                  a,b=baseline[case],candidate[case]
+                  print(f'| {case} | {a[0]:.0f} | {b[0]:.0f} | {(b[0]/a[0]-1)*100:+.1f}% | {a[1]:.0f} | {b[1]:.0f} | {a[2]:.0f} | {b[2]:.0f} |',file=output)
+          print((base/'comparison.md').read_text())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bootstrap-compare-${{ github.run_id }}
+          path: benchmark-results/
+          retention-days: 30

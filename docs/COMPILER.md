@@ -40,7 +40,7 @@ The compiler accepts only a subset of annotation expressions. Controller, module
 2. Decorator tokens are replaced with spaces, preserving source offsets and line numbers.
 3. The Go parser validates the remaining source and discovers decorated declarations.
 4. `Generate` produces metadata describing controllers, providers, modules, routes and parameter bindings.
-5. `CompileDir` formats and writes generated Go files.
+5. `CompileDir` formats and writes generated Go files and the versioned module export contract.
 
 The compiler reports invalid annotations, dangling decorators, unsupported placements, duplicate method decorators, invalid status codes and mixed package declarations.
 
@@ -48,7 +48,7 @@ The compiler reports invalid annotations, dangling decorators, unsupported place
 
 The generated `*_generated.go` files contain the original Go code with annotations removed. `zz_modforge_metadata.go` contains an `init()` function that calls `metadata.Register` for the package.
 
-Both files are Go source code and should be inspected in code review. They are **not** dynamically interpreted at runtime.
+The compiler also writes `zz_nestgo_modules.json` with schema version `1` and the modules' explicitly declared `providers` and `exports`. Commit this generated file together with the generated Go files when distributing an imported NestGo module. When the original `.mgo` is absent, the importing compiler checks this contract before accepting concrete cross-package DI. If neither `.mgo` nor the contract exists, compilation fails closed. The runtime continues to enforce module visibility. The contract does not replace Go type checking, and it does not yet support external interface-provider visibility checks.\n\nThe generated Go files should be inspected in code review. They are **not** dynamically interpreted at runtime.
 
 ## Known limitations
 
