@@ -27,11 +27,14 @@ type User struct {
     @TransformInput(url.PathUnescape)
     Slug string ` + "\u0060json:\"slug\"\u0060" + `
     @TransformOutput(Uppercase)
+    @TransformOutput(&AddSuffix{})
     Label string ` + "\u0060json:\"label\"\u0060" + `
     @ExcludeOutput()
     Token string ` + "\u0060json:\"token\"\u0060" + `
     @ExcludeInput()
     ServerID string ` + "\u0060json:\"server_id\"\u0060" + `
+    @TransformInput(TrimTenant{})
+    Tenant string ` + "\u0060json:\"tenant\"\u0060" + `
     @Type(Address)
     Address Address ` + "\u0060json:\"address\"\u0060" + `
     Age int ` + "\u0060json:\"age,omitempty\"\u0060" + `
@@ -39,6 +42,10 @@ type User struct {
 
 func NormalizeEmail(value string) (string,error) { return strings.ToLower(value),nil }
 func Uppercase(value string) (string,error) { return strings.ToUpper(value),nil }
+type TrimTenant struct{}
+func (TrimTenant) Transform(value string) (string,error) { return strings.TrimSpace(value),nil }
+type AddSuffix struct{}
+func (*AddSuffix) Transform(value string) (string,error) { return value+"!",nil }
 `
 
 func TestPropertyDecoratorsCompileAndRoundTrip(t *testing.T) {
@@ -53,7 +60,7 @@ func TestPropertyDecoratorsCompileAndRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"MarshalJSON()", "UnmarshalJSON(data []byte)", "NormalizeEmail(p", "url.PathUnescape(p", "Uppercase(p", "display_name"} {
+	for _, expected := range []string{"MarshalJSON()", "UnmarshalJSON(data []byte)", "ApplyFunc[string](p", "Apply[string](p", "TrimTenant{}", "&AddSuffix{}", "display_name"} {
 		if !strings.Contains(string(codec), expected) {
 			t.Fatalf("missing %q from generated codec:\n%s", expected, codec)
 		}
@@ -84,15 +91,15 @@ import (
 
 func TestCodec(t *testing.T) {
     var u User
-    if err := json.Unmarshal([]byte("{\"display_name\":\"Ada\",\"password\":\"secret\",\"email\":\"ADA@EXAMPLE.COM\",\"slug\":\"%2Fapi\",\"token\":\"inbound\",\"server_id\":\"user-controlled\",\"label\":\"hello\",\"address\":{\"city\":\"London\"}}"), &u); err != nil {t.Fatal(err)}
-    if u.Name!="Ada"||u.Password!=""||u.Email!="ada@example.com"||u.Slug!="/api"||u.Token!="inbound"||u.ServerID!=""||u.Label!="hello"||u.Address.City!="London" {t.Fatalf("decoded: %+v",u)}
+    if err := json.Unmarshal([]byte("{\"display_name\":\"Ada\",\"password\":\"secret\",\"email\":\"ADA@EXAMPLE.COM\",\"slug\":\"%2Fapi\",\"token\":\"inbound\",\"server_id\":\"user-controlled\",\"label\":\"hello\",\"tenant\":\"  premium  \",\"address\":{\"city\":\"London\"}}"), &u); err != nil {t.Fatal(err)}
+    if u.Name!="Ada"||u.Password!=""||u.Email!="ada@example.com"||u.Slug!="/api"||u.Token!="inbound"||u.ServerID!=""||u.Label!="hello"||u.Tenant!="premium"||u.Address.City!="London" {t.Fatalf("decoded: %+v",u)}
     u.Password="private"
     u.ServerID="server-set"
     data,err:=json.Marshal(u)
     if err != nil {t.Fatal(err)}
     if strings.Contains(string(data),"private")||strings.Contains(string(data),"password") {t.Fatalf("password leaked: %s",data)}
     if !strings.Contains(string(data),"\"display_name\":\"Ada\"") {t.Fatalf("alias missing: %s",data)}
-    if strings.Contains(string(data), "inbound") || !strings.Contains(string(data), "\"server_id\":\"server-set\"") || !strings.Contains(string(data), "\"label\":\"HELLO\"") {t.Fatalf("output transformations/exclusions failed: %s", data)}
+    if strings.Contains(string(data), "inbound") || !strings.Contains(string(data), "\"server_id\":\"server-set\"") || !strings.Contains(string(data), "\"label\":\"HELLO!\"") {t.Fatalf("output transformations/exclusions failed: %s", data)}
 }
 `
 	if err := os.WriteFile(filepath.Join(dir, "dto_test.go"), []byte(testSource), 0644); err != nil {
