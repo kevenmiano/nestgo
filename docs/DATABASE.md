@@ -39,7 +39,7 @@ Run `go run ./cmd/modforge compile ./path/to/package`. The compiler emits `Users
 
 **Current limitations:** generated `@Query` supports `SELECT` returning `*Entity` or `[]Entity` only. Columns are mapped by returned name (case-insensitive field names and snake_case), not field order. Unknown or repeated result columns fail explicitly; empty single-row results return `sql.ErrNoRows`. `@Entity` is only a local model; `@Column`, schema migrations, arbitrary typed DTOs, writes, and autocomplete are not implemented yet (#89, #91, #93).
 
-**SQL dialect warning:** `CompileDir` currently defaults to PostgreSQL and `CompileDirWithDialect` selects a single dialect for the entire compilation. Native connections can mix PostgreSQL and MySQL, but generated repositories do not yet select SQL dialect per named connection. Do not mix generated dialects until #90 is implemented.
+**SQL dialects:** `CompileDir` defaults to PostgreSQL; `CompileDirWithDialect` selects one dialect for the compilation. For mixed databases, compile explicitly with `CompileDirWithDialects(dir, map[string]sqlgen.Dialect{"users": sqlgen.PostgreSQL, "billing": sqlgen.Question})`, or run `go run ./cmd/modforge compile ./path/to/package --connection=users:postgres --connection=billing:mysql`. The compiler resolves each `@Repository(Entity, "connection")` by name and refuses missing mappings. The connection/driver dialect is not yet cross-validated at runtime (#90).
 
 ## Direct native SQL
 
