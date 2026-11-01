@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/kevenmiano/nestgo/database/sqlgen"
 )
 
 // WatchDir compiles immediately and again when top-level .mgo files change.
@@ -30,9 +32,13 @@ func WatchDir(ctx context.Context, dir string, interval time.Duration, report fu
 	if err != nil {
 		return err
 	}
+	cache := &incrementalCache{}
+	compile := func() error {
+		return compileDirWithCache(dir, sqlgen.PostgreSQL, nil, false, cache)
+	}
 	if report != nil {
-		report(CompileDir(dir))
-	} else if err := CompileDir(dir); err != nil {
+		report(compile())
+	} else if err := compile(); err != nil {
 		return err
 	}
 	ticker := time.NewTicker(interval)
@@ -53,7 +59,7 @@ func WatchDir(ctx context.Context, dir string, interval time.Duration, report fu
 				continue
 			}
 			current = next
-			if err := CompileDir(dir); report != nil {
+			if err := compile(); report != nil {
 				report(err)
 			} else if err != nil {
 				return err
@@ -62,8 +68,9 @@ func WatchDir(ctx context.Context, dir string, interval time.Duration, report fu
 	}
 }
 
-// sourceFingerprint includes file names and their contents, not modtimes:
+// sourceFingerprint includes source file names and contents, not modtimes:
 // fast atomic saves and same-size edits must both trigger regeneration.
+// Hand-written Go source is included to invalidate cross-file transformer symbols.
 func sourceFingerprint(dir string) ([sha256.Size]byte, error) {
 	var zero [sha256.Size]byte
 	entries, err := os.ReadDir(dir)
@@ -72,7 +79,7 @@ func sourceFingerprint(dir string) ([sha256.Size]byte, error) {
 	}
 	h := sha256.New()
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".mgo") {
+		if entry.IsDir() || !isWatchedSource(entry.Name()) {
 			continue
 		}
 		name := entry.Name()
@@ -97,4 +104,19 @@ func finishFingerprint(h hash.Hash) [sha256.Size]byte {
 	var sum [sha256.Size]byte
 	copy(sum[:], h.Sum(nil))
 	return sum
+}
+
+// isWatchedSource includes hand-written Go dependencies: a local transformer
+// type can change without modifying the annotated .mgo file. Compiler-owned
+// outputs and test stubs must never retrigger the watcher.
+func isWatchedSource(name string) bool {
+	if strings.HasSuffix(name, ".mgo") {
+		return true
+	}
+	if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") ||
+		strings.HasSuffix(name, "_generated.go") ||
+		strings.HasPrefix(name, "zz_modforge_") || strings.HasPrefix(name, "zz_nestgo_") {
+		return false
+	}
+	return true
 }

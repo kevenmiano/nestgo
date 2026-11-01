@@ -19,7 +19,9 @@ nestgo compile --watch ./myapp
 nestgo compile ./myapp --watch --poll-interval=500ms
 ```
 
-The watcher compiles immediately, then fingerprints the names and contents of top-level `.mgo` sources. It triggers a directory compile only after changes, and `writeIfChanged` avoids rewriting identical outputs. This is **incremental change detection**, not yet selective per-file compilation. Errors are printed and the watcher keeps observing files until cancellation. Generated Go files are ignored to prevent infinite compile loops.
+The watcher compiles immediately, then fingerprints top-level `.mgo` and handwritten `.go` sources (including same-size edits). After the initial build, unchanged `.mgo` units reuse their parsed decorators and formatted local Go output; edited files are reparsed. Package-wide metadata, SQL/DTO generation, dependency contracts and wiring assertions are still validated each time to avoid cross-file stale results. The cache is process-local, never affects `check`, and is discarded when the watcher exits. Removed source units have their compiler-owned Go artifacts cleaned up. Developer-owned tests remain untouched.
+
+Errors are reported without stopping the watcher. Generated Go outputs are ignored by the change detector to prevent recursive builds. See the [incremental build contract](https://github.com/kevenmiano/nestgo/blob/main/docs/COMPILER.md) for semantics and benchmarks.
 
 ## Generated test contracts
 
