@@ -45,6 +45,9 @@ func TestFromRegistryLoadsImportedPackage(t *testing.T) {
 	if _, err := FromRegistry("nestgo-closure-no-import-test"); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
 		t.Fatalf("unimported provider must remain inaccessible: %v", err)
 	}
+	if _, err := ApplicationFromRegistry(ApplicationOptions{}, "nestgo-closure-no-import-test"); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+		t.Fatalf("adapter bootstrap must reject missing imported provider: %v", err)
+	}
 }
 
 func TestApplicationFromRegistryRejectsInvalidImportedPackage(t *testing.T) {
