@@ -32,11 +32,17 @@ func TestClassMiddlewareGlobalAndRouteOrder(t *testing.T) {
 			return ctx.Write([]byte("ok"))
 		}}),
 	)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer app.Shutdown(context.Background())
-	if err := adapter.routes["GET /status"](&capturedContext{}); err != nil { t.Fatal(err) }
+	if err := adapter.routes["GET /status"](&capturedContext{}); err != nil {
+		t.Fatal(err)
+	}
 	want := "class before,class before,handler,class after,class after"
-	if got := strings.Join(steps, ","); got != want { t.Fatalf("order: got %s, want %s", got, want) }
+	if got := strings.Join(steps, ","); got != want {
+		t.Fatalf("order: got %s, want %s", got, want)
+	}
 }
 
 func TestClassMiddlewareTypedNilFailsAtBootstrap(t *testing.T) {
