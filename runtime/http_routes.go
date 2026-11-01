@@ -126,6 +126,14 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 			params := bindings
 			methodType := typ
 			err := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
+				var result any
+				if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
+					value, err := rt.StaticInvoke(instance.Interface())
+					if err != nil {
+						return respondError(ctx, 500, err.Error())
+					}
+					result = value
+				} else {
 				args := make([]reflect.Value, methodType.NumIn())
 				for i := 0; i < methodType.NumIn(); i++ {
 					t := methodType.In(i)
@@ -163,9 +171,11 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 					}
 					args[i] = v.Elem()
 				}
-				results := handler.Call(args)
-				if len(results) == 2 && !results[1].IsNil() {
-					return respondError(ctx, 500, results[1].Interface().(error).Error())
+					results := handler.Call(args)
+					if len(results) == 2 && !results[1].IsNil() {
+						return respondError(ctx, 500, results[1].Interface().(error).Error())
+					}
+					result = results[0].Interface()
 				}
 				status := rt.Status
 				if status == 0 {
@@ -177,7 +187,7 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 				}
 				ctx.Status(status)
 				ctx.SetHeader("Content-Type", "application/json")
-				data, err := json.Marshal(results[0].Interface())
+				data, err := json.Marshal(result)
 				if err != nil {
 					return errors.New("failed to encode HTTP response: " + err.Error())
 				}
