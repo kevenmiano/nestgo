@@ -12,13 +12,13 @@ import (
 // RepositoryDefinition is the compiler's validated input for emitting repository
 // implementations. The .mgo decorator parser will construct this representation.
 type RepositoryDefinition struct {
-	Package string
-	Name    string
-	Entity  string
+	Package    string
+	Name       string
+	Entity     string
 	Connection string
-	Fields  []RepositoryField
-	Methods []RepositoryMethod
-	Dialect sqlgen.Dialect
+	Fields     []RepositoryField
+	Methods    []RepositoryMethod
+	Dialect    sqlgen.Dialect
 }
 
 type RepositoryField struct {
