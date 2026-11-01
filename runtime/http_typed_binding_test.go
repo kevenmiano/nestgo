@@ -16,8 +16,8 @@ type typedBenchDTO struct {
 
 type typedBenchController struct{}
 
-func (*typedBenchController) ByID(id string) string { return id }
-func (*typedBenchController) Search(q string) string { return q }
+func (*typedBenchController) ByID(id string) string         { return id }
+func (*typedBenchController) Search(q string) string        { return q }
 func (*typedBenchController) Create(v typedBenchDTO) string { return v.Name }
 func (*typedBenchController) Fail(q string) (string, error) {
 	return "", errors.New("application failure")
@@ -29,7 +29,7 @@ type typedBenchContext struct {
 	query string
 }
 
-func (c *typedBenchContext) Body() []byte { return c.body }
+func (c *typedBenchContext) Body() []byte        { return c.body }
 func (c *typedBenchContext) Query(string) string { return c.query }
 
 func typedBenchRoutes(useStatic bool) (*capturedAdapter, error) {
@@ -70,7 +70,7 @@ func TestTypedHTTPDispatchAndErrors(t *testing.T) {
 	}
 	cases := []struct {
 		name, route, query, body, id, want string
-		status int
+		status                             int
 	}{
 		{"path", "GET /typed/path/{id}", "", "", "Ada", "\"Ada\"\n", 200},
 		{"query", "GET /typed/query", "Grace", "", "", "\"Grace\"\n", 200},
@@ -82,7 +82,7 @@ func TestTypedHTTPDispatchAndErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := &typedBenchContext{
 				capturedContext: &capturedContext{params: map[string]string{"id": tc.id}},
-				body: []byte(tc.body), query: tc.query,
+				body:            []byte(tc.body), query: tc.query,
 			}
 			if err := adapter.routes[tc.route](ctx); err != nil {
 				t.Fatal(err)
@@ -130,7 +130,7 @@ func TestTypedHTTPDispatchConcurrent(t *testing.T) {
 
 func BenchmarkHTTPBinding(b *testing.B) {
 	for _, mode := range []struct {
-		name string
+		name   string
 		static bool
 	}{
 		{"typed", true},
@@ -151,7 +151,7 @@ func BenchmarkHTTPBinding(b *testing.B) {
 				handler := adapter.routes[scenario.route]
 				ctx := &typedBenchContext{
 					capturedContext: &capturedContext{params: map[string]string{"id": "42"}},
-					query: scenario.query, body: []byte(scenario.payload),
+					query:           scenario.query, body: []byte(scenario.payload),
 				}
 				b.ReportAllocs()
 				b.ResetTimer()
