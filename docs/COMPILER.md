@@ -37,12 +37,18 @@ For every input `name.mgo`, the compiler writes `name_generated.go`. It also wri
 | `@TransformInput(Fn)` | DTO struct field | Transforms incoming JSON values |
 | `@TransformOutput(Fn)` | DTO struct field | Transforms values during JSON output |
 | `@Type(T)` | DTO struct field | Verifies the declared nested Go field type |
+| `@IsEmail()`, `@IsCPF()`, `@IsCNPJ()` | DTO struct field | Validates common identifiers and documents on input |
+| `@Regex("pattern")`, `@Matches("pattern")` | DTO struct field | Applies a compile-time checked Go regexp |
+| `@IsNotEmpty()`, `@IsOptional()` | DTO struct field | Required and optional input semantics |
+| `@MinLength(n)`, `@MaxLength(n)`, `@Length(min,max)` | DTO struct field | Validates Unicode string length |
+| `@Min(n)`, `@Max(n)` | DTO struct field | Validates numeric range |
+| `@Validate(CustomFn)` | DTO struct field | Invokes a statically typed custom validation callback |
 
 Declaration annotations must occupy their own line. Route decorators must be attached to methods with a receiver whose controller type is declared in the same `.mgo` file. Only a single HTTP method decorator is permitted per handler.
 
 The compiler accepts only a subset of annotation expressions. Controller, module and route arguments are string literals; `@HttpCode` takes a numeric HTTP status.
 
-For property transformation behavior, custom callbacks and limitations, see [DTO property transformers](DTO_TRANSFORMERS.md). Decorated DTOs generate an additional `*_transformers_generated.go` file with typed JSON codec methods.
+For property transformation behavior and custom callbacks, see [DTO property transformers](DTO_TRANSFORMERS.md). For input constraints, see [DTO validation](DTO_VALIDATION.md). Decorated DTOs generate an additional `*_transformers_generated.go` file with typed JSON codec methods.
 
 ## Compilation stages
 
