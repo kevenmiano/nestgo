@@ -68,8 +68,11 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				if rt.StaticHTTP != nil {
 					value, status, err := rt.StaticHTTP(instance.Interface(), ctx)
 					if err != nil {
-						if status == 0 {
+						if status < 400 || status > 599 {
 							status = 500
+						}
+						if status >= 500 {
+							return respondError(ctx, status, "Internal server error")
 						}
 						return respondError(ctx, status, err.Error())
 					}
@@ -77,7 +80,7 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				} else if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
 					value, err := rt.StaticInvoke(instance.Interface())
 					if err != nil {
-						return respondError(ctx, 500, err.Error())
+						return respondError(ctx, 500, "Internal server error")
 					}
 					result = value
 				} else {
@@ -120,7 +123,7 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 					}
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
-						return respondError(ctx, 500, results[1].Interface().(error).Error())
+						return respondError(ctx, 500, "Internal server error")
 					}
 					result = results[0].Interface()
 				}
@@ -167,6 +170,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 	return nil
 }
 func respondError(ctx httpadapter.Context, status int, message string) error {
+	if status >= 500 {
+		message = "Internal server error"
+	}
 	ctx.Status(status)
 	ctx.SetHeader("Content-Type", "text/plain; charset=utf-8")
 	return ctx.Write([]byte(message + "\n"))
