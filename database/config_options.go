@@ -43,4 +43,3 @@ func WithConnectionFromConfig(name string, settings *config.Service, prefix stri
 		return nil
 	}
 }
-
