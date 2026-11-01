@@ -211,7 +211,8 @@ http {
 				} {
 					resp, err := client.Get(base + "/cached/" + tc.id)
 					if err != nil {
-						t.Fatal(err)
+						logData, _ := os.ReadFile(filepath.Join(workdir, "error.log"))
+						t.Fatalf("cache request %s failed: %v; nginx error log:\n%s", tc.id, err, logData)
 					}
 					body, err := io.ReadAll(resp.Body)
 					_ = resp.Body.Close()
