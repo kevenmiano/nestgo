@@ -29,26 +29,20 @@ For every input `name.mgo`, the compiler writes `name_generated.go`. It also wri
 | `@Param("id")` | Method parameter | Binds a string URL path variable |
 | `@Query("page")` | Method parameter | Binds a string query value |
 | `@Headers("name")` | Method parameter | Recognized by the compiler; **not supported by the runtime** |
-| `@Expose("alias")` | DTO struct field | Exposes or renames a JSON property |
-| `@Exclude()` | DTO struct field | Excludes a property in both JSON directions |
-| `@ExcludeInput()` | DTO struct field | Ignores a field when decoding JSON into a DTO |
-| `@ExcludeOutput()` | DTO struct field | Omits a field when encoding a DTO as JSON |
-| `@Transform(Fn)` | DTO struct field | Invokes a typed custom transformation in both directions |
-| `@TransformInput(Fn)` | DTO struct field | Transforms incoming JSON values |
-| `@TransformOutput(Fn)` | DTO struct field | Transforms values during JSON output |
-| `@Type(T)` | DTO struct field | Verifies the declared nested Go field type |
-| `@IsEmail()`, `@IsCPF()`, `@IsCNPJ()` | DTO struct field | Validates common identifiers and documents on input |
-| `@Regex("pattern")`, `@Matches("pattern")` | DTO struct field | Applies a compile-time checked Go regexp |
-| `@IsNotEmpty()`, `@IsOptional()` | DTO struct field | Required and optional input semantics |
-| `@MinLength(n)`, `@MaxLength(n)`, `@Length(min,max)` | DTO struct field | Validates Unicode string length |
-| `@Min(n)`, `@Max(n)` | DTO struct field | Validates numeric range |
-| `@Validate(CustomFn)` | DTO struct field | Invokes a statically typed custom validation callback |
+
+| `@Expose("alias")` | DTO field | Rename or expose a JSON property |
+| `@Exclude()`, `@ExcludeInput()`, `@ExcludeOutput()` | DTO field | Input/output JSON visibility |
+| `@Transform(Fn)`, `@TransformInput(Fn)`, `@TransformOutput(Fn)` | DTO field | Typed compile-time transformation |
+| `@Type(T)` | DTO field | Validate nested field type contract |
+| `@IsEmail()`, `@IsCPF()`, `@IsCNPJ()`, `@IsNotEmpty()`, `@IsOptional()` | DTO field | Compiled input validation |
+| `@Regex("pattern")`, `@Matches("pattern")`, `@MinLength(n)`, `@MaxLength(n)`, `@Length(min,max)` | DTO field | String validation |
+| `@Min(n)`, `@Max(n)`, `@Validate(CustomFn)` | DTO field | Numeric and custom validation |
+
+See [DTO property transformers](DTO_TRANSFORMERS.md) and [DTO validation](DTO_VALIDATION.md). DTOs with field annotations also emit `*_transformers_generated.go`.
 
 Declaration annotations must occupy their own line. Route decorators must be attached to methods with a receiver whose controller type is declared in the same `.mgo` file. Only a single HTTP method decorator is permitted per handler.
 
 The compiler accepts only a subset of annotation expressions. Controller, module and route arguments are string literals; `@HttpCode` takes a numeric HTTP status.
-
-For property transformation behavior and custom callbacks, see [DTO property transformers](DTO_TRANSFORMERS.md). For input constraints, see [DTO validation](DTO_VALIDATION.md). Decorated DTOs generate an additional `*_transformers_generated.go` file with typed JSON codec methods.
 
 ## Compilation stages
 

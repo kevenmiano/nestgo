@@ -46,4 +46,4 @@ For supported syntax and diagnostics, consult the [compiler reference](https://g
 
 ## Property transformations
 
-DTO structs can use `@Expose`, `@Exclude`, `@Transform` and `@Type` on exported fields. Generated `MarshalJSON` and `UnmarshalJSON` methods apply across both HTTP adapters. Read [DTO transformers](./dto-transformers.md) for examples and custom functions.
+Decorate DTO fields with `@Expose`, `@Exclude`, `@Transform` and validators such as `@IsEmail` and `@IsCPF`. The compiler emits typed JSON methods, which work with either HTTP adapter. See [DTO transformers](./dto-transformers.md).

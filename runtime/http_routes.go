@@ -156,9 +156,7 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 						value, status, err := rt.StaticHTTP(controllerInstance, bound)
 						if err != nil {
 							var validationErrors validation.Errors
-							if errors.As(err, &validationErrors) {
-								return err
-							}
+							if errors.As(err, &validationErrors) { return err }
 							if status >= 400 && status <= 599 {
 								return httpadapter.NewHTTPException(status, err.Error())
 							}
@@ -199,6 +197,7 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 									if err := json.Unmarshal(body, v.Interface()); err != nil {
 										return httpadapter.NewHTTPException(400, "invalid JSON: "+err.Error())
 									}
+									if err := validation.Check(v.Elem().Interface()); err != nil { return err }
 								case "Param":
 									if t.Kind() != reflect.String {
 										return httpadapter.NewHTTPException(500, "path parameter must be string")
@@ -229,11 +228,6 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 										return httpadapter.NewHTTPException(400, "pipe returned an incompatible parameter type")
 									}
 									v.Elem().Set(value)
-									if p.Kind == "Body" {
-										if err := validation.Check(v.Elem().Interface()); err != nil {
-											return err
-										}
-									}
 								}
 							} else {
 								for _, part := range strings.Split(rt.Path, "/") {
@@ -326,21 +320,19 @@ func respondError(ctx httpadapter.Context, status int, message string) error {
 	return ctx.Write([]byte(message + "\n"))
 }
 
+// respondValidationError reports only field names, rules and generic messages.
+// User-provided values are never serialized in validation errors.
 func respondValidationError(ctx httpadapter.Context, err error) error {
 	var fields validation.Errors
-	if !errors.As(err, &fields) {
-		return respondError(ctx, 400, err.Error())
-	}
+	if !errors.As(err, &fields) { return http.WriteError(ctx, http.NewHTTPError(400, "Bad Request")) }
 	ctx.Status(400)
 	ctx.SetHeader("Content-Type", "application/json")
 	payload := struct {
-		StatusCode int               `json:"statusCode"`
-		Error      string            `json:"error"`
-		Fields     validation.Errors `json:"fields"`
+		StatusCode int `json:"statusCode"`
+		Error string `json:"error"`
+		Fields validation.Errors `json:"fields"`
 	}{400, "Bad Request", fields}
 	data, marshalErr := json.Marshal(payload)
-	if marshalErr != nil {
-		return respondError(ctx, 500, "Internal server error")
-	}
+	if marshalErr != nil { return http.WriteError(ctx, marshalErr) }
 	return ctx.Write(append(data, '\n'))
 }

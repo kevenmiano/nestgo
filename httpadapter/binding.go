@@ -3,8 +3,8 @@ package httpadapter
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/kevenmiano/nestgo/validation"
 	"reflect"
+	"github.com/kevenmiano/nestgo/validation"
 )
 
 // DecodeBody decodes JSON before applying global, controller and route pipes.
@@ -34,9 +34,7 @@ func TransformBody[T any](ctx Context, value T, index int) (T, int, error) {
 		var zero T
 		return zero, 400, NewHTTPException(400, "body pipe returned an incompatible type")
 	}
-	if err := validation.Check(result); err != nil {
-		return result, 400, err
-	}
+	if err := validation.Check(result); err != nil { return result, 400, err }
 	return result, 0, nil
 }
 
