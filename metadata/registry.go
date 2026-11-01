@@ -2,10 +2,10 @@ package metadata
 
 import (
 	"fmt"
-
-	"github.com/kevenmiano/nestgo/httpadapter"
 	"reflect"
 	"sync"
+
+	"github.com/kevenmiano/nestgo/httpadapter"
 )
 
 type Parameter struct {
