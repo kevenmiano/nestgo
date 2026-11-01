@@ -135,7 +135,7 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 					out[k] = ' '
 				}
 			}
-			if name == "Body" || name == "Param" || name == "Query" || name == "Headers" {
+			if name == "Body" || name == "Param" || name == "Query" || name == "Headers" || name == "Res" || name == "Response" {
 				if name == "Res" || name == "Response" {
 					if argument != "" && argument != "{passthrough:true}" {
 						return "", nil, nil, Diagnostic{path, startLine, "@Res expects no argument or {passthrough:true}"}

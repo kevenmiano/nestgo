@@ -38,7 +38,7 @@ func (c *UsersController) Go(@Res({passthrough:true}) response string) string { 
 func TestResponseDecoratorValidation(t *testing.T) {
 	for _, tc := range []struct{ decorator, want string }{
 		{`@Header("X-One")`, "@Header"},
-		{`@Header("X-Test", "bad\\nvalue")`, "@Header"},
+		{`@Header("X-Test", "bad\nvalue")`, "@Header"},
 		{`@Redirect("/go", 200)`, "@Redirect"},
 		{`@Redirect("")`, "@Redirect"},
 		{`@Res({passthrough:false})`, "@Res"},
