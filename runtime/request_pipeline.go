@@ -147,7 +147,9 @@ func handleHTTPException(err error, exec httpadapter.ExecutionContext, filters [
 	}
 	var pipelineError *httpadapter.HTTPException
 	if errors.As(err,&pipelineError)&&pipelineError!=nil {
-		err=http.NewHTTPError(pipelineError.Status,pipelineError.Message)
+		message := pipelineError.Message
+		if pipelineError.Status >= 500 {message = "Internal server error"}
+		err=http.NewHTTPError(pipelineError.Status,message)
 	}
 	return http.WriteError(exec.Request,err)
 }
