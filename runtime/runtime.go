@@ -13,10 +13,6 @@ import (
 	"time"
 )
 
-func New(packages ...metadata.Package) (http.Handler, error) {
-	return NewWithOptions(Options{}, packages...)
-}
-
 // Options controls framework lifecycle diagnostics without affecting request handling.
 type Options struct {
 	Logger    *logging.Service
@@ -24,7 +20,7 @@ type Options struct {
 	Instances []any
 }
 
-func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler, error) {
+func newHandler(options Options, packages ...metadata.Package) (http.Handler, error) {
 	logger := options.Logger
 	if logger == nil {
 		logger = logging.New(logging.Config{MinLevel: logging.LevelInfo})
