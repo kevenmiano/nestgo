@@ -64,7 +64,7 @@ O módulo `config/viper` é opcional e não é importado automaticamente. DSNs e
 
 `@Repository(User, "users")` usa uma conexão nomeada. `CompileDir` gera `UsersRepositoryGenerated` e uma factory registrada no metadata; não é necessário chamar `NewGeneratedRepositories` manualmente. Um único `@Module` local assume o provider automaticamente. Para múltiplos módulos, declare exatamente um proprietário e configure `imports` / `exports`.
 
-**Limitação:** o SQL gerado ainda usa um dialeto único por compilação (PostgreSQL por padrão), **não** um dialeto por conexão. `database/sql` aceita PostgreSQL e MySQL simultaneamente, mas a geração de repositórios mistos precisa da issue #90.
+**Dialetos por conexão:** `CompileDir` mantém PostgreSQL como padrão para projetos simples. Para repositórios mistos, use `CompileDirWithDialects(dir, map[string]sqlgen.Dialect{"users": sqlgen.PostgreSQL, "billing": sqlgen.Question})` ou `go run ./cmd/modforge compile ./path --connection=users:postgres --connection=billing:mysql`. O compilador valida a associação ao `@Repository(Entity, "connection")`; ainda falta validar incompatibilidades entre dialeto compilado e driver configurado em runtime (#90).
 
 Somente `SELECT` com resultados `*Entity` / `[]Entity` é gerado atualmente. Escritas, DTOs arbitrários, relações, migrations e autocomplete permanecem nas issues #89, #91 e #93. `@Column` não é suportado.
 
