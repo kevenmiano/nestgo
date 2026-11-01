@@ -92,6 +92,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				routeResponseHeaders(responseCtx, spec)
 				replyRoute := spec
 				args := make([]reflect.Value, typ.NumIn())
+				if spec.StaticHTTP == nil {
 				for i := 0; i < typ.NumIn(); i++ {
 					t := typ.In(i)
 					v := reflect.New(t)
@@ -135,6 +136,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 						}
 					}
 					args[i] = v.Elem()
+				}
 				}
 				var result any
 				if spec.StaticHTTP != nil {
