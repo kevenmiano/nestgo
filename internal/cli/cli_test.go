@@ -15,7 +15,7 @@ func executeForTest(args ...string) (string, error) {
 	cmd := New()
 	cmd.SetOut(&output)
 	cmd.SetErr(&output)
-	cmd.SetArgs(args)
+	cmd.SetArgs(normalizeArgs(args))
 	err := cmd.Execute()
 	return output.String(), err
 }
@@ -99,5 +99,21 @@ func TestPrivateFlagsStayHidden(t *testing.T) {
 	}
 	if strings.Contains(output, "cold-child") {
 		t.Fatal("internal diagnostic benchmark child flag must not be documented")
+	}
+}
+
+func TestSingleDashDiagnosticFlagsRemainAccepted(t *testing.T) {
+	out := normalizeArgs([]string{"diagnose", "-example", "-cold-samples=0", "-strict", "--", "-app"})
+	want := []string{"diagnose", "--example", "--cold-samples=0", "--strict", "--", "-app"}
+	for i, value := range want {
+		if out[i] != value {
+			t.Fatalf("argument %d: got %q, want %q", i, out[i], value)
+		}
+	}
+	if _, err := executeForTest("diagnose", "-example", "-samples=1", "-iterations=1", "-cold-samples=0", "-out", t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := executeForTest("diagnose", "--example", "--samples=1", "--iterations=1", "--cold-samples=0", "--out", t.TempDir()); err != nil {
+		t.Fatal(err)
 	}
 }

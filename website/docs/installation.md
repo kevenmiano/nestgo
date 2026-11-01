@@ -15,7 +15,9 @@ nestgo --help
 nestgo compile ./myapp
 ```
 
-Read the [CLI guide](./cli/overview.md) for all commands, flags, completion and generated reference pages.\n\nFor reproducible builds, replace `@latest` with a published release tag such as `@v0.1.0`. Check [available releases](https://github.com/kevenmiano/nestgo/releases) before pinning a version.
+Read the [CLI guide](./cli/overview.md) for all commands, flags, completion and generated reference pages.
+
+For reproducible builds, replace `@latest` with a published release tag such as `@v0.1.0`. Check [available releases](https://github.com/kevenmiano/nestgo/releases) before pinning a version.
 
 :::tip Existing modforge users
 The original `modforge` executable remains available through `go install github.com/kevenmiano/nestgo/cmd/modforge@latest`.

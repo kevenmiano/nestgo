@@ -142,7 +142,9 @@ Features are evolving. Constructor injection, request-scoped providers, guards, 
 
 Read the [documentation portal](https://kevenmiano.github.io/nestgo/) or browse the [documentation sources](website/docs/). The site is built in CI; GitHub Pages publication currently happens through the separate release workflow.
 
-For all commands, diagnostic flags and shell completion, see the [CLI guide](website/docs/cli/overview.md). The Docusaurus command reference is generated from Cobra.\n\nAdditional references: [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
+For all commands, diagnostic flags and shell completion, see the [CLI guide](website/docs/cli/overview.md). The Docusaurus command reference is generated from Cobra.
+
+Additional references: [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
 
 ## Contributing
 

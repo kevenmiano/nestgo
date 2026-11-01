@@ -27,7 +27,9 @@ Re-run the compiler after changing `.mgo` files. Generate CLI reference with `go
 - `compiler/`: decorator parsing, validation and source generation.
 - `metadata/`: registration data structures.
 - `runtime/`: HTTP handling and dependency injection.
-- `internal/cli/`: Cobra command tree and CLI tests.\n- `cmd/nestgo/`: CLI entry point.\n- `cmd/nestgo-docs/`: generated CLI reference.
+- `internal/cli/`: Cobra command tree and CLI tests.
+- `cmd/nestgo/`: CLI entry point.
+- `cmd/nestgo-docs/`: generated CLI reference.
 - `examples/shop/`: runnable source example and tests.
 
 ## Commit conventions
