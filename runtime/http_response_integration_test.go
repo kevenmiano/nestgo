@@ -55,6 +55,15 @@ func (*responseTestController) Failure() (string, error) {
 	return "", http.NotFound("user missing")
 }
 func (*responseTestController) GenericFailure() (string, error) { return "", errors.New("secret") }
+func (*responseTestController) BuiltinError(code string) (any, error) {
+	switch code {
+	case "405": return nil, http.MethodNotAllowed()
+	case "421": return nil, http.Misdirected()
+	case "429": return nil, http.TooManyRequests("rate limit")
+	case "503": return nil, http.ServiceUnavailable()
+	default: return nil, http.BadRequest("unknown code")
+	}
+}
 
 func (*responseTestController) MissingWrite(w *http.Writer) {}
 func responseTestPackage() metadata.Package {
@@ -74,6 +83,7 @@ func responseTestPackage() metadata.Package {
 			{Method: "GET", Path: "/cookies", Handler: "Cookies"},
 			{Method: "GET", Path: "/error", Handler: "Failure"},
 			{Method: "GET", Path: "/generic-error", Handler: "GenericFailure"},
+			{Method: "GET", Path: "/builtin/{code}", Handler: "BuiltinError", Parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "code"}}},
 			{Method: "GET", Path: "/missing-write", Handler: "MissingWrite", Parameters: []metadata.Parameter{{Index: 0, Kind: "Res"}}},
 		},
 	}}}
@@ -128,6 +138,10 @@ func checkResponseCases(t *testing.T, base string) {
 		{"cookies", "/cookies", "", 200, `"cookie"` + "\n", "", "", "", 2},
 		{"error", "/error", "", 404, `{"statusCode":404,"message":"user missing"}` + "\n", "", "", "", 0},
 		{"generic", "/generic-error", "", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n", "", "", "", 0},
+		{"method-not-allowed", "/builtin/405", "", 405, `{"statusCode":405,"message":"Method Not Allowed"}` + "\n", "", "", "", 0},
+		{"misdirected", "/builtin/421", "", 421, `{"statusCode":421,"message":"Misdirected Request"}` + "\n", "", "", "", 0},
+		{"too-many-requests", "/builtin/429", "", 429, `{"statusCode":429,"message":"rate limit"}` + "\n", "", "", "", 0},
+		{"service-unavailable", "/builtin/503", "", 503, `{"statusCode":503,"message":"Service Unavailable"}` + "\n", "", "", "", 0},
 		{"missing-write", "/missing-write", "", 500, `{"statusCode":500,"message":"explicit @Res() handler did not write a response"}` + "\n", "", "", "", 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

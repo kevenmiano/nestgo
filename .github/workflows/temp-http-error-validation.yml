@@ -1,0 +1,34 @@
+name: Temporary HTTP error helpers verification
+on:
+  push:
+    branches: [feat/http-response-contract]
+permissions:
+  contents: write
+jobs:
+  format-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/http-response-contract
+          persist-credentials: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Format HTTP package and integration tests
+        run: |
+          gofmt -w http/response.go http/errors.go http/status.go http/errors_test.go http/status_test.go runtime/http_response_integration_test.go
+      - name: Run complete Go tests and vet
+        run: |
+          go test ./...
+          go vet ./...
+      - name: Commit formatting if necessary
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "style(http): format status constants and exception helpers"
+            git push origin HEAD:feat/http-response-contract
+          fi

@@ -105,11 +105,57 @@ func (c *UsersController) FindOne(@Param("id") id string) (any, error) {
 }
 ```
 
-Built-in typed errors: `NewHTTPError`, `BadRequest`, `Unauthorized`,
-`Forbidden`, `NotFound`, `Conflict`, `UnprocessableEntity` and
-`InternalServerError`. They serialize as
-`{"statusCode":404,"message":"..."}`. Unrecognized errors produce an
-opaque 500 JSON response; internal details are not exposed to clients.
+All NestJS built-in HTTP exception categories are available as small Go helpers, plus
+`TooManyRequests`. They are **functions**, not a separate class for each status:
+
+| Helper | Status constant |
+| --- | --- |
+| `http.BadRequest()` | `http.StatusBadRequest` |
+| `http.Unauthorized()` | `http.StatusUnauthorized` |
+| `http.Forbidden()` | `http.StatusForbidden` |
+| `http.NotFound()` | `http.StatusNotFound` |
+| `http.MethodNotAllowed()` | `http.StatusMethodNotAllowed` |
+| `http.NotAcceptable()` | `http.StatusNotAcceptable` |
+| `http.RequestTimeout()` | `http.StatusRequestTimeout` |
+| `http.Conflict()` | `http.StatusConflict` |
+| `http.Gone()` | `http.StatusGone` |
+| `http.PreconditionFailed()` | `http.StatusPreconditionFailed` |
+| `http.PayloadTooLarge()` | `http.StatusPayloadTooLarge` |
+| `http.UnsupportedMediaType()` | `http.StatusUnsupportedMediaType` |
+| `http.ImATeapot()` | `http.StatusIAmATeapot` |
+| `http.Misdirected()` | `http.StatusMisdirected` |
+| `http.UnprocessableEntity()` | `http.StatusUnprocessableEntity` |
+| `http.TooManyRequests()` | `http.StatusTooManyRequests` |
+| `http.InternalServerError()` | `http.StatusInternalServerError` |
+| `http.NotImplemented()` | `http.StatusNotImplemented` |
+| `http.BadGateway()` | `http.StatusBadGateway` |
+| `http.ServiceUnavailable()` | `http.StatusServiceUnavailable` |
+| `http.GatewayTimeout()` | `http.StatusGatewayTimeout` |
+| `http.HTTPVersionNotSupported()` | `http.StatusHTTPVersionNotSupported` |
+
+Call each helper with a custom message or without arguments to use the standard
+HTTP reason phrase. For instance:
+
+```go
+return nil, http.TooManyRequests("request quota exceeded")
+return nil, http.ServiceUnavailable()
+return nil, http.NewHTTPError(http.StatusLocked, "resource locked")
+```
+
+The package also exports the Go standard HTTP status constants
+(`StatusOK`, `StatusCreated`, `StatusNoContent`, `StatusNotFound`,
+`StatusTooManyRequests`, etc.) and useful NestJS naming aliases:
+`StatusPayloadTooLarge`, `StatusURITooLong`, `StatusIAmATeapot`,
+`StatusMisdirected` and `StatusAmbiguous`. All are integer constants
+matching their `net/http` values.
+
+Typed exceptions serialize as `{"statusCode":404,"message":"..."}`.
+Errors not recognized as `*http.HTTPError`, nil typed errors and invalid
+exception statuses use a generic 500 payload to avoid exposing internal
+details. An `HTTPError.Cause` is accessible via `errors.Unwrap` but
+is not sent to clients.
+
+See the [NestJS exception reference](https://docs.nestjs.com/exception-filters#built-in-http-exceptions).
 
 ## Architecture
 

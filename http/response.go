@@ -106,32 +106,6 @@ func (r Response[T]) WithCookie(cookie Cookie) Response[T] {
 	return r
 }
 
-// HTTPError is a typed error that retains its status across HTTP platforms.
-type HTTPError struct {
-	StatusCode int
-	Message    string
-	Cause      error
-}
-
-func (e *HTTPError) Error() string { return e.Message }
-func (e *HTTPError) Unwrap() error { return e.Cause }
-func NewHTTPError(status int, message string) *HTTPError {
-	return &HTTPError{StatusCode: status, Message: message}
-}
-func BadRequest(message string) *HTTPError { return NewHTTPError(stdhttp.StatusBadRequest, message) }
-func Unauthorized(message string) *HTTPError {
-	return NewHTTPError(stdhttp.StatusUnauthorized, message)
-}
-func Forbidden(message string) *HTTPError { return NewHTTPError(stdhttp.StatusForbidden, message) }
-func NotFound(message string) *HTTPError  { return NewHTTPError(stdhttp.StatusNotFound, message) }
-func Conflict(message string) *HTTPError  { return NewHTTPError(stdhttp.StatusConflict, message) }
-func UnprocessableEntity(message string) *HTTPError {
-	return NewHTTPError(stdhttp.StatusUnprocessableEntity, message)
-}
-func InternalServerError(message string) *HTTPError {
-	return NewHTTPError(stdhttp.StatusInternalServerError, message)
-}
-
 func validStatus(status int) bool { return status >= 100 && status <= 599 }
 
 func appendCookie(ctx Transport, c Cookie) error {
@@ -226,24 +200,18 @@ func Write(ctx Transport, value any, defaultStatus int) error {
 // Unrecognized errors are never returned to callers with an arbitrary status code.
 func WriteError(ctx Transport, err error) error {
 	var httpErr *HTTPError
-	if errors.As(err, &httpErr) {
+	if errors.As(err, &httpErr) && httpErr != nil &&
+		validStatus(httpErr.StatusCode) && httpErr.StatusCode >= StatusBadRequest {
 		status := httpErr.StatusCode
-		if !validStatus(status) {
-			status = stdhttp.StatusInternalServerError
-		}
-		message := httpErr.Message
-		if message == "" {
-			message = stdhttp.StatusText(status)
-		}
 		return Write(ctx, JSON(struct {
 			StatusCode int    `json:"statusCode"`
 			Message    string `json:"message"`
-		}{status, message}).WithStatus(status), status)
+		}{status, httpErr.Error()}).WithStatus(status), status)
 	}
 	return Write(ctx, JSON(struct {
 		StatusCode int    `json:"statusCode"`
 		Message    string `json:"message"`
-	}{stdhttp.StatusInternalServerError, "Internal server error"}).WithStatus(stdhttp.StatusInternalServerError), stdhttp.StatusInternalServerError)
+	}{StatusInternalServerError, "Internal server error"}).WithStatus(StatusInternalServerError), StatusInternalServerError)
 }
 
 // Writer supports explicit @Res() operations without exposing fasthttp or net/http.
