@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.0](https://github.com/kevenmiano/nestgo/compare/v1.0.1...v1.1.0) (2026-11-01)
+
+
+### Features
+
+* **cli:** versioned JSON diagnostics for compiler commands ([#168](https://github.com/kevenmiano/nestgo/issues/168)) ([2698902](https://github.com/kevenmiano/nestgo/commit/269890208c432fe0ce0b971a9783651b8721cd25))
+* **compiler:** selective incremental compilation for watch sessions ([#172](https://github.com/kevenmiano/nestgo/issues/172)) ([92bde53](https://github.com/kevenmiano/nestgo/commit/92bde5356e82d2a70cf8d33e3e553b26193961db))
+* **pipeline:** enforce compile-time interface contracts ([558eb25](https://github.com/kevenmiano/nestgo/commit/558eb251d7e24277c324df3f442d906a0591093c))
+
 ## [1.0.1](https://github.com/kevenmiano/nestgo/compare/v1.0.0...v1.0.1) (2026-11-01)
 
 
