@@ -66,7 +66,20 @@ func externalProviderExported(sourcePath, qualifier, provider string, imports []
 		return false, err
 	}
 	if len(paths) == 0 {
-		return true, nil // no source contract: runtime remains fail-closed
+		contract, err := readModuleContract(dir)
+		if err != nil {
+			return false, err
+		}
+		for _, moduleName := range selected {
+			public, exists := contract.Modules[moduleName]
+			if !exists {
+				continue
+			}
+			if containsModuleType(public.Providers, provider) && containsModuleType(public.Exports, provider) {
+				return true, nil
+			}
+		}
+		return false, nil
 	}
 	for _, filename := range paths {
 		raw, err := os.ReadFile(filename)

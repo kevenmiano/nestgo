@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "modules": {
+    "UsersModule": {
+      "providers": [],
+      "exports": []
+    }
+  }
+}
