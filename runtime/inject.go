@@ -33,9 +33,8 @@ func nilDependency(v reflect.Value) bool {
 
 // injectFields resolves dependencies before mutating any field. The explicit
 // nestgo:"inject" marker declares a required dependency; "optional" permits
-// an absent provider and "-" excludes a field from injection. Untagged
-// pointer/interface fields retain the existing implicit-required behavior
-// until migration of all generated packages and fixtures is complete.
+// an absent provider and "-" excludes a field from injection. Untagged fields
+// are never treated as dependencies; every injection must be explicitly marked.
 func injectFields(v reflect.Value, providers map[reflect.Type]reflect.Value, order []reflect.Type, visibility map[reflect.Type]map[reflect.Type]bool) error {
 	if !v.IsValid() || v.Kind() != reflect.Ptr || v.IsNil() || v.Elem().Kind() != reflect.Struct {
 		return fmt.Errorf("invalid injection target: expected non-nil pointer to struct")
@@ -51,7 +50,7 @@ func injectFields(v reflect.Value, providers map[reflect.Type]reflect.Value, ord
 		default:
 			return fmt.Errorf("invalid nestgo injection tag %q on %s.%s", marker, v.Elem().Type(), sf.Name)
 		}
-		if marker == "-" {
+		if marker == "" || marker == "-" {
 			continue
 		}
 		if sf.Anonymous || !field.CanSet() {
