@@ -49,6 +49,11 @@ func BenchmarkRouteLookup(b *testing.B) {
 			})
 		}
 		index := compileRoutes(routes)
+		byMethod := make(map[string][]httpadapter.Route)
+		for _, route := range routes {
+			key := fmt.Sprintf("%s %d", route.Method, segmentCount(route.Path))
+			byMethod[key] = append(byMethod[key], route)
+		}
 		target := fmt.Sprintf("/api/resource%d/42", count-1)
 		for _, benchmark := range []struct {
 			name string
@@ -65,10 +70,7 @@ func BenchmarkRouteLookup(b *testing.B) {
 			}},
 			{"current_main", func() bool {
 				segments := segmentCount(target)
-				for _, route := range routes {
-					if segmentCount(route.Path) != segments || route.Method != "GET" {
-						continue
-					}
+				for _, route := range byMethod[fmt.Sprintf("GET %d", segments)] {
 					if _, ok := match(route.Path, target); ok {
 						return true
 					}
