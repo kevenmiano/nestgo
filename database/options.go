@@ -17,6 +17,12 @@ type ConnectionOption func(*ConnectionOptions) error
 // Options is an immutable-by-convention bootstrap plan after New returns.
 type Options struct {
 	Connections []ConnectionOptions
+	factories []connectionFactory
+}
+
+type connectionFactory struct {
+	name string
+	build func(context.Context) (ConnectionOptions, error)
 }
 
 // NewModule builds a connection descriptor without opening sockets or reading env.
@@ -38,6 +44,12 @@ func NewModule(opts ...Option) (*Module, error) {
 		}
 		seen[conn.Name] = true
 	}
+	for _, factory := range plan.factories {
+		if strings.TrimSpace(factory.name) == "" || seen[factory.name] {
+			return nil, fmt.Errorf("database: empty or duplicate connection name %q", factory.name)
+		}
+		seen[factory.name] = true
+	}
 	return &Module{options: plan}, nil
 }
 
@@ -50,7 +62,22 @@ func (m *Module) Open(ctx context.Context) (*Connections, error) {
 	if m == nil {
 		return nil, errors.New("database: nil module")
 	}
-	return Bootstrap(ctx, append([]ConnectionOptions(nil), m.options.Connections...))
+	connections := append([]ConnectionOptions(nil), m.options.Connections...)
+	for _, factory := range m.options.factories {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		conn, err := factory.build(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("database: resolve connection %q: %w", factory.name, err)
+		}
+		if conn.Name != "" && conn.Name != factory.name {
+			return nil, fmt.Errorf("database: factory connection name mismatch for %q", factory.name)
+		}
+		conn.Name = factory.name
+		connections = append(connections, conn)
+	}
+	return Bootstrap(ctx, connections)
 }
 
 func WithConnection(name string, opts ...ConnectionOption) Option {
@@ -115,6 +142,18 @@ func WithPingTimeout(timeout time.Duration) ConnectionOption {
 			return errors.New("database: ping timeout must be positive")
 		}
 		c.PingTimeout = timeout
+		return nil
+	}
+}
+
+// WithConnectionFactory resolves connection settings at Open(ctx), allowing
+// dependency-aware bootstrap without JavaScript-style async constructors.
+func WithConnectionFactory(name string, build func(context.Context) (ConnectionOptions, error)) Option {
+	return func(plan *Options) error {
+		if strings.TrimSpace(name) == "" || build == nil {
+			return errors.New("database: factory name and callback required")
+		}
+		plan.factories = append(plan.factories, connectionFactory{name: name, build: build})
 		return nil
 	}
 }
