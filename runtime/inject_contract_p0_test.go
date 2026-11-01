@@ -11,6 +11,9 @@ import (
 
 type explicitRepo struct{}
 type absentRepo struct{}
+type unmarkedUserState struct {
+	Repo *explicitRepo
+}
 type explicitController struct {
 	Repo  *explicitRepo `nestgo:"inject"`
 	Extra *absentRepo   `nestgo:"-"`
@@ -45,6 +48,22 @@ type explicitUnexported struct {
 }
 type explicitNonPointer struct {
 	Count int `nestgo:"inject"`
+}
+
+func TestP0UnmarkedPointersAreNotDependencies(t *testing.T) {
+	target := &unmarkedUserState{}
+	repoType := reflect.TypeOf((*explicitRepo)(nil))
+	if err := injectFields(reflect.ValueOf(target), map[reflect.Type]reflect.Value{
+		repoType: reflect.ValueOf(&explicitRepo{}),
+	}, []reflect.Type{repoType}, nil); err != nil {
+		t.Fatalf("unmarked user field must not be injected: %v", err)
+	}
+	if target.Repo != nil {
+		t.Fatal("unmarked field should remain nil even if a matching provider exists")
+	}
+	if err := injectFields(reflect.ValueOf(&unmarkedUserState{}), nil, nil, nil); err != nil {
+		t.Fatalf("unmarked field must not require a registered provider: %v", err)
+	}
 }
 
 func TestP0InjectionMarkersAndControllerConstruction(t *testing.T) {
