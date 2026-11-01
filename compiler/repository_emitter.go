@@ -132,9 +132,10 @@ func GenerateRepository(def RepositoryDefinition) ([]byte, error) {
 		out.WriteString(columnCases.String())
 		fmt.Fprintf(&out, "default: return nil, fmt.Errorf(%q, column)\n}\n", "repository: unmapped result column %q")
 		out.WriteString("if seen[indexes[i]] { return nil, fmt.Errorf(\"repository: duplicate mapped result column %q\", column) }\nseen[indexes[i]] = true\n}\n")
-		// A separate destination array is required per row because sql.Rows.Scan
-		// needs pointers into each newly allocated typed entity.
-		scanRow := fmt.Sprintf("var row %s\ntargets := make([]any, len(indexes))\nfor i, index := range indexes {\nswitch index {\n%sdefault: return nil, fmt.Errorf(\"repository: invalid column index %%d\", index)\n}\n}\nif err := rows.Scan(targets...); err != nil { return nil, err }\n", def.Entity, scanCases.String())
+		// Reuse the destination slice across rows. Each iteration repoints it
+		// to the new typed entity before sql.Rows.Scan, avoiding per-row slices.
+		out.WriteString("targets := make([]any, len(indexes))\n")
+		scanRow := fmt.Sprintf("var row %s\nfor i, index := range indexes {\nswitch index {\n%sdefault: return nil, fmt.Errorf(\"repository: invalid column index %%d\", index)\n}\n}\nif err := rows.Scan(targets...); err != nil { return nil, err }\n", def.Entity, scanCases.String())
 		if method.Many {
 			fmt.Fprintf(&out, "result := make([]%s, 0)\nfor rows.Next() {\n", def.Entity)
 			out.WriteString(scanRow)
