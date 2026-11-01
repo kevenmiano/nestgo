@@ -23,12 +23,18 @@ type responseTestController struct{}
 func (*responseTestController) Typed() http.Response[map[string]string] {
 	return http.Created(map[string]string{"name": "Ada"}).WithHeader("X-Result", "typed").WithCookie(http.Cookie{Name: "one", Value: "1"})
 }
+
 type responseDTO struct {
 	ID string `json:"id"`
 }
-func (*responseTestController) TypedDTO() http.Response[responseDTO] { return http.OK(responseDTO{ID:"42"}) }
-func (*responseTestController) PlainDTO() responseDTO { return responseDTO{ID:"42"} }
-func (*responseTestController) DynamicResult() http.Result { return http.Accepted(responseDTO{ID:"42"}) }
+
+func (*responseTestController) TypedDTO() http.Response[responseDTO] {
+	return http.OK(responseDTO{ID: "42"})
+}
+func (*responseTestController) PlainDTO() responseDTO { return responseDTO{ID: "42"} }
+func (*responseTestController) DynamicResult() http.Result {
+	return http.Accepted(responseDTO{ID: "42"})
+}
 
 func (*responseTestController) Decorated(header string) string { return header }
 func (*responseTestController) StaticRedirect() string         { return "ignored" }

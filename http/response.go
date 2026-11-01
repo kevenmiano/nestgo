@@ -44,24 +44,24 @@ type Result interface {
 // responseData erases T only at the transport boundary, after the compiler
 // has checked the DTO type in controller signatures.
 type responseData struct {
-	StatusCode int
-	Body any
+	StatusCode  int
+	Body        any
 	ContentType string
-	Headers map[string]string
+	Headers     map[string]string
 	RedirectURL string
-	Cookies []Cookie
+	Cookies     []Cookie
 }
 
 // Response[T] describes an HTTP response with a statically typed body.
 // Go requires an explicit type argument for this type, but helper calls
 // infer T directly from their body argument.
 type Response[T any] struct {
-	StatusCode int
-	Body T
+	StatusCode  int
+	Body        T
 	ContentType string
-	Headers map[string]string
+	Headers     map[string]string
 	RedirectURL string
-	Cookies []Cookie
+	Cookies     []Cookie
 }
 
 func (r Response[T]) responseValue() responseData {
@@ -73,32 +73,36 @@ func (r Response[T]) responseValue() responseData {
 
 func (r Response[T]) RedirectTarget() string { return r.RedirectURL }
 
-func JSON[T any](body T) Response[T] { return Response[T]{Body:body} }
+func JSON[T any](body T) Response[T] { return Response[T]{Body: body} }
 func Text(body string) Response[string] {
 	return Response[string]{Body: body, ContentType: "text/plain; charset=utf-8"}
 }
-func OK[T any](body T) Response[T] { return JSON(body).WithStatus(stdhttp.StatusOK) }
-func Created[T any](body T) Response[T] { return JSON(body).WithStatus(stdhttp.StatusCreated) }
+func OK[T any](body T) Response[T]       { return JSON(body).WithStatus(stdhttp.StatusOK) }
+func Created[T any](body T) Response[T]  { return JSON(body).WithStatus(stdhttp.StatusCreated) }
 func Accepted[T any](body T) Response[T] { return JSON(body).WithStatus(stdhttp.StatusAccepted) }
-func NoContent() Response[any] { return Response[any]{StatusCode: stdhttp.StatusNoContent} }
+func NoContent() Response[any]           { return Response[any]{StatusCode: stdhttp.StatusNoContent} }
 func Redirect(url string, status ...int) Response[any] {
 	code := stdhttp.StatusFound
-	if len(status) > 0 { code = status[0] }
-	return Response[any]{StatusCode:code, RedirectURL:url}
+	if len(status) > 0 {
+		code = status[0]
+	}
+	return Response[any]{StatusCode: code, RedirectURL: url}
 }
 func (r Response[T]) WithStatus(code int) Response[T] {
-	r.StatusCode=code
+	r.StatusCode = code
 	return r
 }
-func (r Response[T]) WithHeader(name,value string) Response[T] {
-	clone:=make(map[string]string,len(r.Headers)+1)
-	for k,v:=range r.Headers {clone[k]=v}
-	clone[name]=value
-	r.Headers=clone
+func (r Response[T]) WithHeader(name, value string) Response[T] {
+	clone := make(map[string]string, len(r.Headers)+1)
+	for k, v := range r.Headers {
+		clone[k] = v
+	}
+	clone[name] = value
+	r.Headers = clone
 	return r
 }
 func (r Response[T]) WithCookie(cookie Cookie) Response[T] {
-	r.Cookies=append(append([]Cookie(nil),r.Cookies...),cookie)
+	r.Cookies = append(append([]Cookie(nil), r.Cookies...), cookie)
 	return r
 }
 
@@ -114,11 +118,13 @@ func (e *HTTPError) Unwrap() error { return e.Cause }
 func NewHTTPError(status int, message string) *HTTPError {
 	return &HTTPError{StatusCode: status, Message: message}
 }
-func BadRequest(message string) *HTTPError   { return NewHTTPError(stdhttp.StatusBadRequest, message) }
-func Unauthorized(message string) *HTTPError { return NewHTTPError(stdhttp.StatusUnauthorized, message) }
-func Forbidden(message string) *HTTPError    { return NewHTTPError(stdhttp.StatusForbidden, message) }
-func NotFound(message string) *HTTPError     { return NewHTTPError(stdhttp.StatusNotFound, message) }
-func Conflict(message string) *HTTPError     { return NewHTTPError(stdhttp.StatusConflict, message) }
+func BadRequest(message string) *HTTPError { return NewHTTPError(stdhttp.StatusBadRequest, message) }
+func Unauthorized(message string) *HTTPError {
+	return NewHTTPError(stdhttp.StatusUnauthorized, message)
+}
+func Forbidden(message string) *HTTPError { return NewHTTPError(stdhttp.StatusForbidden, message) }
+func NotFound(message string) *HTTPError  { return NewHTTPError(stdhttp.StatusNotFound, message) }
+func Conflict(message string) *HTTPError  { return NewHTTPError(stdhttp.StatusConflict, message) }
 func UnprocessableEntity(message string) *HTTPError {
 	return NewHTTPError(stdhttp.StatusUnprocessableEntity, message)
 }

@@ -114,22 +114,32 @@ type testDTO struct {
 }
 
 func TestGenericResponseInfersDTOAndSupportsPlainValues(t *testing.T) {
-	dto:=testDTO{ID:"42"}
+	dto := testDTO{ID: "42"}
 	// Compile-time check: OK infers Response[testDTO] without explicit [testDTO].
-	var typed Response[testDTO]=OK(dto).WithHeader("X-DTO","yes")
-	var generic Result=typed
-	var _ Result=Response[int]{Body:42}
-	for _,tc:=range []struct{value any;status int;body string}{
-		{generic,200,"{\"id\":\"42\"}\n"},
-		{dto,200,"{\"id\":\"42\"}\n"},
-		{JSON(42),200,"42\n"},
+	var typed Response[testDTO] = OK(dto).WithHeader("X-DTO", "yes")
+	var generic Result = typed
+	var _ Result = Response[int]{Body: 42}
+	for _, tc := range []struct {
+		value  any
+		status int
+		body   string
+	}{
+		{generic, 200, "{\"id\":\"42\"}\n"},
+		{dto, 200, "{\"id\":\"42\"}\n"},
+		{JSON(42), 200, "42\n"},
 	} {
-		f:=&fakeTransport{}
-		if err:=Write(f,tc.value,200);err!=nil {t.Fatal(err)}
-		if f.status!=tc.status||f.body!=tc.body {t.Errorf("got %d %q, want %d %q",f.status,f.body,tc.status,tc.body)}
+		f := &fakeTransport{}
+		if err := Write(f, tc.value, 200); err != nil {
+			t.Fatal(err)
+		}
+		if f.status != tc.status || f.body != tc.body {
+			t.Errorf("got %d %q, want %d %q", f.status, f.body, tc.status, tc.body)
+		}
 	}
 	// A typed-nil pointer must not cause a panic.
 	var missing *Response[testDTO]
-	f:=&fakeTransport{}
-	if err:=Write(f,missing,200);err!=nil||f.body!="null\n" {t.Fatalf("typed nil: %v, %q",err,f.body)}
+	f := &fakeTransport{}
+	if err := Write(f, missing, 200); err != nil || f.body != "null\n" {
+		t.Fatalf("typed nil: %v, %q", err, f.body)
+	}
 }
