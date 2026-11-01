@@ -5,11 +5,21 @@ import (
 	"strconv"
 )
 
-// A service receives generated repositories through explicit field injection.
+// The generated repositories satisfy ordinary Go interfaces. Depending on
+// the interfaces avoids referencing code that does not exist until compilation.
+type PostgresUserReader interface {
+	FindByID(ctx context.Context, id int64) (*PostgresUser, error)
+}
+
+type MySQLUserReader interface {
+	FindByID(ctx context.Context, id int64) (*MySQLUser, error)
+}
+
+// NestGo injects the generated concrete implementations through these contracts.
 @Injectable()
 type SQLUsersService struct {
-	Postgres *PostgresUsersRepositoryGenerated `nestgo:"inject"`
-	MySQL *MySQLUsersRepositoryGenerated `nestgo:"inject"`
+	Postgres PostgresUserReader `nestgo:"inject"`
+	MySQL MySQLUserReader `nestgo:"inject"`
 }
 
 func (s *SQLUsersService) FindPostgres(id int64) (*PostgresUser, error) {
