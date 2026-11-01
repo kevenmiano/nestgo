@@ -45,7 +45,7 @@ func CheckName(v string) error {if v=="blocked" { return errors.New("blocked") }
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"Validate() error", "__nestgo_validation.IsEmail(item)", "__nestgo_validation.IsCPF(item)", "__nestgo_validation.MatchRegexp(item", "__nestgo_validation.ApplyFunc[string](item,CheckName)", "__nestgo_regexp.MustCompile"} {
+	for _, expected := range []string{"Validate() error", "__nestgo_validation.IsEmail(item)", "__nestgo_validation.IsCPF(item)", "__nestgo_validation.MatchRegexp(item", "__nestgo_validation.ApplyFunc[string](item, CheckName)", "__nestgo_regexp.MustCompile"} {
 		if !strings.Contains(string(generated), expected) {
 			t.Fatalf("missing %s in generated DTO: %s", expected, generated)
 		}
