@@ -48,3 +48,4 @@ func TestSharedBootstrapGraphRejectsInvalidController(t *testing.T) {
 		t.Fatal("expected invalid controller error")
 	}
 }
+
