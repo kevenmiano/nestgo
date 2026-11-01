@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/kevenmiano/nestgo/httpadapter"
 	"github.com/kevenmiano/nestgo/metadata"
 	fastadapter "github.com/kevenmiano/nestgo/platform/fasthttp"
@@ -32,13 +31,9 @@ func NewApplication(options ApplicationOptions, packages ...metadata.Package) (*
 }
 
 func ApplicationFromRegistry(options ApplicationOptions, names ...string) (*Application, error) {
-	packages := make([]metadata.Package, 0, len(names))
-	for _, name := range names {
-		pkg, ok := metadata.Lookup(name)
-		if !ok {
-			return nil, fmt.Errorf("metadata package not found: %s", name)
-		}
-		packages = append(packages, pkg)
+	packages, err := registryImportClosure(names)
+	if err != nil {
+		return nil, err
 	}
 	return NewApplication(options, packages...)
 }
