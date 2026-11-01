@@ -37,7 +37,7 @@ GraphQL, persistence connectors, or arbitrary legacy factories. Runtime
 | External consumer using current SHA | #147, source-mode external-consumer workflow | Pending PR verification |
 | Tagged consumer through public proxy and checksum DB | #147, release-mode workflow | **Not yet verified for release tag** |
 | Race, vet, static checks, module integrity | `go-quality.yml`, `runtime-race-gates.yml` | CI gates; repeat on release SHA |
-| Route/bootstrap throughput regressions | Router and bootstrap comparative workflows | Partial; p95/p99 and 1/1000 matrix pending |
+| Route/bootstrap throughput regressions | `release-scale.yml` and immutable SHA artifacts: 1/10/100/1000 routes/providers, 3 samples, startup, p95/p99, throughput, allocations for both adapters | Measured in CI; acceptable regression thresholds and exact release SHA sign-off pending |
 | SIGTERM under in-flight load and timeout | Operational load test and trace | Pending |
 | GoReleaser, tags, docs publication | Release workflow evidence | Pending exact tag sign-off |
 | Security handling and disclosure | `SECURITY.md`, error-redaction tests | Guidance available; audit pending |
@@ -76,3 +76,31 @@ For a rollback, deploy the previous **verified immutable** tag and its matching
 configuration/artifacts. Do not force-move or overwrite a published tag. Verify
 external consumers and DB compatibility independently when introducing
 non-MVP adapters. Experimental v0 releases may still change APIs before v1.
+
+## Reproducing release-scale measurements
+
+The `.github/workflows/release-scale.yml` job runs `BenchmarkReleaseScale`
+for 1, 10, 100 and 1,000 routes and singleton providers on the **same** runner,
+for both `fasthttp` and `net/http`, using three repetitions:
+
+```sh
+GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkReleaseScale$' \
+  -benchtime=250ms -count=3 -benchmem -timeout=20m
+```
+
+The downloadable `release-scale-<sha>` artifact contains `environment.txt`
+(Go version, OS, architecture, CPU and commit SHA), raw `bench.txt`,
+machine-readable `summary.json` and a median `summary.md`. CI fails on
+missing or inconsistent samples. The `startup-ms` metric includes NestGo
+metadata/DI initialization and route registration, but excludes TCP listener
+initialization and request warmup. HTTP p95/p99 and throughput include the Go
+client, local TCP stack and adapter, so they are **not** isolated handler or
+routing costs. The 250 ms sample duration is useful for tracking regressions,
+not a high-confidence production load test.
+
+**Release sign-off is still blocked:** collect measurements for the exact
+candidate release SHA, compare them to an approved baseline on comparable
+hardware, define explicit allowed deviations for p95/p99, startup, throughput
+and allocations, then test under production-like concurrency and real
+ingress. Do not turn a successful benchmark run into an automatic performance
+SLA.
