@@ -32,10 +32,25 @@ func Compose[T any](steps ...Func[T]) Func[T] {
 	}
 }
 
-// PlainToInstance constructs a typed DTO from JSON. Generated property
-// decorators are applied through the DTO's UnmarshalJSON method.
-func PlainToInstance[T any](data []byte) (T, error) {
+// PlainToInstance constructs T from a plain value (map, slice or raw JSON).
+// All conversions pass through encoding/json to respect generated DTO property
+// decorators, including those on nested DTOs and DTOs within collections.
+// Raw []byte/json.RawMessage inputs are treated as JSON rather than base64.
+func PlainToInstance[T any](plain any) (T, error) {
 	var value T
+	var data []byte
+	switch input := plain.(type) {
+	case json.RawMessage:
+		data = input
+	case []byte:
+		data = input
+	default:
+		var err error
+		data, err = json.Marshal(plain)
+		if err != nil {
+			return value, err
+		}
+	}
 	if err := json.Unmarshal(data, &value); err != nil {
 		return value, err
 	}
