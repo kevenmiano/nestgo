@@ -14,7 +14,9 @@ import (
 var lifecycleEvents []string
 
 type lifecycleHookProvider struct{}
-type lifecycleHookController struct{ Provider *lifecycleHookProvider `nestgo:"inject"` }
+type lifecycleHookController struct {
+	Provider *lifecycleHookProvider `nestgo:"inject"`
+}
 
 func (*lifecycleHookProvider) OnModuleInit(context.Context) error {
 	lifecycleEvents = append(lifecycleEvents, "provider:init")
