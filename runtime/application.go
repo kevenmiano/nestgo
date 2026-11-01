@@ -21,6 +21,7 @@ type Option func(*applicationConfig)
 type applicationConfig struct {
 	adapter     httpadapter.Adapter
 	packages    []metadata.Package
+	routes      []Route
 	registry    []string
 	logger      *logging.Service
 	debug       bool
@@ -30,6 +31,21 @@ type applicationConfig struct {
 // WithPackages supplies already-generated metadata to the application.
 func WithPackages(packages ...metadata.Package) Option {
 	return func(c *applicationConfig) { c.packages = append(c.packages, packages...) }
+}
+
+// Context is the HTTP-engine-independent request context.
+type Context = httpadapter.Context
+
+// Handler handles an HTTP request without generated controller metadata.
+type Handler = httpadapter.Handler
+
+// Route declares an HTTP endpoint without the NestGo compiler.
+type Route = httpadapter.Route
+
+// WithRoutes registers ordinary Go HTTP handlers on the selected adapter.
+// These routes participate in the same bootstrap error handling and shutdown.
+func WithRoutes(routes ...Route) Option {
+	return func(c *applicationConfig) { c.routes = append(c.routes, routes...) }
 }
 
 // WithRegistry loads named registered packages and their transitive module imports.
@@ -116,7 +132,7 @@ func New(options ...Option) (*Application, error) {
 		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
 	}
 	registrationStarted := time.Now()
-	if err := registerRoutesWithLifecycle(adapter, packages, registry); err != nil {
+	if err := registerRoutesWithLifecycle(adapter, packages, registry, cfg.routes...); err != nil {
 		return fail(err)
 	}
 	registrationDuration := time.Since(registrationStarted)

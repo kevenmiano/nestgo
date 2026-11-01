@@ -46,8 +46,8 @@ func isParam(s string) bool {
 	return len(s) >= 3 && s[0] == '{' && s[len(s)-1] == '}'
 }
 
-// lookup preserves registration order for overlapping patterns and preserves
-// 405 semantics when a path exists for a different HTTP method.
+// lookup prefers more specific literal routes over wildcards, independent of
+// registration order, while preserving 405 for paths bound to other methods.
 func (idx routeIndex) lookup(method, path string) (httpadapter.Handler, map[string]string, bool) {
 	parts := splitPath(path)
 	bucket := idx[len(parts)]

@@ -87,9 +87,9 @@ func TestSecurityRuntimeServerErrorsDoNotLeak(t *testing.T) {
 		t.Fatal("nil application")
 	}
 	for _, tc := range []struct {
-		path string
+		path   string
 		status int
-		body string
+		body   string
 	}{
 		{"/regular", 500, "Internal server error\n"},
 		{"/typed-nil", 500, "Internal server error\n"},
