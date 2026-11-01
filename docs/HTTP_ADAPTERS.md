@@ -28,8 +28,7 @@ bootstrap and registers handlers independently of platform.
 
 **Native fast path:** the fasthttp platform uses `fasthttp.RequestCtx`
 without `fasthttpadaptor`; the standard-library platform uses
-`http.ServeMux`. The initial fasthttp path matcher is linear in route count;
-it must be replaced with an indexed router and benchmarked before release.
+`http.ServeMux`. The fasthttp adapter now builds a method/segment-count index during Serve startup and only scans matching buckets for common requests. This is not a fully indexed path trie; benchmark worst-case bucket sizes and route precedence before release.
 
 **Backward compatibility:** `runtime.New` and `runtime.FromRegistry`
 continue to return `http.Handler`; these legacy APIs remain on net/http.
