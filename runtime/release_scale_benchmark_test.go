@@ -23,7 +23,7 @@ import (
 // loopback transport and the Go client; it is not a pure route-lookup benchmark.
 func BenchmarkReleaseScale(b *testing.B) {
 	engines := []struct {
-		name string
+		name       string
 		newAdapter func() httpadapter.Adapter
 	}{
 		{"fasthttp", func() httpadapter.Adapter { return fastadapter.New() }},
@@ -36,7 +36,7 @@ func BenchmarkReleaseScale(b *testing.B) {
 			typ := reflect.StructOf([]reflect.StructField{{
 				Name: "Marker",
 				Type: reflect.TypeOf(0),
-				Tag: reflect.StructTag(fmt.Sprintf("id:%q", fmt.Sprint(i))),
+				Tag:  reflect.StructTag(fmt.Sprintf("id:%q", fmt.Sprint(i))),
 			}})
 			pkg.Providers = append(pkg.Providers, metadata.Provider{Type: reflect.PointerTo(typ)})
 			routes = append(routes, Route{
