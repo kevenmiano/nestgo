@@ -120,7 +120,7 @@ func lineOfOffset(fset *token.FileSet, file *ast.File, offset int) int {
 }
 
 func validateDTOField(path string, field DTOField) error {
-	var expose, exclude bool
+	var expose, exclude, excludeInput, excludeOutput bool
 	for _, annotation := range field.Annotations {
 		switch annotation.Name {
 		case "Expose":
@@ -134,16 +134,23 @@ func validateDTOField(path string, field DTOField) error {
 					return Diagnostic{path, annotation.Line, "@Expose expects a non-empty quoted JSON name"}
 				}
 			}
-		case "Exclude":
-			if exclude {
-				return Diagnostic{path, annotation.Line, "duplicate @Exclude"}
+		case "Exclude", "ExcludeInput", "ExcludeOutput":
+			if annotation.Argument != "" {
+				return Diagnostic{path, annotation.Line, "@" + annotation.Name + " takes no arguments; use @ExcludeInput() or @ExcludeOutput() to choose a direction"}
 			}
-			exclude = true
-			if annotation.Argument != "" && annotation.Argument != "\"toPlainOnly\"" && annotation.Argument != "\"toClassOnly\"" {
-				return Diagnostic{path, annotation.Line, "@Exclude expects \"toPlainOnly\" or \"toClassOnly\""}
+			switch annotation.Name {
+			case "Exclude":
+				if exclude { return Diagnostic{path, annotation.Line, "duplicate @Exclude"} }
+				exclude = true
+			case "ExcludeInput":
+				if excludeInput { return Diagnostic{path, annotation.Line, "duplicate @ExcludeInput"} }
+				excludeInput = true
+			case "ExcludeOutput":
+				if excludeOutput { return Diagnostic{path, annotation.Line, "duplicate @ExcludeOutput"} }
+				excludeOutput = true
 			}
-		case "Transform":
-			if _, _, err := transformerSpec(annotation.Argument); err != nil {
+		case "Transform", "TransformInput", "TransformOutput":
+			if _, err := transformerSpec(annotation.Argument); err != nil {
 				return Diagnostic{path, annotation.Line, err.Error()}
 			}
 		case "Type":
@@ -166,42 +173,34 @@ func validateDTOField(path string, field DTOField) error {
 	if expose && exclude {
 		return Diagnostic{path, field.Annotations[0].Line, "@Expose and @Exclude cannot decorate the same field"}
 	}
+	if exclude && (excludeInput || excludeOutput) {
+		return Diagnostic{path, field.Annotations[0].Line, "@Exclude cannot be combined with @ExcludeInput or @ExcludeOutput"}
+	}
 	return nil
 }
 
-// transform arguments are a Go function identifier (or package selector), with
-// an optional direction. Reject arbitrary expressions in generated code.
-func transformerSpec(argument string) (name, direction string, err error) {
-	direction = "both"
-	parts := strings.Split(argument, ",")
-	if len(parts) < 1 || len(parts) > 2 {
-		return "", "", fmt.Errorf("@Transform expects a function and optional direction")
-	}
-	name = strings.TrimSpace(parts[0])
-	expr, parseErr := parserExpr(name)
-	if parseErr != nil {
-		return "", "", fmt.Errorf("@Transform expects a function identifier")
+// transformerSpec accepts only a named Go function or package-qualified
+// function. Direction is explicit in the decorator name; string flags are
+// deliberately unsupported.
+func transformerSpec(argument string) (string, error) {
+	name := strings.TrimSpace(argument)
+	expr, err := parserExpr(name)
+	if err != nil {
+		return "", fmt.Errorf("@Transform expects one function identifier; use @TransformInput or @TransformOutput to select a direction")
 	}
 	switch expression := expr.(type) {
 	case *ast.Ident:
 		if expression.Name == "_" {
-			return "", "", fmt.Errorf("@Transform expects a function identifier")
+			return "", fmt.Errorf("@Transform expects a function identifier")
 		}
 	case *ast.SelectorExpr:
 		if _, ok := expression.X.(*ast.Ident); !ok {
-			return "", "", fmt.Errorf("@Transform expects a function identifier")
+			return "", fmt.Errorf("@Transform expects a function identifier")
 		}
 	default:
-		return "", "", fmt.Errorf("@Transform expects a function identifier")
+		return "", fmt.Errorf("@Transform expects a function identifier")
 	}
-	if len(parts) == 2 {
-		value, unquoteErr := strconv.Unquote(strings.TrimSpace(parts[1]))
-		if unquoteErr != nil || (value != "toClassOnly" && value != "toPlainOnly") {
-			return "", "", fmt.Errorf("@Transform direction must be \"toClassOnly\" or \"toPlainOnly\"")
-		}
-		direction = value
-	}
-	return name, direction, nil
+	return name, nil
 }
 
 // Kept separate from Parse so the lexer can retain the offsets of property markers.
@@ -210,12 +209,14 @@ func parserExpr(source string) (ast.Expr, error) {
 }
 
 func (field DTOField) excluded(direction string) bool {
-	for _, a := range field.Annotations {
-		if a.Name != "Exclude" {
-			continue
-		}
-		if a.Argument == "" || a.Argument == strconv.Quote(direction) {
+	for _, annotation := range field.Annotations {
+		switch annotation.Name {
+		case "Exclude":
 			return true
+		case "ExcludeInput":
+			if direction == "input" { return true }
+		case "ExcludeOutput":
+			if direction == "output" { return true }
 		}
 	}
 	return false
@@ -248,16 +249,16 @@ func propertyMethods(file *File) string {
 	var out strings.Builder
 	for _, dto := range file.DTOs {
 		fmt.Fprintf(&out, "\nfunc (value %s) MarshalJSON() ([]byte, error) {\n", dto.Name)
-		writeDTOJSONMethod(&out, dto, "toPlainOnly")
+		writeDTOJSONMethod(&out, dto, "output")
 		fmt.Fprintf(&out, "\nfunc (value *%s) UnmarshalJSON(data []byte) error {\n", dto.Name)
 		out.WriteString("if value == nil { return __nestgo_fmt.Errorf(\"cannot unmarshal into nil DTO\") }\n")
-		writeDTOJSONMethod(&out, dto, "toClassOnly")
+		writeDTOJSONMethod(&out, dto, "input")
 	}
 	return out.String()
 }
 
 func writeDTOJSONMethod(out *strings.Builder, dto DTO, direction string) {
-	encoding := direction == "toPlainOnly"
+	encoding := direction == "output"
 	type indexedField struct {
 		index int
 		field DTOField
@@ -287,13 +288,12 @@ func writeDTOJSONMethod(out *strings.Builder, dto DTO, direction string) {
 		}
 		n := 0
 		for _, a := range field.Annotations {
-			if a.Name != "Transform" {
+			if a.Name != "Transform" &&
+				!(a.Name == "TransformInput" && direction == "input") &&
+				!(a.Name == "TransformOutput" && direction == "output") {
 				continue
 			}
-			name, use, _ := transformerSpec(a.Argument)
-			if use != "both" && use != direction {
-				continue
-			}
+			name, _ := transformerSpec(a.Argument)
 			fmt.Fprintf(out, "next%d_%d, err%d_%d := %s(p%d)\n", i, n, i, n, name, i)
 			fmt.Fprintf(out, "if err%d_%d != nil { return ", i, n)
 			if encoding {
