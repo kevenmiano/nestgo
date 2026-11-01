@@ -94,9 +94,9 @@ func finishCompilerCommand(cmd *cobra.Command, format, command, successText stri
 	case "json":
 		report := DiagnosticReport{
 			SchemaVersion: diagnosticSchemaVersion,
-			Command: command,
-			OK: err == nil,
-			Diagnostics: diagnosticEntries(err),
+			Command:       command,
+			OK:            err == nil,
+			Diagnostics:   diagnosticEntries(err),
 		}
 		encoder := json.NewEncoder(cmd.OutOrStdout())
 		encoder.SetEscapeHTML(false)

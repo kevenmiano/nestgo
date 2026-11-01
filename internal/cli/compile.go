@@ -36,8 +36,8 @@ func newCompileCommand() *cobra.Command {
 				if cmd.Flags().Changed("poll-interval") {
 					return finishCompilerCommand(cmd, format, "compile", "", fmt.Errorf("--poll-interval requires --watch"))
 				}
-			err := compiler.CompileDir(path)
-			return finishCompilerCommand(cmd, format, "compile", "compiled "+path, err)
+				err := compiler.CompileDir(path)
+				return finishCompilerCommand(cmd, format, "compile", "compiled "+path, err)
 			}
 			if interval <= 0 {
 				return fmt.Errorf("--poll-interval must be positive")

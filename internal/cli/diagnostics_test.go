@@ -72,7 +72,10 @@ func TestJSONDiagnosticsForMissingAndOutdatedOutputs(t *testing.T) {
 }
 
 func TestJSONDiagnosticsForDecoratorsAndSyntax(t *testing.T) {
-	for _, tc := range []struct{ source, want string; line int }{
+	for _, tc := range []struct {
+		source, want string
+		line         int
+	}{
 		{"package sample\n@NoSuchDecorator()\ntype Foo struct{}\n", "NG1001", 2},
 		{"package sample\n@Injectable()\ntype Foo struct {\n", "NG1002", 3},
 	} {
