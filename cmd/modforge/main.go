@@ -36,7 +36,7 @@ func main() {
 		fmt.Println("generated", path)
 		return
 	}
-	if os.Args[1] != "compile" || len(os.Args) != 3 {
+	if os.Args[1] != "compile" || len(os.Args) < 3 {
 		usage()
 	}
 	path := os.Args[2]
@@ -52,7 +52,37 @@ func main() {
 		}
 		path = filepath.Dir(path)
 	}
-	if err := compiler.CompileDir(path); err != nil {
+	dialects := make(map[string]sqlgen.Dialect)
+	for _, flag := range os.Args[3:] {
+		if !strings.HasPrefix(flag, "--connection=") {
+			usage()
+		}
+		name, dialectName, ok := strings.Cut(strings.TrimPrefix(flag, "--connection="), ":")
+		if !ok || name == "" {
+			fmt.Fprintln(os.Stderr, "expected --connection=<name>:<postgres|mysql>")
+			os.Exit(2)
+		}
+		if _, exists := dialects[name]; exists {
+			fmt.Fprintln(os.Stderr, "duplicate connection dialect:", name)
+			os.Exit(2)
+		}
+		switch dialectName {
+		case "postgres":
+			dialects[name] = sqlgen.PostgreSQL
+		case "mysql":
+			dialects[name] = sqlgen.Question
+		default:
+			fmt.Fprintln(os.Stderr, "unsupported dialect for connection:", name)
+			os.Exit(2)
+		}
+	}
+	var err error
+	if len(dialects) > 0 {
+		err = compiler.CompileDirWithDialects(path, dialects)
+	} else {
+		err = compiler.CompileDir(path)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
@@ -60,6 +90,6 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: modforge compile <directory|file.mgo> | modforge compile-repository <file.mgo> <postgres|mysql>")
+	fmt.Fprintln(os.Stderr, "usage: modforge compile <directory|file.mgo> [--connection=<name>:<postgres|mysql> ...] | modforge compile-repository <file.mgo> <postgres|mysql>")
 	os.Exit(2)
 }
