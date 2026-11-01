@@ -113,3 +113,15 @@ func WithDebug() AppOption {
 		return nil
 	}
 }
+
+// WithRegistry includes compiled metadata packages by their registered names.
+func WithRegistry(names ...string) AppOption {
+	return func(o *appOptions) error {
+		packages, err := registryImportClosure(names)
+		if err != nil {
+			return err
+		}
+		o.packages = append(o.packages, packages...)
+		return nil
+	}
+}
