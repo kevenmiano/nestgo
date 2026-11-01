@@ -62,5 +62,5 @@ module-bound middleware classes. Errors from middleware reach only global
 [exception filters](./exception-filters.md).
 :::
 
-See the [runnable example](https://github.com/kevenmiano/nestgo/tree/feat/http-request-pipeline/examples/pipeline)
+See the [runnable example](https://github.com/kevenmiano/nestgo/tree/main/examples/pipeline)
 or the [request lifecycle](./request-pipeline.md).
