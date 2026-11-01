@@ -17,15 +17,24 @@ type bootstrapGraph struct {
 	visibility       map[reflect.Type]map[reflect.Type]bool
 }
 
-func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type), onPackage func()) (*bootstrapGraph, error) {
-	graph := &bootstrapGraph{providers: make(map[reflect.Type]reflect.Value)}
+func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type), onPackage func()) (bootstrapGraph, error) {
+	providerCount, controllerCount := 0, 0
+	for _, pkg := range packages {
+		providerCount += len(pkg.Providers)
+		controllerCount += len(pkg.Controllers)
+	}
+	graph := bootstrapGraph{
+		providers: make(map[reflect.Type]reflect.Value, providerCount),
+		orderedProviders: make([]reflect.Type, 0, providerCount),
+		controllers: make([]metadata.Controller, 0, controllerCount),
+	}
 	for _, pkg := range packages {
 		for _, p := range pkg.Providers {
 			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
-				return nil, fmt.Errorf("invalid provider %v: must be pointer to struct", p.Type)
+				return bootstrapGraph{}, fmt.Errorf("invalid provider %v: must be pointer to struct", p.Type)
 			}
 			if _, exists := graph.providers[p.Type]; exists {
-				return nil, fmt.Errorf("duplicate provider: %v", p.Type)
+				return bootstrapGraph{}, fmt.Errorf("duplicate provider: %v", p.Type)
 			}
 			graph.providers[p.Type] = reflect.New(p.Type.Elem())
 			graph.orderedProviders = append(graph.orderedProviders, p.Type)
@@ -40,7 +49,7 @@ func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type)
 	}
 	visibility, err := moduleVisibility(packages)
 	if err != nil {
-		return nil, err
+		return bootstrapGraph{}, err
 	}
 	graph.visibility = visibility
 	sort.Slice(graph.orderedProviders, func(i, j int) bool {
@@ -48,7 +57,7 @@ func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type)
 	})
 	for _, typ := range graph.orderedProviders {
 		if err := graph.inject(graph.providers[typ]); err != nil {
-			return nil, err
+			return bootstrapGraph{}, err
 		}
 	}
 	return graph, nil
