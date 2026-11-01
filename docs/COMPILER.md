@@ -99,6 +99,17 @@ A `validate` tag is a contract hint: it does not enable validation in the runtim
 
 **Boundary:** The generated assertion checks *compiled registry consistency*, not full runtime dependency construction or correct application behavior. The editable unit stubs do not automatically create mocks, start servers, or execute HTTP requests. Add dependency fakes and assertions as needed. Test generation adds no cost to a production binary because all generated tests live in `*_test.go` files.
 
+## Read-only compiler check
+
+```bash
+nestgo compile ./myapp
+nestgo check ./myapp
+```
+
+`nestgo check` runs the same source parsing, metadata generation, SQL repository generation and wiring-test generation as a normal compile, but compares compiler-owned artifacts **in memory** against existing files. It never writes to disk. Missing or changed output files result in `compiler.ErrOutdated` (nonzero CLI exit), with deterministic sorted file paths and a suggestion to recompile.
+
+Developer-owned `zz_nestgo_stubs_test.go` is intentionally excluded from equality checks: the compiler must not overwrite handwritten assertions or insist on a specific test body. A successful check verifies compiler-owned outputs, **not** behavioral correctness, and does not run `go test`. SQL dialect defaults match `CompileDir`; dedicated CLI dialect flags are not yet available.
+
 ## Known limitations
 
 - No recursive directory compilation.

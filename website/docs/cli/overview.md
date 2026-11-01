@@ -56,7 +56,19 @@ go build ./...
 go test ./...
 ```
 
-There is currently **no separate** `nestgo new`, `start`, `watch`, `generate`, `check`, or `test` subcommand; `--watch` is a flag on `compile`. Do not confuse this compiler with a long-running application server.
+There is currently **no separate** `nestgo new`, `start`, `watch`, `generate`, or `test` subcommand; `--watch` is a flag on `compile`. Do not confuse this compiler with a long-running application server.
+
+## Verify generated output in CI
+
+```bash
+nestgo compile ./myapp
+nestgo check ./myapp
+go test ./...
+```
+
+`nestgo check` validates decorated source and compares emitted Go metadata, module contracts, SQL repository outputs and generated wiring assertions with files already on disk. It exits unsuccessfully when files are stale or missing, printing their paths and a recompile hint. It **never writes files** and deliberately excludes editable test stubs from byte-for-byte comparison.
+
+You can run it against a `.mgo` file; like `compile`, it operates on the containing directory. Use the same compiler version for generation and checking. It is not a substitute for `go test`, and does not start application processes or execute application `init()` functions.
 
 ## Diagnose dependencies and startup
 

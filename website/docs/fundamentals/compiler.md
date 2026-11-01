@@ -27,6 +27,15 @@ Successful compilation also writes compiler-owned `zz_nestgo_wiring_generated_te
 
 See the [CLI guide](../cli/overview.md) for supported flags and [compiler reference](https://github.com/kevenmiano/nestgo/blob/main/docs/COMPILER.md) for details.
 
+## Verify generated artifacts
+
+```bash
+nestgo compile ./myapp
+nestgo check ./myapp
+```
+
+`check` is a read-only consistency gate for compiler-owned Go and metadata outputs. It detects missing or outdated generated files and prints a recompile instruction. Developer-edited test scaffolds are excluded by design. Use it in CI alongside `go test ./...`.
+
 ## Validation and invocation
 
 The compiler validates declared module references, local dependency graphs, interface matching in supported cases and malformed annotations. It generates optional `StaticInvoke` wrappers for conservative, zero-argument, single-result routes. Other method signatures use the reflective runtime path. The direct path is an optimization, not a removal of dynamic execution.
