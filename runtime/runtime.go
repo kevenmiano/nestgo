@@ -93,50 +93,50 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				replyRoute := spec
 				args := make([]reflect.Value, typ.NumIn())
 				if spec.StaticHTTP == nil {
-				for i := 0; i < typ.NumIn(); i++ {
-					t := typ.In(i)
-					v := reflect.New(t)
-					if p, ok := bindings[i]; ok {
-						switch p.Kind {
-						case "Body":
-							if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(v.Interface()); err != nil {
-								http.Error(w, "invalid JSON: "+err.Error(), 400)
+					for i := 0; i < typ.NumIn(); i++ {
+						t := typ.In(i)
+						v := reflect.New(t)
+						if p, ok := bindings[i]; ok {
+							switch p.Kind {
+							case "Body":
+								if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(v.Interface()); err != nil {
+									http.Error(w, "invalid JSON: "+err.Error(), 400)
+									return
+								}
+							case "Param":
+								if t.Kind() != reflect.String {
+									http.Error(w, "path parameter must be string", 500)
+									return
+								}
+								v.Elem().SetString(r.PathValue(p.Name))
+							case "Query":
+								if t.Kind() != reflect.String {
+									http.Error(w, "query parameter must be string", 500)
+									return
+								}
+								v.Elem().SetString(r.URL.Query().Get(p.Name))
+							case "Headers":
+								if t.Kind() != reflect.String {
+									http.Error(w, "header parameter must be string", 500)
+									return
+								}
+								v.Elem().SetString(r.Header.Get(p.Name))
+							case "Res", "Response":
+								v.Elem().Set(reflect.ValueOf(writer))
+							default:
+								http.Error(w, "unsupported parameter decorator", 500)
 								return
 							}
-						case "Param":
-							if t.Kind() != reflect.String {
-								http.Error(w, "path parameter must be string", 500)
-								return
+						} else {
+							for _, part := range strings.Split(spec.Path, "/") {
+								if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+									v.Elem().SetString(r.PathValue(strings.Trim(part, "{}")))
+									break
+								}
 							}
-							v.Elem().SetString(r.PathValue(p.Name))
-						case "Query":
-							if t.Kind() != reflect.String {
-								http.Error(w, "query parameter must be string", 500)
-								return
-							}
-							v.Elem().SetString(r.URL.Query().Get(p.Name))
-						case "Headers":
-							if t.Kind() != reflect.String {
-								http.Error(w, "header parameter must be string", 500)
-								return
-							}
-							v.Elem().SetString(r.Header.Get(p.Name))
-						case "Res", "Response":
-							v.Elem().Set(reflect.ValueOf(writer))
-						default:
-							http.Error(w, "unsupported parameter decorator", 500)
-							return
 						}
-					} else {
-						for _, part := range strings.Split(spec.Path, "/") {
-							if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
-								v.Elem().SetString(r.PathValue(strings.Trim(part, "{}")))
-								break
-							}
-						}
+						args[i] = v.Elem()
 					}
-					args[i] = v.Elem()
-				}
 				}
 				var result any
 				if spec.StaticHTTP != nil {
