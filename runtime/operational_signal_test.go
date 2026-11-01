@@ -173,9 +173,9 @@ func TestOperationalSIGTERMRealProcess(t *testing.T) {
 				}
 			}
 			type inflightResult struct {
-				body string
+				body   string
 				status int
-				err error
+				err    error
 			}
 			inflightDone := make(chan inflightResult, 1)
 			go func() {
