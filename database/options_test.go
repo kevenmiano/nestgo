@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewFunctionalOptions(t *testing.T) {
-	module, err := New(
+	module, err := NewModule(
 		WithConnection("users", WithDriver("postgres"), WithDSN("postgres://localhost/users"), WithMaxOpenConns(20), WithMaxIdleConns(5), WithPingTimeout(3*time.Second)),
 		WithConnection("billing", WithDriver("mysql"), WithDSN("billing-dsn")),
 	)
@@ -36,7 +36,7 @@ func TestNewFunctionalOptionsInvalid(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := New(tc.opts...); err == nil {
+			if _, err := NewModule(tc.opts...); err == nil {
 				t.Fatal("expected validation error")
 			}
 		})
