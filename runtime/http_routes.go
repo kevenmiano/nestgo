@@ -7,7 +7,6 @@ import (
 	"github.com/kevenmiano/nestgo/httpadapter"
 	"github.com/kevenmiano/nestgo/metadata"
 	"reflect"
-	"sort"
 	"strings"
 )
 
