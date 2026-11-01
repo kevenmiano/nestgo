@@ -1,0 +1,46 @@
+name: HTTP security behind Nginx
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/**'
+      - 'platform/**'
+      - 'httpadapter/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/security-nginx-proxy.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/**'
+      - 'platform/**'
+      - 'httpadapter/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/security-nginx-proxy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nginx:
+    name: Local Nginx reverse-proxy security boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Install Nginx
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y nginx
+          nginx -v
+      - name: HTTP framing and limit integration tests
+        env:
+          NESTGO_NGINX_E2E: "1"
+        run: go test ./runtime -run '^TestNginxProxySecurityBoundaries$' -count=1 -v -timeout=120s
