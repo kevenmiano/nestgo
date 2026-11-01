@@ -30,6 +30,23 @@ jobs:
           mkdir -p benchmark-results
           go version | tee benchmark-results/environment.txt
           GOMAXPROCS=2 go test ./platform/fasthttp -run '^$' -bench '^BenchmarkRouteLookup$' -benchmem -count=5 -benchtime=300ms | tee benchmark-results/router.txt
+      - name: Benchmark literal route registration (1, 10, 100, 1000 routes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOMAXPROCS=2 go test ./platform/fasthttp -run '^
+        if: always()
+        with:
+          name: router-comparison-${{ github.sha }}
+          path: benchmark-results/
+          retention-days: 30
+ -bench '^BenchmarkRegisterLiteralRoutes
+        if: always()
+        with:
+          name: router-comparison-${{ github.sha }}
+          path: benchmark-results/
+          retention-days: 30
+ -benchmem -count=3 -benchtime=300ms | tee benchmark-results/registration.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
