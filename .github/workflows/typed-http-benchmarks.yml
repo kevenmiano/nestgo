@@ -1,0 +1,49 @@
+name: Typed HTTP dispatch performance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'compiler/**'
+      - 'metadata/**'
+      - 'httpadapter/**'
+      - 'runtime/**'
+      - '.github/workflows/typed-http-benchmarks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test compiler and runtime
+        run: go test ./compiler ./runtime ./httpadapter -count=1
+      - name: Benchmark identical handlers with typed and reflective bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          { go version; uname -a; } > results/environment.txt
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPBinding$' -benchtime=500ms -benchmem -count=5 | tee results/binding.txt
+      - name: Capture isolated CPU and allocation profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPBinding/(path|body|query)' -benchtime=500ms -count=1 -cpuprofile=results/binding.cpu.pprof | tee results/profile-cpu.txt
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPBinding/(path|body|query)' -benchtime=500ms -count=1 -memprofile=results/binding.heap.pprof -memprofilerate=512 | tee results/profile-alloc.txt
+          go tool pprof -top -nodecount=25 results/binding.cpu.pprof > results/cpu-top.txt
+          go tool pprof -alloc_space -top -nodecount=25 results/binding.heap.pprof > results/alloc-top.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: typed-http-comparison-${{ github.sha }}
+          path: results/
+          retention-days: 30
