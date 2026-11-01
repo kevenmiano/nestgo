@@ -43,3 +43,23 @@ func TestCustomAndErrors(t *testing.T) {
 		t.Fatal("missing error")
 	}
 }
+
+func BenchmarkIsCPF(b *testing.B) {
+	value := "529.982.247-25"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if !IsCPF(value) {
+			b.Fatal("valid CPF rejected")
+		}
+	}
+}
+
+func BenchmarkIsEmail(b *testing.B) {
+	value := "ada@example.com"
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		if !IsEmail(value) {
+			b.Fatal("valid email rejected")
+		}
+	}
+}
