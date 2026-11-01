@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -91,5 +92,61 @@ func TestCompiledRootDiscoveryRejectsMissingImportedModule(t *testing.T) {
 	}
 	if _, err := moduleVisibility(pkgs); err == nil || !strings.Contains(err.Error(), "imports unknown module") {
 		t.Fatalf("expected missing module diagnostic, got %v", err)
+	}
+}
+
+func compiledBenchmarkGraph(n int) map[string]metadata.Package {
+	packages := make(map[string]metadata.Package, n)
+	types := make([]reflect.Type, n)
+	for i := range types {
+		types[i] = reflect.ArrayOf(i+1, reflect.TypeOf(byte(0)))
+	}
+	for i, typ := range types {
+		name := fmt.Sprintf("compiled_%03d", i)
+		var imports []reflect.Type
+		if i > 0 {
+			imports = []reflect.Type{types[i-1]}
+		}
+		packages[name] = metadata.Package{Modules: []metadata.Module{{Type: typ, Imports: imports}}}
+	}
+	return packages
+}
+
+func TestCompiledDiscoveryScalesAndMatchesExplicitClosure(t *testing.T) {
+	for _, n := range []int{1, 10, 100} {
+		packages := compiledBenchmarkGraph(n)
+		got, err := compiledRootClosure(packages, packages)
+		if err != nil {
+			t.Fatal(err)
+		}
+		root := fmt.Sprintf("compiled_%03d", n-1)
+		want, err := registryImportClosureFrom([]string{root}, packages)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != len(want) {
+			t.Fatalf("%d modules: discovered %d packages, explicit closure %d", n, len(got), len(want))
+		}
+		for i := range got {
+			if got[i].Modules[0].Type != want[i].Modules[0].Type {
+				t.Fatalf("%d modules: package order mismatch at %d", n, i)
+			}
+		}
+	}
+}
+
+func BenchmarkCompiledModuleDiscovery(b *testing.B) {
+	for _, count := range []int{1, 10, 100} {
+		b.Run(fmt.Sprintf("modules_%d", count), func(b *testing.B) {
+			compiled := compiledBenchmarkGraph(count)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				packages, err := compiledRootClosure(compiled, compiled)
+				if err != nil || len(packages) != count {
+					b.Fatalf("expected %d modules, got %d: %v", count, len(packages), err)
+				}
+			}
+		})
 	}
 }
