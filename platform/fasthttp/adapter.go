@@ -12,12 +12,14 @@ import (
 )
 
 type Adapter struct {
-	mu      sync.Mutex
-	routes  []httpadapter.Route
-	keys    map[string]bool
-	server  *fast.Server
-	limits  httpadapter.ServerLimits
-	started bool
+	mu          sync.Mutex
+	routes      []httpadapter.Route
+	keys        map[string]bool
+	literalKeys map[string]bool
+	server      *fast.Server
+	limits      httpadapter.ServerLimits
+	hasDynamic  bool
+	started     bool
 }
 
 var _ httpadapter.Adapter = (*Adapter)(nil)
@@ -31,7 +33,7 @@ func WithLimits(limits httpadapter.ServerLimits) Option {
 }
 
 func New(options ...Option) *Adapter {
-	a := &Adapter{keys: map[string]bool{}, limits: httpadapter.DefaultServerLimits()}
+	a := &Adapter{keys: map[string]bool{}, literalKeys: map[string]bool{}, limits: httpadapter.DefaultServerLimits()}
 	for _, option := range options {
 		if option != nil {
 			option(a)
@@ -52,17 +54,37 @@ func (a *Adapter) Register(route httpadapter.Route) error {
 	if a.keys[key] {
 		return errors.New("duplicate HTTP route: " + key)
 	}
-	for _, existing := range a.routes {
-		if existing.Method != route.Method {
-			continue
-		}
-		overlaps, aMore, bMore := routeOverlap(existing.Path, route.Path)
-		if overlaps && aMore == bMore {
-			return errors.New("ambiguous HTTP routes: " + existing.Path + " and " + route.Path)
+	// Two purely literal routes cannot overlap unless they are identical;
+	// that exact duplicate was already rejected by the constant-time key map.
+	// Keep exhaustive checking for new dynamic patterns and when previously
+	// registered dynamic routes could intersect a new literal route.
+	dynamic := strings.Contains(route.Path, "{")
+	// The indexed router trims leading and trailing slashes. Preserve the
+	// previous fail-closed rule for aliases like /users/me and /users/me/.
+	canonical := route.Method + " " + strings.Trim(route.Path, "/")
+	if !dynamic && a.literalKeys[canonical] {
+		return errors.New("ambiguous HTTP routes: normalized literal path " + canonical)
+	}
+	if dynamic || a.hasDynamic {
+		for _, existing := range a.routes {
+			if existing.Method != route.Method {
+				continue
+			}
+			if !dynamic && !strings.Contains(existing.Path, "{") {
+				continue
+			}
+			overlaps, aMore, bMore := routeOverlap(existing.Path, route.Path)
+			if overlaps && aMore == bMore {
+				return errors.New("ambiguous HTTP routes: " + existing.Path + " and " + route.Path)
+			}
 		}
 	}
 	a.keys[key] = true
 	a.routes = append(a.routes, route)
+	if !dynamic {
+		a.literalKeys[canonical] = true
+	}
+	a.hasDynamic = a.hasDynamic || dynamic
 	return nil
 }
 func (a *Adapter) Serve(listener net.Listener) error {
