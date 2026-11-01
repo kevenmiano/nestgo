@@ -18,7 +18,7 @@ import (
 
 // wiringTestSource generates assertions against the exact registry emitted by
 // Generate. The output is owned by the compiler and may be regenerated.
-func wiringTestSource(files []*File) ([]byte, error) {
+func wiringTestSource(files []*File, repositories ...RepositoryDefinition) ([]byte, error) {
 	if len(files) == 0 {
 		return nil, fmt.Errorf("no source files")
 	}
@@ -58,6 +58,11 @@ func wiringTestSource(files []*File) ([]byte, error) {
 				}
 			}
 		}
+	}
+	// The module also owns compiled repository factories. Count them in the
+	// generated wiring acceptance test, not only @Injectable source types.
+	for _, repository := range repositories {
+		providers = append(providers, repository.Name+"Generated")
 	}
 	for _, file := range files {
 		for _, decl := range file.Declarations {
