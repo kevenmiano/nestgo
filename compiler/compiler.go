@@ -3,6 +3,7 @@ package compiler
 import (
 	"bytes"
 	"fmt"
+	"github.com/kevenmiano/nestgo/database/sqlgen"
 	"go/ast"
 	"go/format"
 	"go/parser"
@@ -44,7 +45,7 @@ type File struct {
 	Declarations          []Declaration
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Header": true, "Redirect": true, "Res": true, "Response": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Header": true, "Redirect": true, "Res": true, "Response": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Entity": true, "Repository": true}
 
 func Parse(path string, src []byte) (*File, error) {
 	source, annotations, paramMarkers, err := lexDecorators(path, src)
@@ -87,7 +88,7 @@ func Parse(path string, src []byte) (*File, error) {
 			}
 			d := Declaration{Name: spec.Name.Name, Kind: "type", Annotations: ann}
 			for _, a := range ann {
-				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" && a.Name != "Imports" && a.Name != "Exports" {
+				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" && a.Name != "Imports" && a.Name != "Exports" && a.Name != "Entity" && a.Name != "Repository" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a type"}
 				}
 			}
@@ -107,7 +108,7 @@ func Parse(path string, src []byte) (*File, error) {
 				}
 			}
 			for _, a := range ann {
-				if !isRoute(a.Name) && a.Name != "HttpCode" && a.Name != "Header" && a.Name != "Redirect" {
+				if !isRoute(a.Name) && a.Name != "HttpCode" && a.Name != "Header" && a.Name != "Redirect" && a.Name != "Query" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a function"}
 				}
 			}
@@ -255,6 +256,10 @@ func arg(a Annotation, def string) (string, error) {
 	return s, nil
 }
 func Generate(files []*File) ([]byte, error) {
+	return generateMetadata(files, false)
+}
+
+func generateMetadata(files []*File, allowPersistence bool, repositories ...RepositoryDefinition) ([]byte, error) {
 	if len(files) == 0 {
 		return nil, fmt.Errorf("no source files")
 	}
@@ -262,6 +267,18 @@ func Generate(files []*File) ([]byte, error) {
 	for _, f := range files {
 		if f.Package != pkg {
 			return nil, fmt.Errorf("mixed packages: %s and %s", pkg, f.Package)
+		}
+	}
+	// Fail closed until the repository emitter and provider wiring are present.
+	// Accepting annotations without generating executable repositories would
+	// create a false sense of persistence support.
+	for _, file := range files {
+		for _, declaration := range file.Declarations {
+			for _, annotation := range declaration.Annotations {
+				if !allowPersistence && (annotation.Name == "Entity" || annotation.Name == "Repository" || (annotation.Name == "Query" && declaration.Kind == "func")) {
+					return nil, Diagnostic{File: file.Path, Line: annotation.Line, Message: "persistence code generation is not yet implemented; refusing to silently ignore @" + annotation.Name}
+				}
+			}
 		}
 	}
 	controllers := map[string]string{}
@@ -295,6 +312,17 @@ func Generate(files []*File) ([]byte, error) {
 				}
 			}
 		}
+	}
+	for _, repository := range repositories {
+		if repository.Connection == "" {
+			return nil, fmt.Errorf("repository: %s must declare a named connection for DI", repository.Name)
+		}
+		generatedType := repository.Name + "Generated"
+		if providerNames[generatedType] {
+			return nil, fmt.Errorf("repository: duplicate provider %s", generatedType)
+		}
+		providerNames[generatedType] = true
+		providers = append(providers, fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)),Scope:"singleton",Factory:func(resolve func(reflect.Type)(any,bool))(any,error){value,ok:=resolve(reflect.TypeOf((*database.Connections)(nil)));if !ok{return nil,fmt.Errorf("repository %s: database connections not initialized")};return New%sGeneratedFromConnections(value.(*database.Connections))}}`, generatedType, repository.Name, repository.Name))
 	}
 	if err := validateRequiredConcreteDependencies(files, providerNames, controllers); err != nil {
 		return nil, err
@@ -334,6 +362,23 @@ func Generate(files []*File) ([]byte, error) {
 			options, err := parseModuleOptions(f.Path, *moduleAnnotation, d.Name)
 			if err != nil {
 				return nil, err
+			}
+			// A single local module owns generated repositories by default.
+			// With multiple modules the declaration must choose the owner explicitly.
+			for _, repository := range repositories {
+				typ := repository.Name + "Generated"
+				if len(moduleNames) == 1 {
+					found := false
+					for _, name := range options.Providers {
+						if name == typ {
+							found = true
+						}
+					}
+					if !found {
+						options.Providers = append(options.Providers, typ)
+					}
+					sortStrings(options.Providers)
+				}
 			}
 			if err := validateModuleOptions(f.Path, moduleAnnotation.Line, options, moduleNames, providerNames, controllerTypeNames(controllers)); err != nil {
 				return nil, err
@@ -378,7 +423,7 @@ func Generate(files []*File) ([]byte, error) {
 			for _, n := range exportNames {
 				exportsCode = append(exportsCode, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n))
 			}
-			if len(imports) == 0 && len(exports) == 0 && !strings.HasPrefix(strings.TrimSpace(moduleAnnotation.Argument), "{") {
+			if len(repositories) == 0 && len(imports) == 0 && len(exports) == 0 && !strings.HasPrefix(strings.TrimSpace(moduleAnnotation.Argument), "{") {
 				// Preserve exact legacy generated metadata for plain @Module.
 				modules = append(modules, fmt.Sprintf(`{Type: reflect.TypeOf((*%s)(nil)), Name: %q}`, d.Name, name))
 			} else {
@@ -392,6 +437,22 @@ func Generate(files []*File) ([]byte, error) {
 				}
 				modules = append(modules, fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)), Name:%q, Imports:[]reflect.Type{%s}, Providers:[]reflect.Type{%s}, Controllers:[]reflect.Type{%s}, Exports:[]reflect.Type{%s}}`,
 					d.Name, name, strings.Join(importsCode, ","), strings.Join(providerCodes, ","), strings.Join(controllerCodes, ","), strings.Join(exportsCode, ",")))
+			}
+		}
+	}
+	if len(moduleNames) > 1 {
+		for _, repository := range repositories {
+			generated := repository.Name + "Generated"
+			owners := 0
+			for _, contract := range moduleContracts {
+				for _, provider := range contract.Providers {
+					if provider == generated {
+						owners++
+					}
+				}
+			}
+			if owners != 1 {
+				return nil, fmt.Errorf("repository %s: expected exactly one owning @Module provider, got %d", generated, owners)
 			}
 		}
 	}
@@ -478,6 +539,9 @@ func Generate(files []*File) ([]byte, error) {
 	}
 	var out strings.Builder
 	out.WriteString("// Code generated by NestGo compiler. DO NOT EDIT.\npackage " + pkg + "\n\nimport (\n\"reflect\"\n\"github.com/kevenmiano/nestgo/metadata\"\n")
+	if len(repositories) > 0 {
+		out.WriteString("\"fmt\"\n\"github.com/kevenmiano/nestgo/database\"\n")
+	}
 	if needsHTTPAdapter {
 		out.WriteString("\"github.com/kevenmiano/nestgo/httpadapter\"\n")
 	}
@@ -485,7 +549,7 @@ func Generate(files []*File) ([]byte, error) {
 	for _, imported := range qualifiedImports {
 		out.WriteString("import " + imported + "\n")
 	}
-	out.WriteString("func init() { metadata.Register(")
+	out.WriteString("func init() { metadata.RegisterCompiled(")
 	out.WriteString(strconv.Quote(pkg))
 	out.WriteString(", metadata.Package{\nControllers: []metadata.Controller{\n")
 	names := make([]string, 0, len(controllers))
@@ -551,6 +615,36 @@ func sortStrings(a []string) {
 	}
 }
 func CompileDir(dir string) error {
+	return CompileDirWithDialect(dir, sqlgen.PostgreSQL)
+}
+
+// CompileDirWithDialect compiles repositories with one explicitly chosen dialect.
+func CompileDirWithDialect(dir string, dialect sqlgen.Dialect) error {
+	return compileDirWithDialectPlan(dir, dialect, nil)
+}
+
+// CompileDirWithDialects binds generated SQL to the named connection in each
+// @Repository declaration. It rejects missing mappings rather than accidentally
+// generating PostgreSQL placeholders for a MySQL repository.
+func CompileDirWithDialects(dir string, dialects map[string]sqlgen.Dialect) error {
+	if len(dialects) == 0 {
+		return fmt.Errorf("compiler: connection dialect mappings required")
+	}
+	for name, dialect := range dialects {
+		if !schemaIdentifier(name) {
+			return fmt.Errorf("compiler: invalid connection name %q", name)
+		}
+		if dialect != sqlgen.PostgreSQL && dialect != sqlgen.Question {
+			return fmt.Errorf("compiler: invalid SQL dialect for connection %q", name)
+		}
+	}
+	return compileDirWithDialectPlan(dir, sqlgen.PostgreSQL, dialects)
+}
+
+func compileDirWithDialectPlan(dir string, dialect sqlgen.Dialect, dialects map[string]sqlgen.Dialect) error {
+	if dialect != sqlgen.PostgreSQL && dialect != sqlgen.Question {
+		return fmt.Errorf("compiler: unsupported SQL dialect %d", dialect)
+	}
 	paths, err := filepath.Glob(filepath.Join(dir, "*.mgo"))
 	if err != nil {
 		return err
@@ -570,7 +664,66 @@ func CompileDir(dir string) error {
 		}
 		files = append(files, file)
 	}
-	registry, err := Generate(files)
+	repositoryFiles := make(map[string][]byte)
+	var repositoryDefinitions []RepositoryDefinition
+	for _, file := range files {
+		hasRepo := false
+		for _, declaration := range file.Declarations {
+			for _, annotation := range declaration.Annotations {
+				switch annotation.Name {
+				case "Repository":
+					hasRepo = true
+				case "Entity":
+					// Entity metadata is not yet emitted. It is only supported as
+					// a local model for a compiled repository in this file.
+				case "Query":
+					if declaration.Kind == "func" {
+						matched := false
+						for _, candidate := range file.Declarations {
+							if candidate.Kind != "type" || candidate.Name != declaration.Receiver {
+								continue
+							}
+							for _, a := range candidate.Annotations {
+								if a.Name == "Repository" {
+									matched = true
+								}
+							}
+						}
+						if !matched {
+							return Diagnostic{File: file.Path, Line: annotation.Line, Message: "@Query requires a local @Repository receiver"}
+						}
+					}
+				}
+			}
+		}
+		if hasRepo {
+			def, err := RepositoryFromMGO(file, dialect)
+			if err != nil {
+				return err
+			}
+			if dialects != nil {
+				resolved, ok := dialects[def.Connection]
+				if !ok {
+					return fmt.Errorf("repository %s: missing SQL dialect for connection %q", def.Name, def.Connection)
+				}
+				def.Dialect = resolved
+			}
+			generated, err := GenerateRepository(def)
+			if err != nil {
+				return err
+			}
+			repositoryDefinitions = append(repositoryDefinitions, def)
+			repositoryFiles[strings.TrimSuffix(file.Path, ".mgo")+"_repository_generated.go"] = generated
+		}
+	}
+	if len(repositoryDefinitions) > 0 {
+		providers, err := GenerateRepositoryProviders(files[0].Package, repositoryDefinitions)
+		if err != nil {
+			return err
+		}
+		repositoryFiles[filepath.Join(dir, "zz_modforge_repositories.go")] = providers
+	}
+	registry, err := generateMetadata(files, true, repositoryDefinitions...)
 	if err != nil {
 		return err
 	}
@@ -598,6 +751,11 @@ func CompileDir(dir string) error {
 	}
 	if err := writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry); err != nil {
 		return err
+	}
+	for target, source := range repositoryFiles {
+		if err := writeIfChanged(target, source); err != nil {
+			return err
+		}
 	}
 	return writeIfChanged(filepath.Join(dir, moduleContractFile), append(contract, '\n'))
 }
