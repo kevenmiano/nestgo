@@ -42,7 +42,6 @@ func TestGenerateRepositoryRejectsUnsafeSQLAndNames(t *testing.T) {
 	}
 }
 
-
 func TestGenerateRepositorySupportsPartialReorderedProjections(t *testing.T) {
 	source, err := GenerateRepository(RepositoryDefinition{
 		Package: "users", Name: "UsersRepository", Entity: "User", Dialect: sqlgen.PostgreSQL,
@@ -74,5 +73,55 @@ func TestGeneratedRepositoryRejectsAmbiguousColumnMappings(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "ambiguous result column") {
 		t.Fatalf("expected ambiguous column error, got %v", err)
+	}
+}
+
+
+func TestGeneratedRepositoriesSupportDMLRowsAffected(t *testing.T) {
+	for _, tc := range []struct {
+		sql string
+		dialect sqlgen.Dialect
+		wantSQL string
+	}{
+		{"INSERT INTO users (id) VALUES (:id)", sqlgen.PostgreSQL, "VALUES ($1)"},
+		{"UPDATE users SET id=:id", sqlgen.Question, "SET id=?"},
+		{"DELETE FROM users WHERE id=:id", sqlgen.PostgreSQL, "WHERE id=$1"},
+	} {
+		out, err := GenerateRepository(RepositoryDefinition{
+			Package: "users", Name: "Repo", Entity: "User", Dialect: tc.dialect,
+			Fields: []RepositoryField{{Name: "ID"}},
+			Methods: []RepositoryMethod{{Name: "Write", SQL: tc.sql, Exec: true, Parameters: []RepositoryParameter{{Name: "id", Type: "int64"}}}},
+		})
+		if err != nil {
+			t.Fatalf("%q: %v", tc.sql, err)
+		}
+		for _, part := range []string{"ExecContext(ctx, query, id)", "return result.RowsAffected()", tc.wantSQL} {
+			if !strings.Contains(string(out), part) {
+				t.Fatalf("%q: missing %q in %s", tc.sql, part, out)
+			}
+		}
+		if strings.Contains(string(out), "\"database/sql\"") || strings.Contains(string(out), "\"strings\"") {
+			t.Fatalf("exec-only code should not import read-only helpers: %s", out)
+		}
+	}
+}
+
+func TestGeneratedRepositoryReturningValidation(t *testing.T) {
+	def := RepositoryDefinition{
+		Package: "users", Name: "Repo", Entity: "User", Dialect: sqlgen.PostgreSQL,
+		Fields: []RepositoryField{{Name: "ID"}},
+		Methods: []RepositoryMethod{{Name: "Insert", SQL: "INSERT INTO users (id) VALUES (:id) RETURNING id", Parameters: []RepositoryParameter{{Name: "id", Type: "int64"}}}},
+	}
+	if out, err := GenerateRepository(def); err != nil || !strings.Contains(string(out), "QueryContext(ctx, query, id)") {
+		t.Fatalf("PostgreSQL RETURNING should use typed row query: %v: %s", err, out)
+	}
+	def.Dialect = sqlgen.Question
+	if _, err := GenerateRepository(def); err == nil || !strings.Contains(err.Error(), "only supported for PostgreSQL") {
+		t.Fatalf("expected MySQL RETURNING rejection: %v", err)
+	}
+	def.Dialect = sqlgen.PostgreSQL
+	def.Methods[0].Exec = true
+	if _, err := GenerateRepository(def); err == nil {
+		t.Fatal("DML returning rows affected while RETURNING is present must fail")
 	}
 }
