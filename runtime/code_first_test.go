@@ -112,3 +112,4 @@ func TestCodeFirstRoutesShareControllerRouteNamespace(t *testing.T) {
 		t.Fatalf("expected shared route duplicate check: app=%v err=%v", app, err)
 	}
 }
+
