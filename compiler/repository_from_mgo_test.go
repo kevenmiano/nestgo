@@ -31,7 +31,7 @@ func (r *UsersRepository) FindByID(ctx context.Context, id int64) (*User, error)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"WHERE id=$1", "QueryRowContext(ctx, query, id)", "Scan(&row.ID, &row.Name)"} {
+	for _, expected := range []string{"WHERE id=$1", "QueryContext(ctx, query, id)", "rows.Scan(targets...)", "case \"id\":", "case \"name\":"} {
 		if !strings.Contains(string(gen), expected) {
 			t.Fatalf("missing %s in %s", expected, gen)
 		}
