@@ -10,13 +10,13 @@ import (
 func init() {
 	metadata.Register("pipeline", metadata.Package{
 		Controllers: []metadata.Controller{
-			{Type: reflect.TypeOf((*UsersController)(nil)), Prefix: "/users", Guards: []reflect.Type{reflect.TypeOf((*ApiKeyGuard)(nil))}, Pipes: []reflect.Type{reflect.TypeOf((*TrimPipe)(nil))}, Routes: []metadata.Route{{Method: "GET", Path: "/{id}", Handler: "FindOne", Status: 0, Parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "id"}}, Pipes: []reflect.Type{reflect.TypeOf((*RequiredPipe)(nil))}, StaticHTTP: func(receiver any, ctx httpadapter.Context) (any, int, error) {
+			{Type: reflect.TypeOf((*UsersController)(nil)), Prefix: "/users", Guards: []reflect.Type{reflect.TypeOf((*ApiKeyGuard)(nil))}, Pipes: []reflect.Type{reflect.TypeOf((*TrimPipe)(nil))}, Routes: []metadata.Route{{Method: "GET", Path: "/{id}", Handler: "FindOne", Status: 0, Headers: []metadata.Header{}, RedirectURL: "", RedirectStatus: 0, Parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "id"}}, Pipes: []reflect.Type{reflect.TypeOf((*RequiredPipe)(nil))}, StaticHTTP: func(receiver any, ctx httpadapter.Context) (any, int, error) {
 				arg0, code, err := httpadapter.BindParam(ctx, "id", 0)
 				if err != nil {
 					return nil, code, err
 				}
 				return receiver.(*UsersController).FindOne(arg0), 0, nil
-			}}, {Method: "POST", Path: "/", Handler: "Create", Status: 0, Parameters: []metadata.Parameter{{Index: 0, Kind: "Body", Name: ""}}, Pipes: []reflect.Type{reflect.TypeOf((*RequiredPipe)(nil))}, Filters: []reflect.Type{reflect.TypeOf((*BadRequestFilter)(nil))}, StaticHTTP: func(receiver any, ctx httpadapter.Context) (any, int, error) {
+			}}, {Method: "POST", Path: "/", Handler: "Create", Status: 0, Headers: []metadata.Header{}, RedirectURL: "", RedirectStatus: 0, Parameters: []metadata.Parameter{{Index: 0, Kind: "Body", Name: ""}}, Pipes: []reflect.Type{reflect.TypeOf((*RequiredPipe)(nil))}, Filters: []reflect.Type{reflect.TypeOf((*BadRequestFilter)(nil))}, StaticHTTP: func(receiver any, ctx httpadapter.Context) (any, int, error) {
 				arg0, code, err := httpadapter.DecodeBodyAt[CreateUserDTO](ctx, 0)
 				if err != nil {
 					return nil, code, err

@@ -22,14 +22,18 @@ func (g *globalTestGuard) CanActivate(httpadapter.ExecutionContext) (bool, error
 	return true, nil
 }
 
-type controllerTestGuard struct{ Trace *pipelineTrace `nestgo:"inject"` }
+type controllerTestGuard struct {
+	Trace *pipelineTrace `nestgo:"inject"`
+}
 
 func (g *controllerTestGuard) CanActivate(httpadapter.ExecutionContext) (bool, error) {
 	g.Trace.add("controller guard")
 	return true, nil
 }
 
-type routeTestGuard struct{ Trace *pipelineTrace `nestgo:"inject"` }
+type routeTestGuard struct {
+	Trace *pipelineTrace `nestgo:"inject"`
+}
 
 func (g *routeTestGuard) CanActivate(c httpadapter.ExecutionContext) (bool, error) {
 	g.Trace.add("route guard")
@@ -43,14 +47,18 @@ func (p *globalTestPipe) Transform(v any, _ httpadapter.ArgumentMetadata) (any, 
 	return v, nil
 }
 
-type controllerTestPipe struct{ Trace *pipelineTrace `nestgo:"inject"` }
+type controllerTestPipe struct {
+	Trace *pipelineTrace `nestgo:"inject"`
+}
 
 func (p *controllerTestPipe) Transform(v any, _ httpadapter.ArgumentMetadata) (any, error) {
 	p.Trace.add("controller pipe")
 	return v, nil
 }
 
-type routeTestPipe struct{ Trace *pipelineTrace `nestgo:"inject"` }
+type routeTestPipe struct {
+	Trace *pipelineTrace `nestgo:"inject"`
+}
 
 func (p *routeTestPipe) Transform(v any, m httpadapter.ArgumentMetadata) (any, error) {
 	p.Trace.add("route pipe")
@@ -60,7 +68,9 @@ func (p *routeTestPipe) Transform(v any, m httpadapter.ArgumentMetadata) (any, e
 	return v, nil
 }
 
-type routeTestFilter struct{ Trace *pipelineTrace `nestgo:"inject"` }
+type routeTestFilter struct {
+	Trace *pipelineTrace `nestgo:"inject"`
+}
 
 func (f *routeTestFilter) Catch(err error, c httpadapter.ExecutionContext) (bool, error) {
 	f.Trace.add("route filter")
@@ -76,7 +86,9 @@ func (f *globalTestFilter) Catch(err error, c httpadapter.ExecutionContext) (boo
 	return true, c.Request.Write([]byte("global caught: " + err.Error()))
 }
 
-type pipelineTestController struct{ Trace *pipelineTrace `nestgo:"inject"` }
+type pipelineTestController struct {
+	Trace *pipelineTrace `nestgo:"inject"`
+}
 
 func (c *pipelineTestController) Echo(id string) string { c.Trace.add("handler"); return id }
 func (*pipelineTestController) Fail() (string, error) {

@@ -179,7 +179,9 @@ func New(options ...Option) (*Application, error) {
 		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
 	}
 	registrationStarted := time.Now()
-	if err := validatePipeline(cfg.pipeline); err != nil { return fail(err) }
+	if err := validatePipeline(cfg.pipeline); err != nil {
+		return fail(err)
+	}
 	if err := registerRoutesWithPipeline(adapter, packages, registry, cfg.pipeline, cfg.routes...); err != nil {
 		return fail(err)
 	}

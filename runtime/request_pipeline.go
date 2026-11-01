@@ -1,8 +1,8 @@
 package runtime
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"github.com/kevenmiano/nestgo/http"
 	"reflect"
 
@@ -146,12 +146,14 @@ func handleHTTPException(err error, exec httpadapter.ExecutionContext, filters [
 		}
 	}
 	var pipelineError *httpadapter.HTTPException
-	if errors.As(err,&pipelineError)&&pipelineError!=nil {
+	if errors.As(err, &pipelineError) && pipelineError != nil {
 		message := pipelineError.Message
-		if pipelineError.Status >= 500 {message = "Internal server error"}
-		err=http.NewHTTPError(pipelineError.Status,message)
+		if pipelineError.Status >= 500 {
+			message = "Internal server error"
+		}
+		err = http.NewHTTPError(pipelineError.Status, message)
 	}
-	return http.WriteError(exec.Request,err)
+	return http.WriteError(exec.Request, err)
 }
 
 // middlewareChain is compiled once per route at bootstrap. Keeping the

@@ -489,7 +489,9 @@ func Generate(files []*File) ([]byte, error) {
 					needsHTTPAdapter = true
 				}
 				pipelineFields, err := pipelineMetadata(f.Path, d.Annotations, providerNames)
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Headers:[]metadata.Header{%s},RedirectURL:%q,RedirectStatus:%d,Parameters:[]metadata.Parameter{%s}%s%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(headers, ","), redirectURL, redirectStatus, strings.Join(params, ","), pipelineFields, staticInvoke))
 			}
 			if routeCount > 1 {
