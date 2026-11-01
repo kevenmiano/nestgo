@@ -60,7 +60,7 @@ Decorators are accepted in `.mgo` files by the NestGo compiler, **not** by the s
 
 ## Application runtime
 
-The single factory `runtime.New(runtime.WithRoutes(...))` or `runtime.New(runtime.WithRegistry("shop"))` creates `*runtime.Application` with a native fasthttp adapter by default. Use `runtime.WithAdapter(nethttp.New())` to switch engines. Both engines share DI, route contracts, initialization hooks and explicit `app.Shutdown(ctx)`. Declarative modules support imports, providers, controllers and exports with runtime graph checks.
+The single factory `runtime.New(runtime.WithRoutes(...))` or `runtime.New()` creates `*runtime.Application` with a native fasthttp adapter by default. Use `runtime.WithAdapter(nethttp.New())` to switch engines. Both engines share DI, route contracts, initialization hooks and explicit `app.Shutdown(ctx)`. Declarative modules support imports, providers, controllers and exports with runtime graph checks.
 
 The compiler can emit direct invocation wrappers for eligible zero-argument handlers, retaining reflective invocation for other signatures. These are experimental features, not evidence of production-scale performance or complete adapter parity.
 
