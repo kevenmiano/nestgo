@@ -579,6 +579,14 @@ func CompileDir(dir string) error {
 		if err := writeIfChanged(target, formatted); err != nil {
 			return err
 		}
+		codecPath := strings.TrimSuffix(file.Path, ".mgo") + "_transformers_generated.go"
+		codec, err := generatedPropertySource(file)
+		if err != nil { return err }
+		if codec == nil {
+			if err := os.Remove(codecPath); err != nil && !os.IsNotExist(err) { return err }
+		} else if err := writeIfChanged(codecPath, codec); err != nil {
+			return err
+		}
 	}
 	if err := writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry); err != nil {
 		return err
