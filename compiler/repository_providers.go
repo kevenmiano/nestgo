@@ -25,7 +25,7 @@ func GenerateRepositoryProviders(packageName string, definitions []RepositoryDef
 	}
 	out.WriteString("}\n")
 	out.WriteString("func NewGeneratedRepositories(connections *database.Connections) (*GeneratedRepositories, error) {\n")
-	out.WriteString("if connections == nil { return nil, fmt.Errorf("repository providers: nil connections") }\nresult := &GeneratedRepositories{}\n")
+	out.WriteString("if connections == nil { return nil, fmt.Errorf(\"repository providers: nil connections\") }\nresult := &GeneratedRepositories{}\n")
 	for _, def := range definitions {
 		fmt.Fprintf(&out, "var err%s error\nresult.%s, err%s = New%sGeneratedFromConnections(connections)\nif err%s != nil { return nil, err%s }\n", def.Name, def.Name, def.Name, def.Name, def.Name, def.Name)
 	}
