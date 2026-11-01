@@ -24,8 +24,14 @@ func newCheckCommand() *cobra.Command {
 				return finishCompilerCommand(cmd, format, "check", "", err)
 			}
 			dialects, err := parseConnectionDialects(connections)
-			if err != nil { return finishCompilerCommand(cmd, format, "check", "", err) }
-			if len(dialects) == 0 { err = compiler.CheckDir(dir) } else { err = compiler.CheckDirWithDialects(dir, dialects) }
+			if err != nil {
+				return finishCompilerCommand(cmd, format, "check", "", err)
+			}
+			if len(dialects) == 0 {
+				err = compiler.CheckDir(dir)
+			} else {
+				err = compiler.CheckDirWithDialects(dir, dialects)
+			}
 			return finishCompilerCommand(cmd, format, "check", "checked "+dir+": generated artifacts up to date", err)
 		},
 	}
