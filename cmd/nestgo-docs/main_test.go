@@ -10,7 +10,7 @@ import (
 func TestPrepareForDocusaurus(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "nestgo_completion_bash.md")
-	content := "Run source <(nestgo completion bash)\n\n```bash\nsource <(nestgo completion bash)\n```\n"
+	content := "Run source <(nestgo completion bash) and ${fpath[1]}\n\n```bash\nsource <(nestgo completion bash) and ${fpath[1]}\n```\n"
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestPrepareForDocusaurus(t *testing.T) {
 	if !strings.Contains(string(result), "source &lt;(nestgo completion bash)") {
 		t.Fatalf("non-fenced shell syntax was not escaped: %s", result)
 	}
-	if !strings.Contains(string(result), "```bash\nsource <(nestgo completion bash)") {
+	if !strings.Contains(string(result), "if !strings.Contains(string(result), "```bash\nsource <(nestgo completion bash)") {#123;fpath[1]&#125;") {\n\t\tt.Fatalf("shell parameter expansion was not escaped: %s", result)\n\t}\n\tif !strings.Contains(string(result), "```bash\nsource <(nestgo completion bash) and ${fpath[1]}") {
 		t.Fatalf("fenced examples must remain unchanged: %s", result)
 	}
 }
