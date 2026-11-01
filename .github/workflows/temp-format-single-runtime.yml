@@ -1,0 +1,48 @@
+name: Temporary single runtime gofmt
+
+on:
+  push:
+    branches: [refactor/runtime-single-application-api-100]
+    paths:
+      - runtime/application.go
+      - runtime/route_contract.go
+      - runtime/route_contract_test.go
+      - runtime/lifecycle.go
+      - runtime/http_routes.go
+      - runtime/application_test.go
+      - runtime/lifecycle_test.go
+      - runtime/runtime_logging_test.go
+      - runtime/static_invocation_test.go
+      - runtime/cross_package_graph_test.go
+      - runtime/cross_package_visibility_test.go
+      - runtime/external_module_test.go
+      - runtime/module_visibility_test.go
+      - runtime/registry_imports_test.go
+      - runtime/registry_transitive_test.go
+      - runtime/static_adapter_test.go
+      - runtime/bootstrap_benchmark_test.go
+      - diagnostics/startup.go
+      - diagnostics/registered.go
+      - compiler/cross_package_e2e_test.go
+      - examples/shop/runtime_test.go
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/runtime-single-application-api-100
+      - name: Format changed Go sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          gofmt -w runtime/*.go diagnostics/*.go compiler/cross_package_e2e_test.go examples/shop/runtime_test.go
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add runtime diagnostics compiler/cross_package_e2e_test.go examples/shop/runtime_test.go
+            git commit -m "style(runtime): gofmt sole application API migration"
+            git push origin HEAD:refactor/runtime-single-application-api-100
+          fi
