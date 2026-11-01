@@ -7,6 +7,7 @@ import (
 	"github.com/kevenmiano/nestgo/httpadapter"
 	"github.com/kevenmiano/nestgo/metadata"
 	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -27,32 +28,59 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 		}
 		controllers = append(controllers, pkg.Controllers...)
 	}
+	visibility, err := moduleVisibility(packages)
+	if err != nil {
+		return err
+	}
+	orderedProviders := make([]reflect.Type, 0, len(providers))
+	for providerType := range providers {
+		orderedProviders = append(orderedProviders, providerType)
+	}
+	sort.Slice(orderedProviders, func(i, j int) bool {
+		return orderedProviders[i].String() < orderedProviders[j].String()
+	})
 	inject := func(v reflect.Value) error {
+		allowed, scoped := visibility[v.Type()]
 		for i := 0; i < v.Elem().NumField(); i++ {
 			field := v.Elem().Field(i)
-			if !field.CanSet() || (field.Kind() != reflect.Ptr && field.Kind() != reflect.Interface) {
+			sf := v.Elem().Type().Field(i)
+			if sf.Anonymous || !field.CanSet() || (field.Kind() != reflect.Ptr && field.Kind() != reflect.Interface) {
 				continue
 			}
 			dep, found := providers[field.Type()]
+			if scoped && !allowed[field.Type()] {
+				found = false
+			}
 			if !found && field.Kind() == reflect.Interface {
-				for _, candidate := range providers {
+				for _, candidateType := range orderedProviders {
+					if scoped && !allowed[candidateType] {
+						continue
+					}
+					candidate := providers[candidateType]
 					if candidate.Type().Implements(field.Type()) {
 						if found {
-							return fmt.Errorf("ambiguous dependency %s", v.Elem().Type().Field(i).Name)
+							return fmt.Errorf("ambiguous dependency %s.%s", v.Elem().Type(), sf.Name)
 						}
 						dep = candidate
 						found = true
 					}
 				}
 			}
-			if found {
-				field.Set(dep)
+			if !found {
+				if sf.Tag.Get("nestgo") == "optional" {
+					continue
+				}
+				return fmt.Errorf("missing required dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
 			}
+			if !dep.IsValid() || (dep.Kind() == reflect.Ptr && dep.IsNil()) {
+				return fmt.Errorf("nil dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
+			}
+			field.Set(dep)
 		}
 		return nil
 	}
-	for _, v := range providers {
-		if err := inject(v); err != nil {
+	for _, providerType := range orderedProviders {
+		if err := inject(providers[providerType]); err != nil {
 			return err
 		}
 	}
