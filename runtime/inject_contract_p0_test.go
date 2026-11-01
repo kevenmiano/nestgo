@@ -58,7 +58,9 @@ func TestP0InjectionMarkersAndControllerConstruction(t *testing.T) {
 		t.Fatal(err)
 	}
 	controller, err := graph.newController(cType)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	result := controller.Interface().(*explicitController)
 	if result.Repo == nil || result.Extra != nil {
 		t.Fatalf("incorrect required/ignored injection: %+v", result)
