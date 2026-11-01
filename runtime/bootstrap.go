@@ -47,7 +47,7 @@ func bootstrap(ctx context.Context, options bootstrapOptions, packages ...metada
 	}
 	opts := options.Runtime
 	opts.Instances = append(append([]any{}, opts.Instances...), settings, connections)
-	handler, err := NewWithOptions(opts, packages...)
+	handler, err := newHandler(opts, packages...)
 	if err != nil {
 		_ = connections.Close()
 		return nil, err
