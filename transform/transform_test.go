@@ -7,6 +7,15 @@ import (
 	"testing"
 )
 
+type normalized struct { Email string `json:"email"` }
+func (value *normalized) UnmarshalJSON(data []byte) error {
+	var payload struct { Email string `json:"email"` }
+	if err := json.Unmarshal(data, &payload); err != nil { return err }
+	value.Email = strings.ToLower(payload.Email)
+	return nil
+}
+type nested struct { Value normalized `json:"value"` }
+
 type simple struct {
 	Name string `json:"name"`
 }
@@ -51,5 +60,15 @@ func BenchmarkPlainToInstance(b *testing.B) {
 		if _, err := PlainToInstance[simple](src); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestPlainMapPreservesNestedGeneratedJSONContract(t *testing.T) {
+	instance, err := PlainToInstance[nested](map[string]any{
+		"value": map[string]any{"email": "ADA@EXAMPLE.COM"},
+	})
+	if err != nil { t.Fatal(err) }
+	if instance.Value.Email != "ada@example.com" {
+		t.Fatalf("JSON unmarshal hook was skipped: %+v", instance)
 	}
 }
