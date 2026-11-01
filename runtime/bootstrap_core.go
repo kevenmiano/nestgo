@@ -65,6 +65,9 @@ func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type)
 			return bootstrapGraph{}, err
 		}
 	}
+	if err := orderBootstrap(packages, &graph); err != nil {
+		return bootstrapGraph{}, err
+	}
 	return graph, nil
 }
 

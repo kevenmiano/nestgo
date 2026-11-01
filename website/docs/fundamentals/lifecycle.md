@@ -30,7 +30,8 @@ flowchart TD
   Registry --> Graph["Validate modules and visibility"]
   Direct --> Graph
   Graph --> Provider["Allocate and inject providers"]
-  Provider --> Controller["Create and inject controllers"]
+  Provider --> Order["Topologically order provider hooks and module imports"]
+  Order --> Controller["Create and inject controllers"]
   Controller --> Route["Validate routes and register adapter handlers"]
   Route --> Init["OnModuleInit"]
   Init --> Ready["OnApplicationBootstrap"]
@@ -38,7 +39,7 @@ flowchart TD
   App --> Serve["Listen / Serve"]
 ```
 
-Module validation rejects missing imports, invalid exports, conflicting ownership and module import cycles. Provider injection supports exported pointer or interface fields, and `nestgo:"optional"` allows missing optional dependencies. Scope visibility honors `Imports`, `Providers` and `Exports`; no constructor injection is provided. Module import-cycle detection does not guarantee topological order of provider hooks.
+Module validation rejects missing imports, invalid exports, conflicting ownership and module import cycles. Provider injection supports exported pointer or interface fields, and `nestgo:"optional"` allows missing optional dependencies. Scope visibility honors `Imports`, `Providers` and `Exports`; no constructor injection is provided. Module import cycles and provider injection cycles fail bootstrap before any hook executes. Resolved injection edges (including interface and present optional dependencies) order provider hooks dependency-first. Independent members follow module import ordering; controllers run after providers.
 
 ## Request processing
 
@@ -74,7 +75,7 @@ sequenceDiagram
   App->>Hooks: OnApplicationShutdown(ctx)
 ```
 
-Initialization executes providers in deterministic type-name order, then controllers in metadata registration order. Shutdown hooks execute in reverse instance order. `app.Shutdown(ctx)` is idempotent and aggregates errors. If initialization fails, the application attempts cleanup, but registered adapter routes are not transactionally rolled back.
+Initialization executes providers in dependency-first topological order, with module imports taking precedence among independent providers; controllers initialize afterward in module-aware order. Shutdown hooks execute in reverse initialization order. `app.Shutdown(ctx)` is idempotent and aggregates errors. If initialization fails or the bootstrap context is canceled, the application runs best-effort cleanup with a bounded independent rollback context. Routes registered before failure are not transactionally rolled back, but an application that fails construction is never served.
 
 The application never automatically installs OS signal handlers. The caller provides the shutdown context and deadline. A successfully constructed Application does not imply a listening TCP socket.
 
@@ -86,6 +87,6 @@ Use `go test ./runtime -run '^$' -bench BenchmarkApplicationBootstrapProviders -
 
 ## Constraints
 
-Request-scoped providers, constructor injection, automatic signals, complete rollback, universal guards/interceptors/filters and full resource management are not implemented.
+Request-scoped providers, constructor injection, automatic signals, transactional route rollback, universal guards/interceptors/filters and arbitrary resource disposal are not implemented.
 
 See [runtime reference](https://github.com/kevenmiano/nestgo/blob/main/docs/RUNTIME.md) and [HTTP adapters](https://github.com/kevenmiano/nestgo/blob/main/docs/HTTP_ADAPTERS.md).

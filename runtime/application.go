@@ -147,7 +147,11 @@ func New(options ...Option) (*Application, error) {
 		if logger != nil {
 			logger.Error(ctx, "NestFactory", "Bootstrap failed", slog.String("error", err.Error()))
 		}
-		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
+		// A canceled bootstrap context must not prevent best-effort resource
+		// cleanup. Bound rollback independently rather than using Background.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		return nil, errors.Join(err, registry.shutdown(cleanupCtx, adapter.Shutdown))
 	}
 	registrationStarted := time.Now()
 	if err := registerRoutesWithLifecycle(adapter, packages, registry, cfg.routes...); err != nil {
