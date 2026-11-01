@@ -151,6 +151,7 @@ type editableTestStub struct {
 	name       string
 	typeName   string
 	dependency []string
+	comment    string
 }
 
 // editableStubs makes one unit-test TODO for each decorated type and route.
@@ -164,6 +165,7 @@ func editableStubs(files []*File) ([]editableTestStub, error) {
 			return nil, err
 		}
 		fields := map[string][]string{}
+		validation := map[string][]string{}
 		for _, decl := range node.Decls {
 			gen, ok := decl.(*ast.GenDecl)
 			if !ok || gen.Tok != token.TYPE {
@@ -184,8 +186,15 @@ func editableStubs(files []*File) ([]editableTestStub, error) {
 					}
 					if field.Tag != nil {
 						tag, err := strconv.Unquote(field.Tag.Value)
-						if err == nil && reflect.StructTag(tag).Get("nestgo") == "-" {
-							continue
+						if err == nil {
+							if reflect.StructTag(tag).Get("nestgo") == "-" {
+								continue
+							}
+							if rule := reflect.StructTag(tag).Get("validate"); rule != "" {
+								for _, name := range field.Names {
+									validation[typ.Name.Name] = append(validation[typ.Name.Name], name.Name+" validate:"+strconv.Quote(rule))
+								}
+							}
 						}
 					}
 					var printed bytes.Buffer
@@ -201,6 +210,16 @@ func editableStubs(files []*File) ([]editableTestStub, error) {
 		for _, declaration := range file.Declarations {
 			if declaration.Kind == "type" {
 				for _, annotation := range declaration.Annotations {
+					if annotation.Name == "Dto" {
+						for _, purpose := range []string{"Serialization", "Deserialization"} {
+							name := testStubName(declaration.Name, purpose)
+							byName[name] = editableTestStub{name: name, typeName: declaration.Name, dependency: fields[declaration.Name], comment: "DTO field"}
+						}
+						if len(validation[declaration.Name]) > 0 {
+							name := testStubName(declaration.Name, "Validation")
+							byName[name] = editableTestStub{name: name, typeName: declaration.Name, dependency: validation[declaration.Name], comment: "Validation contract"}
+						}
+					}
 					if annotation.Name == "Controller" || annotation.Name == "Injectable" {
 						name := testStubName(declaration.Name, "")
 						byName[name] = editableTestStub{name: name, typeName: declaration.Name, dependency: fields[declaration.Name]}
@@ -263,7 +282,11 @@ func appendMissingTestStubs(dir, pkg string, stubs []editableTestStub) error {
 		}
 		fmt.Fprintf(&source, "\nfunc %s(t *testing.T) {\n", stub.name)
 		for _, dependency := range stub.dependency {
-			fmt.Fprintf(&source, "// Wiring field: %s\n", dependency)
+			label := stub.comment
+			if label == "" {
+				label = "Wiring field"
+			}
+			fmt.Fprintf(&source, "// %s: %s\n", label, dependency)
 		}
 		fmt.Fprintf(&source, "subject := new(%s)\n_ = subject\n", stub.typeName)
 		fmt.Fprintf(&source, "t.Skip(%q)\n}\n", "TODO: add assertions for "+stub.name)
