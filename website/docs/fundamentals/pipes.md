@@ -34,6 +34,11 @@ func (*RequiredPipe) Transform(v any, meta httpadapter.ArgumentMetadata) (any, e
 Param or Query), `Name`, and `reflect.Type`. To transform a DTO, return
 the same concrete Go type. An incompatible replacement yields HTTP 400.
 
+The compiler emits `var _ httpadapter.Pipe = (*RequiredPipe)(nil)`
+for every decorated pipe provider, rejecting incompatible method signatures
+at compile time. A valid pipe returning the wrong runtime value type still
+produces HTTP 400.
+
 ## Controller and method bindings
 
 ```go
