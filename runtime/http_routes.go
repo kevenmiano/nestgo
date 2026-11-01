@@ -95,7 +95,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			for i := 0; i < typ.NumIn(); i++ {
 				if p, ok := bindings[i]; ok {
 					if p.Kind == "Res" || p.Kind == "Response" {
-						if explicit { return fmt.Errorf("multiple @Res arguments for %s", route.Handler) }
+						if explicit {
+							return fmt.Errorf("multiple @Res arguments for %s", route.Handler)
+						}
 						if !reflect.TypeOf((*httpresponse.Writer)(nil)).AssignableTo(typ.In(i)) {
 							return fmt.Errorf("@Res argument must accept *httpresponse.Writer in %s", route.Handler)
 						}
@@ -148,7 +150,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 								}
 								v.Elem().SetString(ctx.Query(p.Name))
 							case "Headers":
-								if t.Kind() != reflect.String { return respondError(ctx, 500, "header parameter must be string") }
+								if t.Kind() != reflect.String {
+									return respondError(ctx, 500, "header parameter must be string")
+								}
 								v.Elem().SetString(ctx.Header(p.Name))
 							case "Res", "Response":
 								v.Elem().Set(reflect.ValueOf(writer))
@@ -170,8 +174,12 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 						return httpresponse.WriteError(ctx, results[1].Interface().(error))
 					}
 					if len(results) == 1 && results[0].Type().Implements(errType) {
-						if !results[0].IsNil() { return httpresponse.WriteError(ctx, results[0].Interface().(error)) }
-					} else if len(results) > 0 { result = results[0].Interface() }
+						if !results[0].IsNil() {
+							return httpresponse.WriteError(ctx, results[0].Interface().(error))
+						}
+					} else if len(results) > 0 {
+						result = results[0].Interface()
+					}
 				}
 				return finishHTTPResponse(ctx, rt, result, writer, explicit, passthrough)
 			}})

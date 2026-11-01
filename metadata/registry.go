@@ -11,7 +11,7 @@ type Parameter struct {
 	Kind  string
 	Name  string
 }
-type Header struct { Name, Value string }
+type Header struct{ Name, Value string }
 type Route struct {
 	StaticInvoke          func(any) (any, error)
 	Method, Path, Handler string

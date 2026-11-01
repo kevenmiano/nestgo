@@ -119,7 +119,7 @@ func (c *requestContext) Header(n string) string { return string(c.r.Request.Hea
 func (c *requestContext) Body() []byte           { return c.r.PostBody() }
 func (c *requestContext) Status(n int)           { c.status = n }
 func (c *requestContext) SetHeader(k, v string)  { c.r.Response.Header.Set(k, v) }
-func (c *requestContext) AddHeader(k, v string) { c.r.Response.Header.Add(k, v) }
+func (c *requestContext) AddHeader(k, v string)  { c.r.Response.Header.Add(k, v) }
 func (c *requestContext) Write(b []byte) error {
 	if !c.wrote {
 		c.r.SetStatusCode(c.status)
