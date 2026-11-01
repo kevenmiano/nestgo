@@ -115,3 +115,4 @@ func TestStringInvokerConcurrentRequests(t *testing.T) {
 }
 
 var _ httpadapter.Context = (*fastStringContext)(nil)
+
