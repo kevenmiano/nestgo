@@ -1,57 +1,39 @@
-# NestGo roadmap — NestJS-inspired, Go-native
+# NestGo roadmap — minimal production-ready HTTP framework
 
-**Source of truth:** GitHub Issues. **Project board:** https://github.com/users/kevenmiano/projects/2
+**Source of truth:** [Issues](https://github.com/kevenmiano/nestgo/issues) · [Project #2](https://github.com/users/kevenmiano/projects/2) · [Production gate #70](https://github.com/kevenmiano/nestgo/issues/70)
 
-This roadmap uses the [NestJS documentation](https://docs.nestjs.com/) as a **feature taxonomy**, not a promise of 1:1 TypeScript or runtime compatibility. NestGo APIs must remain idiomatic Go. Each feature requires a design discussion, tests, documentation, and CI verification before it can be marked Done.
+## Supported MVP target
 
-## Milestones and dependency order
+A deployable, maintainable Go HTTP framework with deterministic `.mgo` compilation; controllers; explicit module imports/exports; singleton field injection; JSON request/response; safe failures; pluggable HTTP adapter contracts; graceful shutdown; basic health/logging; verified tagged distribution.
 
-| Milestone | Goal | GitHub Issues | Priority | Entry gate |
+**Not MVP requirements:** constructor DI, request/transient scopes, guards/interceptors framework, GraphQL, OpenAPI generation, ORM, caching, queues, WebSockets, microservices, watch mode. These must not hold the minimal production release hostage.
+
+## Strict implementation order
+
+| Order | Gate | Priority | Issues | Acceptance evidence |
 | --- | --- | --- | --- | --- |
-| M001 — Stabilization | CI, compiler coverage, runtime correctness, metadata contracts and GSD governance | #2–#7 | P0/P1 | Existing baseline |
-| M002 — Core architecture | Module graph, dependency injection and controller routing | #10–#12 | P0 | M001 compiler/runtime contracts |
-| M003 — Request pipeline | Middleware, execution context, guards, pipes, interceptors, filters, validation and versioning | #13–#15 | P0 | M002 routing and DI |
-| M004 — Application capabilities | Configuration, logging, health, persistence, caching, security and OpenAPI | #16–#19 | P1 | M003 request pipeline |
-| M005 — Distributed and advanced | Events, jobs, WebSockets, microservices, observability, reliability and GraphQL spike | #20–#23 | P2 | Stable core and adapters |
-| M006 — Developer experience and release | CLI, incremental compilation, end-to-end samples, benchmarks and release gates | #24–#25 | P1 | Runs incrementally across milestones |
+| 0 | Correctness and metadata | P0 | #4 #5 #6 #35 #36 #53 | Compiler goldens, deterministic diagnostics, no DI panics/ambiguity |
+| 1 | Module/DI integration | P0 | #10 #12 #52; singleton subset of #11 | Real multi-package compiler-to-runtime E2E, import/export isolation |
+| 2 | HTTP runtime safety | P0 | #48 #12 #13 (minimal middleware subset) #56 | Adapter conformance, cancellation, errors, body limits, timeouts, graceful shutdown, race |
+| 3 | Minimum operations | P0 | #16 #50; safe-default subset of #18 | Structured logging, liveness/readiness, recovery, error redaction |
+| 4 | Release qualification | P0 | #25 #37 #41 #55 #70 | Reproducible benchmarks, full CI, external installation, integrity-checked immutable version and docs deployment |
+| 5 | Post-MVP extension | P1 | #7 #11 #14 #15 #19 #24 #38 #54 | Expanded lifecycle, validators, docs, tooling |
+| 6 | Optional integrations | P2 | #17 #18 #20 #21 #22 #23 | Data, security integrations, distributed capabilities, GraphQL |
 
-M004 and M006 can run in parallel after their relevant interfaces stabilize; M005 items should be independently scoped and may be postponed.
+M001–M006 remain the existing Project Roadmap taxonomy, not mandatory sequential release phases. Each broad issue can have a bounded P0 slice and defer the rest without claiming the entire issue completed.
 
-## Feature mapping
+## Production gate: #70
 
-- **Core:** [Modules](https://docs.nestjs.com/modules), [Providers](https://docs.nestjs.com/providers), [Controllers](https://docs.nestjs.com/controllers), [Custom providers](https://docs.nestjs.com/fundamentals/custom-providers).
-- **Request pipeline:** [Middleware](https://docs.nestjs.com/middleware), [Request lifecycle](https://docs.nestjs.com/faq/request-lifecycle), [Validation](https://docs.nestjs.com/techniques/validation).
-- **Application and data:** [Configuration](https://docs.nestjs.com/techniques/configuration), [Caching](https://docs.nestjs.com/techniques/caching), [Authentication](https://docs.nestjs.com/security/authentication), [OpenAPI](https://docs.nestjs.com/openapi/introduction).
-- **Distributed:** [Queues](https://docs.nestjs.com/techniques/queues), [Microservices](https://docs.nestjs.com/microservices/basics), [GraphQL](https://docs.nestjs.com/graphql/quick-start).
-- **Quality and operations:** [Testing](https://docs.nestjs.com/fundamentals/testing), [Observability](https://docs.nestjs.com/observability/overview).
+No production-ready claim before **every** #70 acceptance criterion is verified: deterministic compilation, fail-closed DI, real-listener HTTP adapter contract, integration and negative tests, `go test -race ./...`, `go vet ./...`, formatting, generated output checks, representative fuzz testing, startup/per-request benchmarks, clean shutdown, minimum operational safety, immutable semver tags and external module checksum verification.
 
-## GSD tracking
+Production-supported adapters must demonstrate parity; otherwise identify the unsupported adapter explicitly as experimental.
 
-1. **Discuss:** clarify intended Go API, constraints, and ADR.
-2. **Plan:** break an issue into verifiable tasks, identify dependencies.
-3. **Execute:** feature branch and linked PR (`Refs #N` while in progress).
-4. **Verify:** tests, generated output, docs, CI and measured coverage.
-5. **Review:** reconcile implementation with acceptance criteria.
-6. **Ship:** merge, close the issue and update `.planning/STATE.md`.
+## Priority semantics
 
-**Project automation:** [project-sync.yml](../.github/workflows/project-sync.yml) reconciles issue-body Priority and Roadmap metadata into custom single-select Project fields. The destination is **Roadmap** (M001–M006), not GitHub's native Milestone field. A merged PR with `Refs #N` does **not** complete an issue; `Closes #N` / `Fixes #N` / `Resolves #N` explicitly indicate completion. PR #28 was merged; automatic backfill run [41238808688](https://github.com/kevenmiano/nestgo/actions/runs/41238808688) succeeded, processing issues #10–#25 with Roadmap and Priority. Kanban/Roadmap view layout and field visibility should still be reviewed in the Project UI. See [sync guide](../docs/PROJECT_SYNC.md).
+- **P0:** release blocker (correctness, request/DI safety, tests and packaging).
+- **P1:** useful capabilities safely deferred until after minimal production release.
+- **P2:** integrations, distributed features and exploratory work.
 
-## Go distribution and release tracks (GSD)
+Follow **Discuss → Plan → Execute → Verify → Review → Ship** per issue. All merged PRs require checks on exact head SHA; an issue stays open if acceptance criteria are not fully met. Never reuse or move `v0.1.0`; versioned Go module checksums are immutable.
 
-- Go module layout: the public packages `compiler`, `runtime`, `metadata` remain under one root module and share a single semver tag. No nested `go.mod` migration is being introduced.
-- CLI distribution: `cmd/nestgo` is installed by `go install .../cmd/nestgo@version`; legacy `modforge` remains supported. The application installs the library with `go get github.com/kevenmiano/nestgo@version`.
-- Separate CI/CD jobs: docs Pages publishing, Go library conformance and GoReleaser-driven CLI archives, all triggered by published release tags reachable from main. The release packaging strategy is recorded in [ADR 0001](../docs/adr/0001-goreleaser-distribution.md).
-- GSD checkpoints: tests for package imports and CLI installation, release-tag ancestry verification, docs build, versioned binaries and SHA256 checks, verified Actions logs after first real release.
-- Details: [distribution guide](../docs/DISTRIBUTION.md). This is an incremental M006 release delivery and does not complete issue #25.
-
-## Dependency diagnostics and performance measurements (GSD)
-
-- [#36](https://github.com/kevenmiano/nestgo/issues/36): deterministic provider graph, cycles and missing/ambiguous resolution diagnostics (M002).
-- [#37](https://github.com/kevenmiano/nestgo/issues/37): reproducible cold/warm startup and allocation profiling baselines (M006).
-- [#38](https://github.com/kevenmiano/nestgo/issues/38): offline SVG/HTML graph and startup report (M006).
-- Initial deliverable: `nestgo diagnose -example` produces graph.json, graph.dot, report.json and report.html, using real warm `runtime.New` measurements. See [diagnostics guide](../docs/DIAGNOSTICS.md).
-- Remaining: full module import/export graph, scale benchmarks, cold process startup measurement and diagnosis of arbitrary linked applications.
-
-## Current iteration
-
-M001 Phase 1: PR #8 (CI) and PR #9 (compiler coverage) were merged after green checks; issue #4 still requires the full acceptance criteria to be reviewed. Issues #2–#7 remain the stabilization baseline. Newly created #10–#25 are future work, not implemented features.
+See [Semantic releases](../docs/SEMANTIC_RELEASES.md) and [distribution](../docs/DISTRIBUTION.md).
