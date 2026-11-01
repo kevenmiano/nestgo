@@ -19,14 +19,14 @@ func TestInitializedConfigAndConnectionsInjected(t *testing.T) {
 	registry := database.NewConnections()
 	defer registry.Close()
 	pkg := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*externalConfigConsumer)(nil))}}}
-	if _, err := newHandler(Options{Instances: []any{settings, registry}}, pkg); err != nil {
+	if _, err := newHandler(handlerOptions{Instances: []any{settings, registry}}, pkg); err != nil {
 		t.Fatalf("external providers unavailable to DI: %v", err)
 	}
 }
 
 func TestInvalidExternalProvidersRejected(t *testing.T) {
 	for _, instance := range []any{nil, 42, (*config.Service)(nil)} {
-		if _, err := newHandler(Options{Instances: []any{instance}}); err == nil {
+		if _, err := newHandler(handlerOptions{Instances: []any{instance}}); err == nil {
 			t.Fatalf("accepted invalid external provider %T", instance)
 		}
 	}
