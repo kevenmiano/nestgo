@@ -44,7 +44,7 @@ func TestNginxProxySecurityBoundaries(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var probeHits, echoHits atomic.Int64
+			var probeHits, echoHits, cacheHits atomic.Int64
 			adapter := tc.newAdapter()
 			for _, route := range []httpadapter.Route{
 				{
@@ -59,6 +59,13 @@ func TestNginxProxySecurityBoundaries(t *testing.T) {
 					Handler: func(ctx httpadapter.Context) error {
 						echoHits.Add(1)
 						return ctx.Write(ctx.Body())
+					},
+				},
+				{
+					Method: "GET", Path: "/cached/{id}",
+					Handler: func(ctx httpadapter.Context) error {
+						cacheHits.Add(1)
+						return ctx.Write([]byte(ctx.Param("id")))
 					},
 				},
 			} {
@@ -93,12 +100,17 @@ func TestNginxProxySecurityBoundaries(t *testing.T) {
 			proxyAddress := reservation.Addr().String()
 			_ = reservation.Close()
 			workdir := t.TempDir()
+			cacheDir := filepath.Join(workdir, "cache")
+			if err := os.MkdirAll(cacheDir, 0700); err != nil {
+				t.Fatal(err)
+			}
 			config := fmt.Sprintf(`worker_processes 1;
 pid %s;
 error_log %s warn;
 events { worker_connections 128; }
 http {
     access_log off;
+    proxy_cache_path %s levels=1:2 keys_zone=nestgo_cache:1m max_size=10m inactive=1m;
     server_tokens off;
     client_max_body_size 128;
     client_header_buffer_size 1k;
@@ -110,6 +122,17 @@ http {
     proxy_send_timeout 2s;
     server {
         listen %s;
+        location /cached/ {
+            proxy_pass http://%s;
+            proxy_request_buffering on;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header Connection "close";
+            proxy_cache nestgo_cache;
+            proxy_cache_valid 200 1m;
+            proxy_cache_key "$scheme$request_method$host$request_uri";
+            add_header X-Cache-Status $upstream_cache_status always;
+        }
         location / {
             proxy_pass http://%s;
             proxy_request_buffering on;
@@ -119,7 +142,7 @@ http {
         }
     }
 }
-`, filepath.Join(workdir, "nginx.pid"), filepath.Join(workdir, "error.log"), proxyAddress, upstream.Addr().String())
+`, filepath.Join(workdir, "nginx.pid"), filepath.Join(workdir, "error.log"), cacheDir, proxyAddress, upstream.Addr().String(), upstream.Addr().String())
 			configFile := filepath.Join(workdir, "nginx.conf")
 			if err := os.WriteFile(configFile, []byte(config), 0600); err != nil {
 				t.Fatal(err)
@@ -175,6 +198,43 @@ http {
 					}
 				})
 			}
+
+			t.Run("cache-key-isolation", func(t *testing.T) {
+				for _, tc := range []struct {
+					id        string
+					wantCache string
+				}{
+					{"alpha", "MISS"},
+					{"alpha", "HIT"},
+					{"beta", "MISS"},
+					{"beta", "HIT"},
+				} {
+					resp, err := client.Get(base + "/cached/" + tc.id)
+					if err != nil {
+						t.Fatal(err)
+					}
+					body, err := io.ReadAll(resp.Body)
+					_ = resp.Body.Close()
+					if err != nil {
+						t.Fatal(err)
+					}
+					if resp.StatusCode != 200 || string(body) != tc.id || resp.Header.Get("X-Cache-Status") != tc.wantCache {
+						t.Fatalf("/cached/%s: status=%d body=%q cache=%q (want %s)", tc.id, resp.StatusCode, body, resp.Header.Get("X-Cache-Status"), tc.wantCache)
+					}
+				}
+				if got := cacheHits.Load(); got != 2 {
+					t.Fatalf("cache separation: backend called %d times, want 2", got)
+				}
+				// The proxy canonicalizes an extra-space request line. The
+				// normalized /cached/alpha must reuse alpha, not beta's entry.
+				status, err := nginxRawStatus(proxyAddress, "GET  /cached/alpha HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if status != 200 || cacheHits.Load() != 2 {
+					t.Fatalf("normalized cached request: status=%d backendHits=%d", status, cacheHits.Load())
+				}
+			})
 
 			// Raw requests exercise Nginx parsing, not net/http's normalized client.
 			for _, test := range []struct {
