@@ -21,9 +21,9 @@ import (
 
 type benchmarkBindingController struct{}
 
-func (*benchmarkBindingController) Ready() string           { return "ok" }
-func (*benchmarkBindingController) Path(id string) string   { return id }
-func (*benchmarkBindingController) Search(q string) string  { return q }
+func (*benchmarkBindingController) Ready() string          { return "ok" }
+func (*benchmarkBindingController) Path(id string) string  { return id }
+func (*benchmarkBindingController) Search(q string) string { return q }
 func (*benchmarkBindingController) Create(v struct{ Name string }) string {
 	return v.Name
 }
