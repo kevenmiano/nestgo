@@ -166,7 +166,11 @@ func New(options ...Option) (*Application, error) {
 		if logger != nil {
 			logger.Error(ctx, "NestFactory", "Bootstrap failed", slog.String("error", err.Error()))
 		}
-		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
+		// Do not skip resource cleanup when the bootstrap context is canceled.
+		// Limit rollback separately from the caller's canceled context.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		return nil, errors.Join(err, registry.shutdown(cleanupCtx, adapter.Shutdown))
 	}
 	// No environment scan or SQL connection planning for applications that
 	// have not configured these features. Both services remain injectable.
