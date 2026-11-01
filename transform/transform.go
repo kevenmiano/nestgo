@@ -14,6 +14,9 @@ type Func[T any] func(T) (T, error)
 
 // Pure adapts an infallible function to a property transformer.
 func Pure[T any](fn func(T) T) Func[T] {
+	if fn == nil {
+		return nil
+	}
 	return func(value T) (T, error) { return fn(value), nil }
 }
 
@@ -22,7 +25,7 @@ func Compose[T any](steps ...Func[T]) Func[T] {
 	return func(value T) (T, error) {
 		var err error
 		for _, step := range steps {
-			value, err = step(value)
+			value, err = ApplyFunc(value, step)
 			if err != nil {
 				var zero T
 				return zero, err
