@@ -60,5 +60,5 @@ func InstanceToPlain[T any](value T) (any, error) {
 
 // Marshal and Unmarshal expose zero-configuration JSON operations for code
 // that wants DTO transforms without involving an HTTP adapter.
-func Marshal[T any](value T) ([]byte, error) { return json.Marshal(value) }
+func Marshal[T any](value T) ([]byte, error)  { return json.Marshal(value) }
 func Unmarshal[T any](data []byte) (T, error) { return PlainToInstance[T](data) }

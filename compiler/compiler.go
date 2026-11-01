@@ -58,7 +58,9 @@ func Parse(path string, src []byte) (*File, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	dtos, err := collectDTOs(path, file, fset, propertyMarkers)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	result := &File{Path: path, Package: file.Name.Name, Source: source, DTOs: dtos}
 	typeNames := map[string]bool{}
 	for _, node := range file.Decls {
@@ -581,9 +583,13 @@ func CompileDir(dir string) error {
 		}
 		codecPath := strings.TrimSuffix(file.Path, ".mgo") + "_transformers_generated.go"
 		codec, err := generatedPropertySource(file)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if codec == nil {
-			if err := os.Remove(codecPath); err != nil && !os.IsNotExist(err) { return err }
+			if err := os.Remove(codecPath); err != nil && !os.IsNotExist(err) {
+				return err
+			}
 		} else if err := writeIfChanged(codecPath, codec); err != nil {
 			return err
 		}

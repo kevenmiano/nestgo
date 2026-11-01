@@ -1,11 +1,11 @@
 package compiler
 
 import (
-    "os"
-    "os/exec"
-    "path/filepath"
-    "strings"
-    "testing"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
 )
 
 const dtoSource = `package demodto
@@ -35,23 +35,39 @@ func NormalizeEmail(value string) (string,error) { return strings.ToLower(value)
 `
 
 func TestPropertyDecoratorsCompileAndRoundTrip(t *testing.T) {
-    dir := t.TempDir()
-    if err := os.WriteFile(filepath.Join(dir, "dto.mgo"), []byte(dtoSource), 0644); err != nil {t.Fatal(err)}
-    if err := CompileDir(dir); err != nil {t.Fatal(err)}
-    codec, err := os.ReadFile(filepath.Join(dir, "dto_transformers_generated.go"))
-    if err != nil { t.Fatal(err) }
-    for _, expected := range []string{"MarshalJSON()", "UnmarshalJSON(data []byte)", "NormalizeEmail(p", "url.PathUnescape(p", "display_name"} {
-        if !strings.Contains(string(codec), expected) {t.Fatalf("missing %q from generated codec:\n%s",expected,codec)}
-    }
-    normal, err := os.ReadFile(filepath.Join(dir, "dto_generated.go"))
-    if err != nil {t.Fatal(err)}
-    if strings.Contains(string(normal), "\"net/url\"") {t.Fatalf("decorator-only import leaked into normal Go source: %s",normal)}
-    workingDir, err := os.Getwd()
-    if err != nil {t.Fatal(err)}
-    moduleRoot := filepath.Dir(workingDir)
-    mod := "module demodto\n\ngo 1.23\n\nrequire github.com/kevenmiano/nestgo v0.0.0\nreplace github.com/kevenmiano/nestgo => "+filepath.ToSlash(moduleRoot)+"\n"
-    if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil {t.Fatal(err)}
-    testSource := `package demodto
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "dto.mgo"), []byte(dtoSource), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompileDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	codec, err := os.ReadFile(filepath.Join(dir, "dto_transformers_generated.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{"MarshalJSON()", "UnmarshalJSON(data []byte)", "NormalizeEmail(p", "url.PathUnescape(p", "display_name"} {
+		if !strings.Contains(string(codec), expected) {
+			t.Fatalf("missing %q from generated codec:\n%s", expected, codec)
+		}
+	}
+	normal, err := os.ReadFile(filepath.Join(dir, "dto_generated.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(normal), "\"net/url\"") {
+		t.Fatalf("decorator-only import leaked into normal Go source: %s", normal)
+	}
+	workingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	moduleRoot := filepath.Dir(workingDir)
+	mod := "module demodto\n\ngo 1.23\n\nrequire github.com/kevenmiano/nestgo v0.0.0\nreplace github.com/kevenmiano/nestgo => " + filepath.ToSlash(moduleRoot) + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil {
+		t.Fatal(err)
+	}
+	testSource := `package demodto
 
 import (
     "encoding/json"
@@ -70,27 +86,33 @@ func TestCodec(t *testing.T) {
     if !strings.Contains(string(data),"\"display_name\":\"Ada\"") {t.Fatalf("alias missing: %s",data)}
 }
 `
-    if err := os.WriteFile(filepath.Join(dir,"dto_test.go"),[]byte(testSource),0644);err!=nil {t.Fatal(err)}
-    cmd := exec.Command("go","test",".")
-    cmd.Dir = dir
-    cmd.Env = append(os.Environ(),"GOWORK=off")
-    out, err := cmd.CombinedOutput()
-    if err != nil {t.Fatalf("generated DTO does not build or pass tests: %v\n%s",err,out)}
+	if err := os.WriteFile(filepath.Join(dir, "dto_test.go"), []byte(testSource), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("go", "test", ".")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GOWORK=off")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("generated DTO does not build or pass tests: %v\n%s", err, out)
+	}
 }
 
 func TestPropertyDecoratorDiagnostics(t *testing.T) {
-    tests := []struct{name,source,errText string}{
-        {"outside-struct","package demo\n@Exclude()\ntype User struct{}","property decorator"},
-        {"missing-field","package demo\ntype User struct {\n@Expose()\n}","must precede"},
-        {"bad-transform","package demo\ntype User struct {\n@Transform(something())\nName string\n}","function identifier"},
-        {"conflict","package demo\ntype User struct {\n@Expose()\n@Exclude()\nName string\n}","cannot decorate"},
-        {"type-mismatch","package demo\ntype User struct {\n@Type(int)\nName string\n}","must match"},
-        {"bad-direction","package demo\ntype User struct {\n@Transform(Fn, \"invalid\")\nName string\n}","direction"},
-    }
-    for _, tc := range tests {
-        t.Run(tc.name,func(t *testing.T){
-            _,err:=Parse("dto.mgo",[]byte(tc.source))
-            if err==nil || !strings.Contains(err.Error(),tc.errText) {t.Fatalf("expected %q, got %v",tc.errText,err)}
-        })
-    }
+	tests := []struct{ name, source, errText string }{
+		{"outside-struct", "package demo\n@Exclude()\ntype User struct{}", "property decorator"},
+		{"missing-field", "package demo\ntype User struct {\n@Expose()\n}", "must precede"},
+		{"bad-transform", "package demo\ntype User struct {\n@Transform(something())\nName string\n}", "function identifier"},
+		{"conflict", "package demo\ntype User struct {\n@Expose()\n@Exclude()\nName string\n}", "cannot decorate"},
+		{"type-mismatch", "package demo\ntype User struct {\n@Type(int)\nName string\n}", "must match"},
+		{"bad-direction", "package demo\ntype User struct {\n@Transform(Fn, \"invalid\")\nName string\n}", "direction"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Parse("dto.mgo", []byte(tc.source))
+			if err == nil || !strings.Contains(err.Error(), tc.errText) {
+				t.Fatalf("expected %q, got %v", tc.errText, err)
+			}
+		})
+	}
 }

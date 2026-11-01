@@ -14,7 +14,7 @@ import (
 // DTOField is a statically known property in a decorated Go DTO.
 type DTOField struct {
 	Name, Type, JSONTag string
-	Annotations        []Annotation
+	Annotations         []Annotation
 }
 
 // DTO describes a struct requiring generated JSON transformer methods.

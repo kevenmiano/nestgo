@@ -38,13 +38,21 @@ func generatedPropertySource(file *File) ([]byte, error) {
 	for _, dto := range file.DTOs {
 		for _, field := range dto.Fields {
 			parsedType, parseErr := parser.ParseExpr(field.Type)
-			if parseErr != nil { return nil, Diagnostic{file.Path, 1, "invalid DTO field type"} }
+			if parseErr != nil {
+				return nil, Diagnostic{file.Path, 1, "invalid DTO field type"}
+			}
 			ast.Inspect(parsedType, func(node ast.Node) bool {
 				selector, ok := node.(*ast.SelectorExpr)
-				if !ok { return true }
+				if !ok {
+					return true
+				}
 				id, ok := selector.X.(*ast.Ident)
-				if !ok { return true }
-				if uri, found := imports[id.Name]; found { required[id.Name] = uri }
+				if !ok {
+					return true
+				}
+				if uri, found := imports[id.Name]; found {
+					required[id.Name] = uri
+				}
 				return true
 			})
 			for _, ann := range field.Annotations {
@@ -102,4 +110,3 @@ func decoratorOnlyImportAliases(file *File) map[string]bool {
 	}
 	return out
 }
-
