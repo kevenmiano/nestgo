@@ -120,15 +120,17 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				if spec.StaticInvoke != nil && typ.NumIn() == 0 {
 					value, err := spec.StaticInvoke(instance.Interface())
 					if err != nil {
-						http.Error(w, err.Error(), 500)
+						http.Error(w, "Internal server error", http.StatusInternalServerError)
 						return
 					}
 					result = value
 				} else {
 					results := handler.Call(args)
-					if len(results) == 2 && !results[1].IsNil() {
-						http.Error(w, results[1].Interface().(error).Error(), 500)
-						return
+					if len(results) == 2 {
+						if handlerErr := reflectedHandlerError(results[1]); handlerErr != nil {
+							http.Error(w, "Internal server error", http.StatusInternalServerError)
+							return
+						}
 					}
 					result = results[0].Interface()
 				}
