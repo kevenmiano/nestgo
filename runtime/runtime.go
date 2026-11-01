@@ -21,6 +21,7 @@ func New(packages ...metadata.Package) (http.Handler, error) {
 type Options struct {
 	Logger *logging.Service
 	Debug  bool
+	Instances []any
 }
 
 func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler, error) {
@@ -43,17 +44,33 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	providers := map[reflect.Type]reflect.Value{}
 	orderedProviders := make([]reflect.Type, 0)
 	controllers := []metadata.Controller{}
+	for _, instance := range options.Instances {
+		if instance == nil {
+			return fail(fmt.Errorf("nil external provider instance"))
+		}
+		value := reflect.ValueOf(instance)
+		if value.Kind() != reflect.Ptr || value.IsNil() || value.Elem().Kind() != reflect.Struct {
+			return fail(fmt.Errorf("external provider must be a non-nil pointer to struct: %T", instance))
+		}
+		if _, exists := providers[value.Type()]; exists {
+			return fail(fmt.Errorf("duplicate external provider: %s", value.Type()))
+		}
+		providers[value.Type()] = value
+		orderedProviders = append(orderedProviders, value.Type())
+	}
 	for _, pkg := range packages {
 		moduleStart := time.Now()
 		for _, p := range pkg.Providers {
 			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
 				return fail(fmt.Errorf("provider must be pointer to struct: %v", p.Type))
 			}
-			if _, exists := providers[p.Type]; exists {
-				return fail(fmt.Errorf("duplicate provider: %v", p.Type))
+			
+			if existing, ok := providers[p.Type]; !ok {
+				providers[p.Type] = reflect.New(p.Type.Elem())
+				orderedProviders = append(orderedProviders, p.Type)
+			} else if !existing.IsValid() {
+				return fail(fmt.Errorf("invalid provider: %v", p.Type))
 			}
-			providers[p.Type] = reflect.New(p.Type.Elem())
-			orderedProviders = append(orderedProviders, p.Type)
 			logDebug("InstanceLoader", "Provider instantiated", slog.String("provider", p.Type.String()))
 		}
 		controllers = append(controllers, pkg.Controllers...)
