@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/kevenmiano/nestgo/database/sqlgen"
 )
 
 // WatchDir compiles immediately and again when top-level .mgo files change.
@@ -30,9 +32,13 @@ func WatchDir(ctx context.Context, dir string, interval time.Duration, report fu
 	if err != nil {
 		return err
 	}
+	cache := &incrementalCache{}
+	compile := func() error {
+		return compileDirWithCache(dir, sqlgen.PostgreSQL, nil, false, cache)
+	}
 	if report != nil {
-		report(CompileDir(dir))
-	} else if err := CompileDir(dir); err != nil {
+		report(compile())
+	} else if err := compile(); err != nil {
 		return err
 	}
 	ticker := time.NewTicker(interval)
@@ -53,7 +59,7 @@ func WatchDir(ctx context.Context, dir string, interval time.Duration, report fu
 				continue
 			}
 			current = next
-			if err := CompileDir(dir); report != nil {
+			if err := compile(); report != nil {
 				report(err)
 			} else if err != nil {
 				return err

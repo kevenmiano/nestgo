@@ -694,6 +694,16 @@ func compileDirWithDialectPlan(dir string, dialect sqlgen.Dialect, dialects map[
 }
 
 func compileDirWithDialectPlanMode(dir string, dialect sqlgen.Dialect, dialects map[string]sqlgen.Dialect, checkOnly bool) error {
+	return compileDirWithCache(dir, dialect, dialects, checkOnly, nil)
+}
+
+// compileDirWithCache keeps normal compile/check stateless. Only a watch session
+// passes a cache, avoiding repeated parsing/formatting of unchanged .mgo units.
+func compileDirWithCache(dir string, dialect sqlgen.Dialect, dialects map[string]sqlgen.Dialect, checkOnly bool, cache *incrementalCache) error {
+	var next map[string]cachedUnit
+	if cache != nil {
+		next = make(map[string]cachedUnit)
+	}
 	if dialect != sqlgen.PostgreSQL && dialect != sqlgen.Question {
 		return fmt.Errorf("compiler: unsupported SQL dialect %d", dialect)
 	}
@@ -731,7 +741,12 @@ func compileDirWithDialectPlanMode(dir string, dialect sqlgen.Dialect, dialects 
 		if err != nil {
 			return err
 		}
-		file, err := Parse(path, raw)
+		var file *File
+		if cache != nil {
+			file, err = cache.parse(path, raw, next)
+		} else {
+			file, err = Parse(path, raw)
+		}
 		if err != nil {
 			return err
 		}
@@ -818,7 +833,12 @@ func compileDirWithDialectPlanMode(dir string, dialect sqlgen.Dialect, dialects 
 	}
 	for _, file := range files {
 		target := strings.TrimSuffix(file.Path, ".mgo") + "_generated.go"
-		formatted, err := generatedSource(file)
+		var formatted []byte
+		if cache != nil {
+			formatted, err = cache.render(file, next)
+		} else {
+			formatted, err = generatedSource(file)
+		}
 		if err != nil {
 			return err
 		}
@@ -872,7 +892,13 @@ func compileDirWithDialectPlanMode(dir string, dialect sqlgen.Dialect, dialects 
 		}
 		return &OutdatedError{Directory: dir, Artifacts: sortedOutdatedArtifacts(stale)}
 	}
-	return appendMissingTestStubs(dir, files[0].Package, stubs)
+	if err := appendMissingTestStubs(dir, files[0].Package, stubs); err != nil {
+		return err
+	}
+	if cache != nil {
+		cache.commit(next)
+	}
+	return nil
 }
 func writeIfChanged(path string, content []byte) error {
 	old, err := os.ReadFile(path)
