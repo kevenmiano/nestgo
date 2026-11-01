@@ -46,8 +46,8 @@ func isParam(s string) bool {
 	return len(s) >= 3 && s[0] == '{' && s[len(s)-1] == '}'
 }
 
-// lookup preserves registration order for overlapping patterns and preserves
-// 405 semantics when a path exists for a different HTTP method.
+// lookup prefers more specific literal routes over wildcards, independent of
+// registration order, while preserving 405 for paths bound to other methods.
 func (idx routeIndex) lookup(method, path string) (httpadapter.Handler, map[string]string, bool) {
 	parts := splitPath(path)
 	bucket := idx[len(parts)]
@@ -59,6 +59,8 @@ func (idx routeIndex) lookup(method, path string) (httpadapter.Handler, map[stri
 	wildcards := bucket.wildcard
 	li, wi := 0, 0
 	foundPath := false
+	var selected routeEntry
+	bestSpecificity := -1
 	for li < len(literals) || wi < len(wildcards) {
 		var entry routeEntry
 		if wi == len(wildcards) || (li < len(literals) && literals[li].index < wildcards[wi].index) {
@@ -82,16 +84,51 @@ func (idx routeIndex) lookup(method, path string) (httpadapter.Handler, map[stri
 		if entry.route.Method != method {
 			continue
 		}
-		var params map[string]string
-		for i, part := range entry.parts {
-			if isParam(part) {
-				if params == nil {
-					params = make(map[string]string)
-				}
-				params[part[1:len(part)-1]] = parts[i]
+		specificity := 0
+		for _, part := range entry.parts {
+			if !isParam(part) {
+				specificity++
 			}
 		}
-		return entry.route.Handler, params, true
+		if specificity > bestSpecificity {
+			selected = entry
+			bestSpecificity = specificity
+		}
 	}
-	return nil, nil, foundPath
+	if bestSpecificity < 0 {
+		return nil, nil, foundPath
+	}
+	var params map[string]string
+	for i, part := range selected.parts {
+		if isParam(part) {
+			if params == nil {
+				params = make(map[string]string)
+			}
+			params[part[1:len(part)-1]] = parts[i]
+		}
+	}
+	return selected.route.Handler, params, true
+}
+
+// routeOverlap reports whether two patterns can match the same path and whether
+// either is strictly more specific. Overlapping incomparable/equivalent patterns
+// are rejected at registration instead of depending on declaration order.
+func routeOverlap(a, b string) (overlaps, aMore, bMore bool) {
+	left, right := splitPath(a), splitPath(b)
+	if len(left) != len(right) {
+		return false, false, false
+	}
+	for i := range left {
+		aParam, bParam := isParam(left[i]), isParam(right[i])
+		if !aParam && !bParam && left[i] != right[i] {
+			return false, false, false
+		}
+		if !aParam && bParam {
+			aMore = true
+		}
+		if aParam && !bParam {
+			bMore = true
+		}
+	}
+	return true, aMore, bMore
 }

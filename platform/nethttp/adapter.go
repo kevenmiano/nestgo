@@ -46,7 +46,7 @@ func (a *Adapter) register(pattern string, handler httpadapter.Handler) (err err
 	a.mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
 		ctx := &requestContext{w: w, r: r, status: 200}
 		if e := handler(ctx); e != nil && !ctx.wrote {
-			http.Error(w, e.Error(), 500)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
 	})
 	return nil
@@ -104,11 +104,6 @@ func (c *requestContext) Body() []byte {
 func (c *requestContext) Status(code int)       { c.status = code }
 func (c *requestContext) SetHeader(k, v string) { c.w.Header().Set(k, v) }
 func (c *requestContext) AddHeader(k, v string) { c.w.Header().Add(k, v) }
-
-// NewContext exposes the platform-independent response context for legacy handlers.
-func NewContext(w http.ResponseWriter, r *http.Request) httpadapter.Context {
-	return &requestContext{w: w, r: r, status: 200}
-}
 func (c *requestContext) Write(p []byte) (intErr error) {
 	if !c.wrote {
 		c.w.WriteHeader(c.status)

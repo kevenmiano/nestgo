@@ -16,7 +16,7 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 	return registerRoutesWithLifecycle(adapter, packages, nil)
 }
 
-func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
+func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, direct ...httpadapter.Route) error {
 	var onProvider func(reflect.Type)
 	if lifecycle != nil {
 		onProvider = lifecycle.onProvider
@@ -77,9 +77,10 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				if rt.StaticHTTP != nil {
 					value, status, err := rt.StaticHTTP(instance.Interface(), ctx)
 					if err != nil {
-						if status != 0 {
+						if status >= 400 && status <= 599 {
 							return respondError(ctx, status, err.Error())
 						}
+						// Never accept success or redirect statuses for an exception.
 						return http.WriteError(ctx, err)
 					}
 					result, resultStatus = value, status
@@ -167,9 +168,28 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			}
 		}
 	}
+	for _, route := range direct {
+		if route.Handler == nil || route.Method == "" || !strings.HasPrefix(route.Path, "/") {
+			return fmt.Errorf("invalid direct route %s %s: method, absolute path and handler are required", route.Method, route.Path)
+		}
+		key := route.Method + " " + route.Path
+		if seen[key] {
+			return fmt.Errorf("duplicate route %s", key)
+		}
+		seen[key] = true
+		if err := adapter.Register(route); err != nil {
+			return fmt.Errorf("register %s: %w", key, err)
+		}
+		if lifecycle != nil && lifecycle.onRoute != nil {
+			lifecycle.onRoute(route.Method, route.Path)
+		}
+	}
 	return nil
 }
 func respondError(ctx httpadapter.Context, status int, message string) error {
+	if status >= 500 {
+		message = "Internal server error"
+	}
 	ctx.Status(status)
 	ctx.SetHeader("Content-Type", "text/plain; charset=utf-8")
 	return ctx.Write([]byte(message + "\n"))

@@ -2,7 +2,20 @@
 
 All HTTP engines use **the same** `runtime.New` factory, dependency injection, route metadata, lifecycle hooks and shutdown.
 
-Native fasthttp (default):
+Plain Go handler registration needs no metadata or code-generation step:
+
+```go
+app, err := runtime.New(
+    runtime.WithRoutes(runtime.Route{
+        Method: "GET", Path: "/ping",
+        Handler: func(ctx runtime.Context) error { return ctx.Write([]byte("pong")) },
+    }),
+)
+if err != nil { log.Fatal(err) }
+log.Fatal(app.Listen(":8080"))
+```
+
+Generated controller metadata is optional. Native fasthttp (default):
 
 ```go
 app, err := runtime.New(runtime.WithRegistry("shop"))
@@ -33,6 +46,7 @@ No separate legacy `http.Handler` constructor exists.
 
 ## Engine-independent responses
 
-Use `github.com/kevenmiano/nestgo/http` for response helpers. Controllers may return
-plain DTOs, `http.Response[DTO]` for typed HTTP metadata, or `http.Result` for
-transport-neutral responses without a fixed body type. See [HTTP responses](HTTP_RESPONSES.md).
+Import `github.com/kevenmiano/nestgo/http` for transport-independent response helpers.
+Controllers may return ordinary DTOs, `http.Response[DTO]` for typed response metadata,
+or `http.Result` for untyped response contracts. HTTP errors and status constants
+also live in this package; see [HTTP responses](HTTP_RESPONSES.md).
