@@ -30,7 +30,9 @@ func RunRegistered(output string, samples, iterations, coldSamples int, strict, 
 	}
 	if coldChild {
 		app, err := nestgoruntime.New(nestgoruntime.WithPackages(packages...))
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		return app.Close()
 	}
 	if coldSamples < 0 || coldSamples > 50 {
