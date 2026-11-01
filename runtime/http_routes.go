@@ -160,8 +160,7 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 								return err
 							}
 							if status >= 400 && status <= 599 {
-								// A handler's arbitrary error text is never safe to expose.
-							// Preserve established 4xx contracts; redact unexpected 5xx errors.
+								// Preserve existing 4xx behavior; redact unexpected 5xx errors.
 							if status >= 500 {
 								return httpadapter.NewHTTPException(status, "Internal server error")
 							}
