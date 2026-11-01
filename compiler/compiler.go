@@ -214,15 +214,15 @@ func typedHTTPInvoker(d Declaration) string {
 			if !token.IsIdentifier(typ) || typ == "any" || typ == "interface{}" {
 				return ""
 			}
-			fmt.Fprintf(&body, "%s,code,err:=httpadapter.DecodeBody[%s](ctx);if err!=nil{return nil,code,err};", identifier, typ)
+			fmt.Fprintf(&body, "%s,code,err:=httpadapter.DecodeBodyAt[%s](ctx,%d);if err!=nil{return nil,code,err};", identifier, typ, i)
 		case "Param", "Query":
 			if typ != "string" {
 				return ""
 			}
 			if mark.Kind == "Param" {
-				fmt.Fprintf(&body, "%s:=ctx.Param(%q);", identifier, mark.Name)
+				fmt.Fprintf(&body, "%s,code,err:=httpadapter.BindParam(ctx,%q,%d);if err!=nil{return nil,code,err};", identifier, mark.Name, i)
 			} else {
-				fmt.Fprintf(&body, "%s:=ctx.Query(%q);", identifier, mark.Name)
+				fmt.Fprintf(&body, "%s,code,err:=httpadapter.BindQuery(ctx,%q,%d);if err!=nil{return nil,code,err};", identifier, mark.Name, i)
 			}
 		default:
 			return ""
