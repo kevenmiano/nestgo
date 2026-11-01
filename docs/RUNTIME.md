@@ -40,10 +40,11 @@ log.Fatal(app.Listen(":8080"))
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
+| `WithContext(ctx)` | Pass a cancellable context to bootstrap lifecycle hooks |
 | `WithDebug(true)` | Enable detailed per-provider diagnostics |
 | `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
 
-Do not combine `WithRegistry` and `WithPackages`. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
+Do not combine `WithRegistry` and `WithPackages`. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown(ctx)`, `Close()` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
 
 ## Lifecycle
 
@@ -68,7 +69,7 @@ Providers are initialized in stable type-name order and controllers follow metad
 
 Direct Go handlers execute without reflective controller dispatch. For decorator-generated controllers, generated invokers can bypass reflective calls, while other handlers use reflection as needed. Both native `platform/fasthttp` and `platform/nethttp` use the same route namespace and lifecycle. Conflicts between direct and controller-generated routes are rejected at bootstrap.
 
-`app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup, but registered adapter routes are not transactionally rolled back. The caller owns OS signal handling and deadlines.
+`app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup, but registered adapter routes are not transactionally rolled back. The caller owns OS signal handling and deadlines. `Close()` delegates to `Shutdown(context.Background())`; use `Shutdown(ctx)` when a timeout or cancellation deadline is required. `WithContext` applies only to bootstrap lifecycle hooks and does not implicitly cancel serving requests or shut down an already started application.
 
 ## Observability and constraints
 
