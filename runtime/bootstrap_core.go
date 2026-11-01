@@ -25,6 +25,10 @@ func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type)
 }
 
 func prepareBootstrapWithInstances(packages []metadata.Package, instances []any, onProvider func(reflect.Type), onPackage func()) (bootstrapGraph, error) {
+	if len(packages) == 0 && len(instances) == 0 {
+		// Pure code-first apps skip metadata and DI allocation entirely.
+		return bootstrapGraph{}, nil
+	}
 	providerCount, controllerCount := len(instances), 0
 	for _, pkg := range packages {
 		providerCount += len(pkg.Providers)
