@@ -49,7 +49,7 @@ func (g *GreeterService) Greet() string { return "from-external-interface" }
 @Controller("/ready")
 type AppController struct {
     Greeter external.Greeter
-    Optional external.Unused `nestgo:"optional"`
+    Optional external.Unused NESTGO_OPTIONAL_TAG
 }
 
 @Get("/")
@@ -79,7 +79,7 @@ func TestCompiledCrossPackageBootstrap(t *testing.T) {
 `,
 	}
 	for path, content := range files {
-		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		if err := os.WriteFile(path, []byte(strings.ReplaceAll(content, "NESTGO_OPTIONAL_TAG", "`nestgo:\"optional\"`")), 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
