@@ -23,6 +23,7 @@ type Option func(*applicationConfig)
 type applicationConfig struct {
 	adapter     httpadapter.Adapter
 	packages    []metadata.Package
+	routes      []Route
 	registry    []string
 	logger      *logging.Service
 	loggerConfigured bool
@@ -37,6 +38,20 @@ type applicationConfig struct {
 // WithPackages supplies already-generated metadata to the application.
 func WithPackages(packages ...metadata.Package) Option {
 	return func(c *applicationConfig) { c.packages = append(c.packages, packages...) }
+}
+
+// Context is the HTTP-engine-independent request context.
+type Context = httpadapter.Context
+
+// Handler processes an HTTP request without compiled controller metadata.
+type Handler = httpadapter.Handler
+
+// Route declares an HTTP endpoint directly in Go.
+type Route = httpadapter.Route
+
+// WithRoutes registers direct handlers with the same namespace and lifecycle as compiled routes.
+func WithRoutes(routes ...Route) Option {
+	return func(c *applicationConfig) { c.routes = append(c.routes, routes...) }
 }
 
 // WithRegistry loads named registered packages and their transitive module imports.
@@ -173,7 +188,7 @@ func New(options ...Option) (*Application, error) {
 	registry.instances = append(registry.instances, &ownedSQLConnections{connections})
 	instances := append([]any{settings, connections}, cfg.instances...)
 	registrationStarted := time.Now()
-	if err := registerRoutesWithLifecycleAndInstances(adapter, packages, registry, instances); err != nil {
+	if err := registerRoutesWithLifecycleAndInstances(adapter, packages, registry, instances, cfg.routes...); err != nil {
 		return fail(err)
 	}
 	registrationDuration := time.Since(registrationStarted)
