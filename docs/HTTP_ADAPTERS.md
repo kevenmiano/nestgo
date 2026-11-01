@@ -1,52 +1,38 @@
 # HTTP platform adapters
 
-NestGo's application-level API accepts a transport-independent `httpadapter.Adapter`.
-The default adapter is `platform/fasthttp`; the standard-library adapter is
-`platform/nethttp`. Custom engines can implement the same interface.
+All HTTP engines use **the same** `runtime.New` factory, dependency injection, route metadata, lifecycle hooks and shutdown.
+
+Native fasthttp (default):
 
 ```go
-app, err := runtime.ApplicationFromRegistry(runtime.ApplicationOptions{}, "shop")
+app, err := runtime.New(runtime.WithRegistry("shop"))
 if err != nil { log.Fatal(err) }
 log.Fatal(app.Listen(":8080"))
 ```
 
-To explicitly select the standard library adapter:
+Go standard-library HTTP engine:
 
 ```go
-app, err := runtime.ApplicationFromRegistry(
-    runtime.ApplicationOptions{Adapter: nethttp.New()}, "shop",
+app, err := runtime.New(
+    runtime.WithRegistry("shop"),
+    runtime.WithAdapter(nethttp.New()),
 )
 if err != nil { log.Fatal(err) }
 log.Fatal(app.Listen(":8080"))
 ```
 
-Custom adapters must implement `Register(httpadapter.Route) error`,
-`Serve(net.Listener) error` and `Shutdown(context.Context) error`.
-`httpadapter.Context` abstracts request parsing and response writing.
-The application core performs controller/provider resolution once during
-bootstrap and registers handlers independently of platform.
+Custom engines implement `httpadapter.Adapter`: `Register(httpadapter.Route) error`, `Serve(net.Listener) error` and `Shutdown(context.Context) error`. The common `httpadapter.Context` exposes request and response operations. The application owns the adapter; always call `app.Shutdown(ctx)`.
 
-**Native fast path:** the fasthttp platform uses `fasthttp.RequestCtx`
-without `fasthttpadaptor`; the standard-library platform uses
-`http.ServeMux`. The fasthttp adapter now builds a method/segment-count index during Serve startup and only scans matching buckets for common requests. This is not a fully indexed path trie; benchmark worst-case bucket sizes and route precedence before release.
+Fasthttp uses native `fasthttp.RequestCtx` (no net/http adaptor); the standard-library engine uses `http.ServeMux`. Middleware written for net/http might require an adapter-aware integration.
 
-**Backward compatibility:** `runtime.New` and `runtime.FromRegistry`
-continue to return `http.Handler`; these legacy APIs remain on net/http.
-The application-level API uses adapters. Not all net/http-specific middleware
-can operate unchanged on fasthttp; use platform-aware integration when needed.
+## Verification priorities
 
-## Open verification work
+Validate route precedence, 404/405, trailing slash, JSON body-size limits, headers, status codes, and graceful shutdown across engines. Benchmark startup, allocations and p95/p99 HTTP latency before production use. WebSockets and streaming are not guaranteed by the current adapter contract.
 
-- Produce and commit `go.sum` with `go mod tidy` (network-enabled CI).
-- Run `go test ./...` and `go vet ./...` on Go 1.23.
-- Validate route precedence, 404/405, trailing slash, request-body limits,
-  response status and headers, and shutdown parity across engines.
-- Measure throughput, allocations, startup time and p95/p99 latency.
-- Extend generated static invokers beyond eligible zero-argument handlers (currently supported on both runtime paths).
-- Document unsupported platform capabilities such as WebSocket and streaming.
+No separate legacy `http.Handler` constructor exists.
 
-## Response contracts
+## Engine-independent responses
 
-The `http` package provides transport-independent response values,
-explicit `@Res()` writers, redirects, cookies and typed HTTP exceptions.
-See [HTTP responses](HTTP_RESPONSES.md) for API and engine-parity examples.
+Use `github.com/kevenmiano/nestgo/http` for response helpers. Controllers may return
+plain DTOs, `http.Response[DTO]` for typed HTTP metadata, or `http.Result` for
+transport-neutral responses without a fixed body type. See [HTTP responses](HTTP_RESPONSES.md).

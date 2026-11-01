@@ -11,7 +11,7 @@ import (
 	nestgoruntime "github.com/kevenmiano/nestgo/runtime"
 )
 
-// Startup stores measured warm handler construction costs, not OS process boot
+// Startup stores measured warm application construction costs, not OS process boot
 // time. A fixed fixture and identical environment improve comparability, but
 // elapsed time is inherently nondeterministic.
 type Startup struct {
@@ -48,13 +48,13 @@ func MeasureStartup(scenario string, packages []metadata.Package, samples, itera
 		return Startup{}, fmt.Errorf("samples and iterations must be between 1 and their limits (1000 / 100000)")
 	}
 	m := Startup{Scenario: scenario, GoVersion: runtime.Version(), GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, CPUCount: runtime.NumCPU(), Commit: commit, IterationsPerSample: iterations, SamplesNS: make([]float64, 0, samples)}
-	if _, err := nestgoruntime.New(packages...); err != nil {
+	if _, err := nestgoruntime.New(nestgoruntime.WithPackages(packages...)); err != nil {
 		return m, fmt.Errorf("startup fixture invalid: %w", err)
 	}
 	for i := 0; i < samples; i++ {
 		start := time.Now()
 		for j := 0; j < iterations; j++ {
-			if _, err := nestgoruntime.New(packages...); err != nil {
+			if _, err := nestgoruntime.New(nestgoruntime.WithPackages(packages...)); err != nil {
 				return m, err
 			}
 		}
@@ -67,7 +67,7 @@ func MeasureStartup(scenario string, packages []metadata.Package, samples, itera
 	b := testing.Benchmark(func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			_, _ = nestgoruntime.New(packages...)
+			_, _ = nestgoruntime.New(nestgoruntime.WithPackages(packages...))
 		}
 	})
 	m.BytesPerOp = b.AllocedBytesPerOp()

@@ -3,57 +3,147 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
+	"net"
+	"reflect"
+	"time"
+
 	"github.com/kevenmiano/nestgo/httpadapter"
+	"github.com/kevenmiano/nestgo/logging"
 	"github.com/kevenmiano/nestgo/metadata"
 	fastadapter "github.com/kevenmiano/nestgo/platform/fasthttp"
-	"net"
-	"time"
 )
 
-type ApplicationOptions struct {
-	// Adapter selects the HTTP platform. Nil defaults to native fasthttp.
-	Adapter     httpadapter.Adapter
-	OnBootstrap func(BootstrapMetrics)
+// Option configures the application before bootstrap.
+type Option func(*applicationConfig)
+
+type applicationConfig struct {
+	adapter     httpadapter.Adapter
+	packages    []metadata.Package
+	registry    []string
+	logger      *logging.Service
+	debug       bool
+	onBootstrap func(BootstrapMetrics)
 }
 
+// WithPackages supplies already-generated metadata to the application.
+func WithPackages(packages ...metadata.Package) Option {
+	return func(c *applicationConfig) { c.packages = append(c.packages, packages...) }
+}
+
+// WithRegistry loads named registered packages and their transitive module imports.
+// Import the generated Go packages so their init functions register metadata.
+func WithRegistry(names ...string) Option {
+	return func(c *applicationConfig) { c.registry = append(c.registry, names...) }
+}
+
+// WithAdapter selects an HTTP engine; the default is fasthttp.
+func WithAdapter(adapter httpadapter.Adapter) Option {
+	return func(c *applicationConfig) { c.adapter = adapter }
+}
+
+// WithLogger enables structured framework bootstrap diagnostics.
+func WithLogger(logger *logging.Service) Option {
+	return func(c *applicationConfig) { c.logger = logger }
+}
+
+// WithDebug enables per-provider bootstrap diagnostics when a logger is configured.
+func WithDebug(enabled bool) Option {
+	return func(c *applicationConfig) { c.debug = enabled }
+}
+
+// WithBootstrapMetrics registers an observer invoked after successful bootstrap.
+func WithBootstrapMetrics(observer func(BootstrapMetrics)) Option {
+	return func(c *applicationConfig) { c.onBootstrap = observer }
+}
+
+// Application owns one HTTP adapter and the lifecycle of its providers.
 type Application struct {
 	adapter   httpadapter.Adapter
 	lifecycle *lifecycleRegistry
 }
 
-// NewApplication resolves modules and registers controller routes at bootstrap.
-func NewApplication(options ApplicationOptions, packages ...metadata.Package) (*Application, error) {
+// New is the single application factory. All HTTP platforms share DI and hooks.
+//
+// Example: app, err := runtime.New(runtime.WithRegistry("shop"))
+func New(options ...Option) (*Application, error) {
+	var cfg applicationConfig
+	for i, option := range options {
+		if option == nil {
+			return nil, fmt.Errorf("nil application option at index %d", i)
+		}
+		option(&cfg)
+	}
+	if len(cfg.registry) > 0 && len(cfg.packages) > 0 {
+		return nil, errors.New("WithRegistry and WithPackages cannot be combined")
+	}
+	packages := cfg.packages
+	if len(cfg.registry) > 0 {
+		var err error
+		packages, err = registryImportClosure(cfg.registry)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	started := time.Now()
-	adapter := options.Adapter
+	adapter := cfg.adapter
 	if adapter == nil {
 		adapter = fastadapter.New()
 	}
 	registry := &lifecycleRegistry{}
+	ctx := context.Background()
+	logger := cfg.logger
+	if logger != nil {
+		logger.Info(ctx, "NestFactory", "Starting NestGo application...")
+		registry.onProvider = func(typ reflect.Type) {
+			if cfg.debug {
+				logger.Debug(ctx, "InstanceLoader", "Provider instantiated", slog.String("provider", typ.String()))
+			}
+		}
+		registry.onController = func(typ reflect.Type, prefix string) {
+			logger.Info(ctx, "RoutesResolver", "Controller registered", slog.String("controller", typ.String()), slog.String("prefix", prefix))
+		}
+		registry.onRoute = func(method, path string) {
+			logger.Info(ctx, "RouterExplorer", "Mapped route", slog.String("method", method), slog.String("path", path))
+		}
+	}
+	fail := func(err error) (*Application, error) {
+		if logger != nil {
+			logger.Error(ctx, "NestFactory", "Bootstrap failed", slog.String("error", err.Error()))
+		}
+		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
+	}
 	registrationStarted := time.Now()
 	if err := registerRoutesWithLifecycle(adapter, packages, registry); err != nil {
-		return nil, errors.Join(err, registry.shutdown(context.Background(), adapter.Shutdown))
+		return fail(err)
 	}
 	registrationDuration := time.Since(registrationStarted)
-	lifecycleStarted := time.Now()
-	if err := registry.initialize(context.Background()); err != nil {
-		return nil, errors.Join(err, registry.shutdown(context.Background(), adapter.Shutdown))
+	if logger != nil {
+		logger.Startup(ctx, "InstanceLoader", "Provider dependencies resolved", registrationStarted)
+		logger.Startup(ctx, "RouterExplorer", "Routes mapped", registrationStarted)
 	}
-	if options.OnBootstrap != nil {
-		options.OnBootstrap(BootstrapMetrics{RouteRegistration: registrationDuration, LifecycleInitialization: time.Since(lifecycleStarted), Total: time.Since(started)})
+	lifecycleStarted := time.Now()
+	if err := registry.initialize(ctx); err != nil {
+		return fail(err)
+	}
+	if logger != nil {
+		logger.Startup(ctx, "NestApplication", "Application initialized", started)
+	}
+	if cfg.onBootstrap != nil {
+		cfg.onBootstrap(BootstrapMetrics{RouteRegistration: registrationDuration, LifecycleInitialization: time.Since(lifecycleStarted), Total: time.Since(started)})
 	}
 	return &Application{adapter: adapter, lifecycle: registry}, nil
 }
 
-func ApplicationFromRegistry(options ApplicationOptions, names ...string) (*Application, error) {
-	packages, err := registryImportClosure(names)
-	if err != nil {
-		return nil, err
-	}
-	return NewApplication(options, packages...)
-}
+// HTTPAdapter returns the configured transport adapter.
+func (a *Application) HTTPAdapter() httpadapter.Adapter { return a.adapter }
 
-func (a *Application) HTTPAdapter() httpadapter.Adapter  { return a.adapter }
+// Serve handles HTTP requests until the listener closes or Shutdown is called.
 func (a *Application) Serve(listener net.Listener) error { return a.adapter.Serve(listener) }
+
+// Listen binds and serves on the provided address.
 func (a *Application) Listen(addr string) error {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -62,6 +152,8 @@ func (a *Application) Listen(addr string) error {
 	defer listener.Close()
 	return a.Serve(listener)
 }
+
+// Shutdown stops the HTTP adapter and invokes cleanup hooks once.
 func (a *Application) Shutdown(ctx context.Context) error {
 	if a == nil || a.adapter == nil {
 		return errors.New("application is not initialized")

@@ -25,7 +25,7 @@ func BenchmarkApplicationBootstrapProviders(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := NewApplication(ApplicationOptions{}, pkg); err != nil {
+				if _, err := New(WithPackages(pkg)); err != nil {
 					b.Fatal(err)
 				}
 			}

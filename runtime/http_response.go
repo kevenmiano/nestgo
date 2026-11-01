@@ -2,6 +2,7 @@ package runtime
 
 import (
 	stdhttp "net/http"
+	"reflect"
 
 	"github.com/kevenmiano/nestgo/http"
 	"github.com/kevenmiano/nestgo/httpadapter"
@@ -32,14 +33,11 @@ func finishHTTPResponse(ctx httpadapter.Context, route metadata.Route, result an
 		return http.WriteError(ctx, http.InternalServerError("explicit @Res() handler did not write a response"))
 	}
 	if route.RedirectURL != "" {
-		switch value := result.(type) {
-		case http.Response:
-			if value.RedirectURL != "" {
-				return http.Write(ctx, value, route.RedirectStatus)
-			}
-		case *http.Response:
-			if value != nil && value.RedirectURL != "" {
-				return http.Write(ctx, value, route.RedirectStatus)
+		if typed, ok := result.(http.Result); ok {
+			// A typed nil pointer may implement Result; treat it as no override.
+			v := reflect.ValueOf(typed)
+			if !(v.Kind() == reflect.Pointer && v.IsNil()) && typed.RedirectTarget() != "" {
+				return http.Write(ctx, result, route.RedirectStatus)
 			}
 		}
 		return http.Write(ctx, http.Redirect(route.RedirectURL, route.RedirectStatus), route.RedirectStatus)
@@ -49,7 +47,7 @@ func finishHTTPResponse(ctx httpadapter.Context, route metadata.Route, result an
 		status = writer.StatusCode()
 	}
 	if result == nil && writer != nil && passthrough {
-		return http.Write(ctx, http.Response{StatusCode: status, ContentType: "text/plain; charset=utf-8", Body: ""}, status)
+		return http.Write(ctx, http.Response[string]{StatusCode: status, ContentType: "text/plain; charset=utf-8", Body: ""}, status)
 	}
 	return http.Write(ctx, result, status)
 }

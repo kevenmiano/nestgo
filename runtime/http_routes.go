@@ -17,7 +17,11 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 }
 
 func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
-	graph, err := prepareBootstrap(packages, nil, nil)
+	var onProvider func(reflect.Type)
+	if lifecycle != nil {
+		onProvider = lifecycle.onProvider
+	}
+	graph, err := prepareBootstrap(packages, onProvider, nil)
 	if err != nil {
 		return err
 	}
@@ -34,6 +38,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 		}
 		if lifecycle != nil {
 			lifecycle.instances = append(lifecycle.instances, instance.Interface())
+			if lifecycle.onController != nil {
+				lifecycle.onController(controller.Type, controller.Prefix)
+			}
 		}
 		for _, route := range controller.Routes {
 			method := instance.MethodByName(route.Handler)
@@ -43,7 +50,7 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			typ := method.Type()
 			contract, contractErr := compileRouteContract(controller.Prefix, route, typ)
 			if contractErr != nil {
-				return formatRouteContractError(contractErr, false)
+				return contractErr
 			}
 			path := contract.Path
 			key := contract.Key
@@ -154,6 +161,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			}})
 			if registrationErr != nil {
 				return fmt.Errorf("register %s: %w", key, registrationErr)
+			}
+			if lifecycle != nil && lifecycle.onRoute != nil {
+				lifecycle.onRoute(rt.Method, path)
 			}
 		}
 	}

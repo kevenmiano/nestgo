@@ -20,12 +20,19 @@ import (
 
 type responseTestController struct{}
 
-func (*responseTestController) Typed() http.Response {
+func (*responseTestController) Typed() http.Response[map[string]string] {
 	return http.Created(map[string]string{"name": "Ada"}).WithHeader("X-Result", "typed").WithCookie(http.Cookie{Name: "one", Value: "1"})
 }
+type responseDTO struct {
+	ID string `json:"id"`
+}
+func (*responseTestController) TypedDTO() http.Response[responseDTO] { return http.OK(responseDTO{ID:"42"}) }
+func (*responseTestController) PlainDTO() responseDTO { return responseDTO{ID:"42"} }
+func (*responseTestController) DynamicResult() http.Result { return http.Accepted(responseDTO{ID:"42"}) }
+
 func (*responseTestController) Decorated(header string) string { return header }
 func (*responseTestController) StaticRedirect() string         { return "ignored" }
-func (*responseTestController) DynamicRedirect() http.Response {
+func (*responseTestController) DynamicRedirect() http.Response[any] {
 	return http.Redirect("/override", 307)
 }
 func (*responseTestController) Explicit(w *http.Writer) {
@@ -35,7 +42,7 @@ func (*responseTestController) Passthrough(w *http.Writer) string {
 	w.Status(202).Header("X-Pass", "yes")
 	return "from-handler"
 }
-func (*responseTestController) Cookies() http.Response {
+func (*responseTestController) Cookies() http.Response[string] {
 	return http.OK("cookie").WithCookie(http.Cookie{Name: "a", Value: "1"}).WithCookie(http.Cookie{Name: "b", Value: "2"})
 }
 func (*responseTestController) Failure() (string, error) {
@@ -50,6 +57,9 @@ func responseTestPackage() metadata.Package {
 		Prefix: "/response",
 		Routes: []metadata.Route{
 			{Method: "GET", Path: "/typed", Handler: "Typed"},
+			{Method: "GET", Path: "/typed-dto", Handler: "TypedDTO"},
+			{Method: "GET", Path: "/plain-dto", Handler: "PlainDTO"},
+			{Method: "GET", Path: "/result", Handler: "DynamicResult"},
 			{Method: "GET", Path: "/decorated", Handler: "Decorated", Status: 201, Headers: []metadata.Header{{Name: "X-Decorated", Value: "yes"}}, Parameters: []metadata.Parameter{{Index: 0, Kind: "Headers", Name: "X-Input"}}},
 			{Method: "GET", Path: "/redirect", Handler: "StaticRedirect", RedirectURL: "/dest", RedirectStatus: 301},
 			{Method: "GET", Path: "/dynamic", Handler: "DynamicRedirect", RedirectURL: "/dest", RedirectStatus: 301},
@@ -71,7 +81,7 @@ func TestHTTPResponseEngineParity(t *testing.T) {
 		{"nethttp", func() httpadapter.Adapter { return nethttp.New() }},
 	} {
 		t.Run(engine.name, func(t *testing.T) {
-			app, err := NewApplication(ApplicationOptions{Adapter: engine.factory()}, responseTestPackage())
+			app, err := New(WithPackages(responseTestPackage()), WithAdapter(engine.factory()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -91,27 +101,6 @@ func TestHTTPResponseEngineParity(t *testing.T) {
 		})
 	}
 }
-func TestLegacyHTTPResponseParity(t *testing.T) {
-	h, err := New(responseTestPackage())
-	if err != nil {
-		t.Fatal(err)
-	}
-	// The legacy handler is used directly with a real net/http listener.
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := &stdhttp.Server{Handler: h}
-	done := make(chan error, 1)
-	go func() { done <- s.Serve(l) }()
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		_ = s.Shutdown(ctx)
-		<-done
-	}()
-	checkResponseCases(t, "http://"+l.Addr().String())
-}
 func checkResponseCases(t *testing.T, base string) {
 	t.Helper()
 	client := &stdhttp.Client{Timeout: 3 * time.Second, CheckRedirect: func(*stdhttp.Request, []*stdhttp.Request) error { return stdhttp.ErrUseLastResponse }}
@@ -122,6 +111,9 @@ func checkResponseCases(t *testing.T, base string) {
 		cookieCount                         int
 	}{
 		{"typed", "/typed", "", 201, `{"name":"Ada"}` + "\n", "", "X-Result", "typed", 1},
+		{"typed-dto", "/typed-dto", "", 200, `{"id":"42"}` + "\n", "", "", "", 0},
+		{"plain-dto", "/plain-dto", "", 200, `{"id":"42"}` + "\n", "", "", "", 0},
+		{"result", "/result", "", 202, `{"id":"42"}` + "\n", "", "", "", 0},
 		{"decorated", "/decorated", "test", 201, `"test"` + "\n", "", "X-Decorated", "yes", 0},
 		{"redirect", "/redirect", "", 301, "", "/dest", "", "", 0},
 		{"dynamic", "/dynamic", "", 307, "", "/override", "", "", 0},

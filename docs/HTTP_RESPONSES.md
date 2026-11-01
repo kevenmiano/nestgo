@@ -1,6 +1,6 @@
 # Engine-independent HTTP responses
 
-NestGo controllers can return ordinary values, return a typed `http.Response`, or
+NestGo controllers can return ordinary values, return a typed `http.Response[T]`, or
 write explicitly through `@Res()`. These operations use a transport-neutral contract; your
 controller does **not** import the fasthttp or net/http engine.
 
@@ -13,18 +13,19 @@ import "github.com/kevenmiano/nestgo/http"
 type UsersController struct{}
 
 @Get("/{id}")
-func (c *UsersController) FindOne(@Param("id") id string) http.Response {
-    return http.OK(map[string]string{"id": id}).
+func (c *UsersController) FindOne(@Param("id") id string) http.Response[UserDTO] {
+    user := UserDTO{ID:id}
+    return http.OK(user).
         WithHeader("Cache-Control", "no-store")
 }
 
 @Post("/")
-func (c *UsersController) Create(@Body() dto UserDTO) http.Response {
+func (c *UsersController) Create(@Body() dto UserDTO) http.Response[UserDTO] {
     return http.Created(dto)
 }
 
 @Delete("/{id}")
-func (c *UsersController) Remove(@Param("id") id string) http.Response {
+func (c *UsersController) Remove(@Param("id") id string) http.Response[any] {
     return http.NoContent()
 }
 ```
@@ -32,6 +33,9 @@ func (c *UsersController) Remove(@Param("id") id string) http.Response {
 **Helpers:** `JSON(value)`, `Text(string)`, `OK(value)`, `Created(value)`,
 `Accepted(value)`, `NoContent()`, `Redirect(url, optionalStatus)`,
 `WithStatus(code)`, `WithHeader(name, value)` and `WithCookie(Cookie)`.
+Go does not support optional type arguments. Return `http.Response[UserDTO]` when explicit response metadata is needed,
+`http.Result` when the body type is not statically known, or return `UserDTO` directly
+for implicit JSON serialization. `http.OK(user)` infers the type argument `UserDTO`.
 Responses are immutable-by-convention: fluent methods return a modified **copy**.
 A typed response takes precedence over a route's default status.
 
@@ -119,8 +123,7 @@ flowchart LR
     A --> X["Custom adapter"]
 ```
 
-The same response dispatcher is used by adapter-based applications and the
-legacy `runtime.New` path. The response layer knows no native HTTP engine.
+The same response dispatcher is used by adapter-based applications and the shared `runtime.New` application API. The response layer knows no native HTTP engine.
 Adapters implement status, headers, and byte writing, with optional
 multi-value header support.
 

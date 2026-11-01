@@ -92,17 +92,14 @@ type UsersModule struct{}
 Use the generated metadata with the application runtime. For example, after importing your generated package for registration:
 
 ```go
-app, err := runtime.ApplicationFromRegistry(
-    runtime.ApplicationOptions{}, // native fasthttp by default
-    "shop",
-)
+app, err := runtime.New(runtime.WithRegistry("shop")) // native fasthttp by default
 if err != nil {
     log.Fatal(err)
 }
 log.Fatal(app.Listen(":8080"))
 ```
 
-The existing `runtime.FromRegistry` API also returns a standard `http.Handler`. For details on selecting a different HTTP engine, see [HTTP adapters](docs/HTTP_ADAPTERS.md).
+Pass `runtime.WithAdapter(nethttp.New())` to switch to the Go standard-library HTTP engine. Both adapters use the same bootstrap and lifecycle. See [HTTP adapters](docs/HTTP_ADAPTERS.md).
 
 ## Features
 

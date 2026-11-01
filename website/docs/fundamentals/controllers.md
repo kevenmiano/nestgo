@@ -15,12 +15,12 @@ type UsersController struct{}
 
 @Get("/{id}")
 @Header("Cache-Control", "no-store")
-func (c *UsersController) FindOne(@Param("id") id string) http.Response {
+func (c *UsersController) FindOne(@Param("id") id string) http.Response[map[string]string] {
     return http.OK(map[string]string{"id":id})
 }
 
 @Post("/")
-func (c *UsersController) Create(@Body() dto UserDTO) http.Response {
+func (c *UsersController) Create(@Body() dto UserDTO) http.Response[map[string]string] {
     return http.Created(dto)
 }
 ```
