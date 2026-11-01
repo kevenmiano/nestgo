@@ -4,7 +4,10 @@ go 1.23.0
 
 toolchain go1.23.12
 
-require github.com/valyala/fasthttp v1.65.0
+require (
+	github.com/go-viper/mapstructure/v2 v2.5.0
+	github.com/valyala/fasthttp v1.65.0
+)
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
