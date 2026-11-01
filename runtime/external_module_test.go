@@ -27,11 +27,11 @@ func TestImportedModuleAcrossPackages(t *testing.T) {
 		Providers: []metadata.Provider{{Type: service}},
 		Modules:   []metadata.Module{{Type: root, Providers: []reflect.Type{service}, Imports: []reflect.Type{external}}},
 	}
-	if _, err := New(remote, local); err != nil {
+	if _, err := newHandler(Options{}, remote, local); err != nil {
 		t.Fatal(err)
 	}
 	local.Modules[0].Imports = nil
-	if _, err := New(remote, local); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+	if _, err := newHandler(Options{}, remote, local); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
 		t.Fatalf("expected cross-package visibility denial, got %v", err)
 	}
 }
