@@ -3,8 +3,6 @@ package cli
 import (
 	"errors"
 	"fmt"
-
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -12,6 +10,7 @@ import (
 	"github.com/kevenmiano/nestgo/diagnostics"
 	"github.com/kevenmiano/nestgo/metadata"
 	nestgoruntime "github.com/kevenmiano/nestgo/runtime"
+	"github.com/spf13/cobra"
 )
 
 type sampleDatabase struct{}

@@ -4,14 +4,14 @@ This guide describes the contributor workflow for NestGo Compiler v3.
 
 ## Prerequisites
 
-Install Go 1.23 or later and clone the repository.
+Install Go 1.27 or later and clone the repository.
 
 ## Build and test
 
 ```bash
 go test ./...
 go vet ./...
-go run ./cmd/modforge compile ./examples/shop
+go run ./cmd/nestgo compile ./examples/shop
 ```
 
 To check formatting:
@@ -20,14 +20,14 @@ To check formatting:
 gofmt -l ./compiler ./metadata ./runtime ./cmd ./examples
 ```
 
-Re-run the compiler after changing `.mgo` files. Inspect the generated `_generated.go` and `zz_modforge_metadata.go` files before committing them.
+Re-run the compiler after changing `.mgo` files. Generate CLI reference with `go run ./cmd/nestgo-docs ./website/docs/cli/reference`. Inspect the generated `_generated.go` and `zz_modforge_metadata.go` files before committing them.
 
 ## Source layout
 
 - `compiler/`: decorator parsing, validation and source generation.
 - `metadata/`: registration data structures.
 - `runtime/`: HTTP handling and dependency injection.
-- `cmd/modforge/`: CLI entry point.
+- `internal/cli/`: Cobra command tree and CLI tests.\n- `cmd/nestgo/`: CLI entry point.\n- `cmd/nestgo-docs/`: generated CLI reference.
 - `examples/shop/`: runnable source example and tests.
 
 ## Commit conventions

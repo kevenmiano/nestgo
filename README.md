@@ -72,11 +72,12 @@ func main() {
 }
 ```
 
-For optional NestJS-inspired decorators, install the compiler and generate Go metadata once during development/build:
+For optional NestJS-inspired decorators, install the CLI and generate Go metadata once during development/build:
 
 ```bash
 go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
 nestgo compile ./myapp
+nestgo --help
 ```
 
 To explore the included application:
@@ -141,7 +142,7 @@ Features are evolving. Constructor injection, request-scoped providers, guards, 
 
 Read the [documentation portal](https://kevenmiano.github.io/nestgo/) or browse the [documentation sources](website/docs/). The site is built in CI; GitHub Pages publication currently happens through the separate release workflow.
 
-Additional references: [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
+For all commands, diagnostic flags and shell completion, see the [CLI guide](website/docs/cli/overview.md). The Docusaurus command reference is generated from Cobra.\n\nAdditional references: [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
 
 ## Contributing
 
