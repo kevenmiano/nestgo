@@ -95,7 +95,6 @@ func FuzzBind(f *testing.F) {
 	})
 }
 
-
 func TestEscapedSQLLiteralsAndComments(t *testing.T) {
 	for _, tc := range []struct {
 		name, query, want string
