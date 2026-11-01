@@ -100,8 +100,14 @@ func reflectedHandlerError(value reflect.Value) error {
 	if !value.IsValid() {
 		return nil
 	}
+	for value.Kind() == reflect.Interface {
+		if value.IsNil() {
+			return nil
+		}
+		value = value.Elem()
+	}
 	switch value.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Ptr, reflect.Slice:
 		if value.IsNil() {
 			return nil
 		}
