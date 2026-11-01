@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,7 +20,32 @@ type Options struct {
 
 // Service exposes an immutable snapshot of the resolved configuration.
 type Service struct {
-	values map[string]string
+	values   map[string]string
+	deferred bool
+	once     sync.Once
+}
+
+// DeferredEnvironment keeps runtime bootstrap lightweight when no config
+// options are supplied. The environment snapshot is taken only on the first
+// read, then remains immutable for this service's lifetime.
+func DeferredEnvironment() *Service {
+	return &Service{deferred: true}
+}
+
+func (s *Service) loadDeferred() {
+	if !s.deferred {
+		return
+	}
+	s.once.Do(func() {
+		values := make(map[string]string)
+		for _, entry := range os.Environ() {
+			key, value, ok := strings.Cut(entry, "=")
+			if ok {
+				values[key] = value
+			}
+		}
+		s.values = values
+	})
 }
 
 func Load(opts Options) (*Service, error) {
@@ -76,6 +102,7 @@ func (s *Service) Get(key string) (string, bool) {
 	if s == nil {
 		return "", false
 	}
+	s.loadDeferred()
 	v, ok := s.values[key]
 	return v, ok
 }
