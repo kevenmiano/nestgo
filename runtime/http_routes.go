@@ -237,7 +237,9 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 			return fmt.Errorf("invalid direct route %s %s: method, absolute path and handler are required", route.Method, route.Path)
 		}
 		key := route.Method + " " + route.Path
-		if seen[key] { return fmt.Errorf("duplicate route %s", key) }
+		if seen[key] {
+			return fmt.Errorf("duplicate route %s", key)
+		}
 		seen[key] = true
 		middleware := append([]httpadapter.Middleware(nil), pipeline.middleware...)
 		middleware = append(middleware, pipeline.routeMiddleware[key]...)
@@ -247,17 +249,27 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 			managed := func() error {
 				for _, guard := range pipeline.guards {
 					ok, err := guard.CanActivate(exec)
-					if err != nil { return handleHTTPException(err, exec, pipeline.filters) }
-					if !ok { return handleHTTPException(httpadapter.NewHTTPException(403, "Forbidden"), exec, pipeline.filters) }
+					if err != nil {
+						return handleHTTPException(err, exec, pipeline.filters)
+					}
+					if !ok {
+						return handleHTTPException(httpadapter.NewHTTPException(403, "Forbidden"), exec, pipeline.filters)
+					}
 				}
 				bound := ctx
-				if len(pipeline.pipes) != 0 { bound = &pipeContext{Context: ctx, pipes: pipeline.pipes} }
+				if len(pipeline.pipes) != 0 {
+					bound = &pipeContext{Context: ctx, pipes: pipeline.pipes}
+				}
 				return handleHTTPException(handler(bound), exec, pipeline.filters)
 			}
 			return handleHTTPException(runMiddleware(ctx, middleware, managed), exec, pipeline.filters)
 		}}
-		if err := adapter.Register(wrapped); err != nil { return fmt.Errorf("register %s: %w", key, err) }
-		if lifecycle != nil && lifecycle.onRoute != nil { lifecycle.onRoute(route.Method, route.Path) }
+		if err := adapter.Register(wrapped); err != nil {
+			return fmt.Errorf("register %s: %w", key, err)
+		}
+		if lifecycle != nil && lifecycle.onRoute != nil {
+			lifecycle.onRoute(route.Method, route.Path)
+		}
 	}
 	return nil
 }

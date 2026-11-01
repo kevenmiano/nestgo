@@ -17,7 +17,7 @@ import (
 
 func TestCodeFirstPipelineEngineParity(t *testing.T) {
 	for _, tc := range []struct {
-		name string
+		name       string
 		newAdapter func() httpadapter.Adapter
 	}{
 		{name: "fasthttp", newAdapter: func() httpadapter.Adapter { return fastadapter.New() }},
