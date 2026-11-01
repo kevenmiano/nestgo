@@ -1,75 +1,173 @@
-// Package sqlgen compiles named SQL bind parameters into dialect-specific placeholders.
-// It never interpolates parameter values into SQL statements.
+// Package sqlgen converts named SQL parameters into driver bind placeholders.
 package sqlgen
 
 import (
- "fmt"
- "strings"
- "unicode"
+	"fmt"
+	"strings"
 )
 
 type Dialect uint8
+
 const (
- Question Dialect = iota
- PostgreSQL
+	Question Dialect = iota
+	PostgreSQL
 )
 
-// Bind converts :name placeholders to ? or $N and orders arguments by occurrence.
-// Parameters inside SQL strings, quoted identifiers, line comments, block comments,
-// and PostgreSQL :: casts are not interpreted as bind parameters.
+// Bind never interpolates values. It preserves literals and comments and returns
+// arguments separately for database/sql or sqlx. The SQL template itself must be trusted.
 func Bind(query string, params map[string]any, dialect Dialect) (string, []any, error) {
- if dialect != Question && dialect != PostgreSQL { return "", nil, fmt.Errorf("sqlgen: unsupported dialect %d", dialect) }
- var out strings.Builder
- args := make([]any, 0)
- used := make(map[string]bool)
- state := byte(0) // 0 normal, 1 single-quote, 2 double-quote, 3 line comment, 4 block comment, 5 backtick
- for i := 0; i < len(query); {
-  c := query[i]
-  next := byte(0)
-  if i+1 < len(query) { next = query[i+1] }
-  switch state {
-  case 1,2,5:
-   out.WriteByte(c)
-   if c == '\\' && state == 1 && i+1 < len(query) { out.WriteByte(next); i+=2; continue }
-   quote:=byte('\''); if state==2 { quote='"' }; if state==5 { quote='`' }
-   if c==quote {
-    if next==quote { out.WriteByte(next); i+=2; continue }
-    state=0
-   }
-   i++
-   continue
-  case 3:
-   out.WriteByte(c); i++
-   if c=='\n' { state=0 }
-   continue
-  case 4:
-   out.WriteByte(c); i++
-   if c=='*' && next=='/' { out.WriteByte(next); i++; state=0 }
-   continue
-  }
-  if c=='\'' { state=1; out.WriteByte(c); i++; continue }
-  if c=='"' { state=2; out.WriteByte(c); i++; continue }
-  if c=='`' { state=5; out.WriteByte(c); i++; continue }
-  if c=='-' && next=='-' { state=3; out.WriteString("--"); i+=2; continue }
-  if c=='/' && next=='*' { state=4; out.WriteString("/*"); i+=2; continue }
-  if c==':' && next==':' { out.WriteString("::"); i+=2; continue }
-  if c==':' && i+1<len(query) && isStart(rune(next)) {
-   j:=i+2
-   for j<len(query) && isPart(rune(query[j])) {j++}
-   name:=query[i+1:j]
-   value,ok:=params[name]
-   if !ok { return "",nil,fmt.Errorf("sqlgen: missing parameter %q",name) }
-   used[name]=true
-   args=append(args,value)
-   if dialect==Question {out.WriteByte('?')} else {fmt.Fprintf(&out,"$%d",len(args))}
-   i=j
-   continue
-  }
-  out.WriteByte(c);i++
- }
- if state==1 || state==2 || state==4 || state==5 { return "",nil,fmt.Errorf("sqlgen: unterminated SQL literal or comment") }
- for key:=range params { if !used[key] {return "",nil,fmt.Errorf("sqlgen: unused parameter %q",key)} }
- return out.String(),args,nil
+	if dialect != Question && dialect != PostgreSQL {
+		return "", nil, fmt.Errorf("sqlgen: unsupported dialect %d", dialect)
+	}
+	var out strings.Builder
+	args := make([]any, 0)
+	used := make(map[string]bool)
+	for i := 0; i < len(query); {
+		switch {
+		case query[i] == '\'':
+			j, err := quotedEnd(query, i, '\'')
+			if err != nil {
+				return "", nil, err
+			}
+			out.WriteString(query[i:j])
+			i = j
+		case query[i] == '"':
+			j, err := quotedEnd(query, i, '"')
+			if err != nil {
+				return "", nil, err
+			}
+			out.WriteString(query[i:j])
+			i = j
+		case query[i] == '`':
+			j, err := quotedEnd(query, i, '`')
+			if err != nil {
+				return "", nil, err
+			}
+			out.WriteString(query[i:j])
+			i = j
+		case strings.HasPrefix(query[i:], "--"):
+			j := strings.IndexByte(query[i:], '\n')
+			if j < 0 {
+				out.WriteString(query[i:])
+				i = len(query)
+			} else {
+				j += i + 1
+				out.WriteString(query[i:j])
+				i = j
+			}
+		case strings.HasPrefix(query[i:], "/*"):
+			j, err := blockEnd(query, i)
+			if err != nil {
+				return "", nil, err
+			}
+			out.WriteString(query[i:j])
+			i = j
+		case dialect == PostgreSQL && query[i] == '$':
+			tag, ok := dollarTag(query[i:])
+			if !ok {
+				out.WriteByte(query[i])
+				i++
+				continue
+			}
+			start := i + len(tag)
+			end := strings.Index(query[start:], tag)
+			if end < 0 {
+				return "", nil, fmt.Errorf("sqlgen: unterminated dollar-quoted literal")
+			}
+			j := start + end + len(tag)
+			out.WriteString(query[i:j])
+			i = j
+		case strings.HasPrefix(query[i:], "::"):
+			out.WriteString("::")
+			i += 2
+		case query[i] == ':' && i+1 < len(query) && identStart(query[i+1]):
+			j := i + 2
+			for j < len(query) && identPart(query[j]) {
+				j++
+			}
+			name := query[i+1 : j]
+			value, ok := params[name]
+			if !ok {
+				return "", nil, fmt.Errorf("sqlgen: missing parameter %q", name)
+			}
+			used[name] = true
+			args = append(args, value)
+			if dialect == Question {
+				out.WriteByte('?')
+			} else {
+				fmt.Fprintf(&out, "$%d", len(args))
+			}
+			i = j
+		default:
+			out.WriteByte(query[i])
+			i++
+		}
+	}
+	for name := range params {
+		if !used[name] {
+			return "", nil, fmt.Errorf("sqlgen: unused parameter %q", name)
+		}
+	}
+	return out.String(), args, nil
 }
-func isStart(r rune) bool {return r=='_' || unicode.IsLetter(r)}
-func isPart(r rune) bool {return isStart(r) || unicode.IsDigit(r)}
+
+func identStart(c byte) bool {
+	return c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+}
+
+func identPart(c byte) bool {
+	return identStart(c) || c >= '0' && c <= '9'
+}
+
+func dollarTag(s string) (string, bool) {
+	if len(s) < 2 || s[0] != '$' {
+		return "", false
+	}
+	if s[1] == '$' {
+		return "$$", true
+	}
+	if !identStart(s[1]) {
+		return "", false
+	}
+	for i := 2; i < len(s); i++ {
+		if s[i] == '$' {
+			return s[:i+1], true
+		}
+		if !identPart(s[i]) {
+			return "", false
+		}
+	}
+	return "", false
+}
+
+func quotedEnd(s string, i int, quote byte) (int, error) {
+	for j := i + 1; j < len(s); j++ {
+		if s[j] != quote {
+			continue
+		}
+		if j+1 < len(s) && s[j+1] == quote {
+			j++
+			continue
+		}
+		return j + 1, nil
+	}
+	return 0, fmt.Errorf("sqlgen: unterminated quoted literal")
+}
+
+func blockEnd(s string, i int) (int, error) {
+	depth := 1
+	for j := i + 2; j+1 < len(s); j++ {
+		switch {
+		case s[j] == '/' && s[j+1] == '*':
+			depth++
+			j++
+		case s[j] == '*' && s[j+1] == '/':
+			depth--
+			j++
+			if depth == 0 {
+				return j + 1, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("sqlgen: unterminated block comment")
+}
