@@ -69,7 +69,7 @@ import (
 )
 
 func TestCompiledCrossPackageBootstrap(t *testing.T) {
-	application, err := runtime.New(runtime.WithRegistry("app"))
+	application, err := runtime.New()
 	if err != nil { t.Fatal(err) }
 	if err := application.Shutdown(context.Background()); err != nil { t.Fatal(err) }
 }
