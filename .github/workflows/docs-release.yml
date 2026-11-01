@@ -56,7 +56,7 @@ jobs:
           TAG_COMMIT: ${{ steps.version.outputs.commit }}
         run: git checkout --detach "$TAG_COMMIT"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
