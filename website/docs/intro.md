@@ -9,13 +9,13 @@ slug: /intro
 
 ## Requirements
 
-- Go 1.23 or newer
+- A Go toolchain compatible with the root [`go.mod`](https://github.com/kevenmiano/nestgo/blob/main/go.mod) (currently Go 1.27)
 - Go module dependencies resolved through `go.mod` and `go.sum`
 - Node.js 22 only when building the Docusaurus documentation website
 
 ## Install NestGo
 
-Import the ordinary Go runtime using `go get github.com/kevenmiano/nestgo@latest`. No NestGo compiler is needed for plain Go handlers. The CLI (`go install github.com/kevenmiano/nestgo/cmd/nestgo@latest`) is optional and only required for `.mgo` decorators. See [installation](./installation.md).
+Import the ordinary Go runtime using `go get github.com/kevenmiano/nestgo@latest`. No NestGo compiler is needed for plain Go handlers. The CLI (`go install github.com/kevenmiano/nestgo/cmd/nestgo@latest`) is optional and used for `.mgo` compilation and application diagnostics. See [installation](./installation.md) and the [CLI command reference](./cli.md).
 
 ## Quick start: plain Go server
 
@@ -38,7 +38,7 @@ This is a normal imported Go library, similar to creating a gRPC server. Go link
 ```bash
 git clone https://github.com/kevenmiano/nestgo.git
 cd nestgo
-go run ./cmd/modforge compile ./examples/shop
+go run ./cmd/nestgo compile ./examples/shop
 go test ./...
 ```
 
