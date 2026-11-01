@@ -120,13 +120,21 @@ func ValidateSchema(schema Schema) error {
 }
 
 func schemaIdentifier(value string) bool {
-	if value == "" || strings.Contains(value, ".") || !identStart(value[0]) {
+	if value == "" || strings.Contains(value, ".") || !schemaIdentStart(value[0]) {
 		return false
 	}
 	for i := 1; i < len(value); i++ {
-		if !identPart(value[i]) {
+		if !schemaIdentPart(value[i]) {
 			return false
 		}
 	}
 	return true
+}
+
+func schemaIdentStart(c byte) bool {
+	return c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
+}
+
+func schemaIdentPart(c byte) bool {
+	return schemaIdentStart(c) || c >= '0' && c <= '9'
 }
