@@ -9,7 +9,9 @@ import (
 )
 
 type scopedRepo struct{}
-type scopedConsumer struct{ Repo *scopedRepo `nestgo:"inject"` }
+type scopedConsumer struct {
+	Repo *scopedRepo `nestgo:"inject"`
+}
 type scopedModuleA struct{}
 type scopedModuleB struct{}
 
