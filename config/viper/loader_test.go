@@ -20,7 +20,7 @@ func TestLoadDotEnvAndOverride(t *testing.T) {
 	}
 	var settings struct {
 		Host string `env:"HOST,required"`
-		Port int `env:"PORT,min=1,max=65535"`
+		Port int    `env:"PORT,min=1,max=65535"`
 	}
 	if err := service.Decode("DB", &settings); err != nil {
 		t.Fatal(err)
