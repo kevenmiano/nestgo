@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	metadata.Register("shop", metadata.Package{
+	metadata.RegisterCompiled("shop", metadata.Package{
 		Controllers: []metadata.Controller{
 			{Type: reflect.TypeOf((*UsersController)(nil)), Prefix: "/users", Routes: []metadata.Route{{Method: "GET", Path: "/", Handler: "FindAll", Status: 0, Parameters: []metadata.Parameter{}, StaticInvoke: func(receiver any) (any, error) { return receiver.(*UsersController).FindAll(), nil }}, {Method: "GET", Path: "/{id}", Handler: "FindOne", Status: 0, Parameters: []metadata.Parameter{}}, {Method: "POST", Path: "/", Handler: "Create", Status: 201, Parameters: []metadata.Parameter{{Index: 0, Kind: "Body", Name: ""}}, StaticHTTP: func(receiver any, ctx httpadapter.Context) (any, int, error) {
 				arg0, code, err := httpadapter.DecodeBody[CreateUserDTO](ctx)
