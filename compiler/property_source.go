@@ -56,10 +56,10 @@ func generatedPropertySource(file *File) ([]byte, error) {
 				return true
 			})
 			for _, ann := range field.Annotations {
-				if ann.Name != "Transform" {
+				if ann.Name != "Transform" && ann.Name != "TransformInput" && ann.Name != "TransformOutput" {
 					continue
 				}
-				fn, _, err := transformerSpec(ann.Argument)
+				fn, err := transformerSpec(ann.Argument)
 				if err != nil {
 					return nil, err
 				}
@@ -98,7 +98,7 @@ func decoratorOnlyImportAliases(file *File) map[string]bool {
 		for _, field := range dto.Fields {
 			for _, ann := range field.Annotations {
 				if ann.Name == "Transform" {
-					fn, _, err := transformerSpec(ann.Argument)
+					fn, err := transformerSpec(ann.Argument)
 					if err == nil {
 						if alias, _, found := strings.Cut(fn, "."); found {
 							out[alias] = true
