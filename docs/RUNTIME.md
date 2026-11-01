@@ -25,17 +25,17 @@ flowchart TD
   H --> S["Application ready to Serve"]
 ```
 
-Implementation detail: provider pointers are allocated before module validation in the adapter-based path; the diagram above summarizes logical responsibilities, not exact instruction order. The legacy `net/http` path has separate initialization and dispatch code. Provider fields support exported pointer/interface injection; `nestgo:"optional"` allows an unresolved field. Explicit modules enforce imports/exports visibility, while legacy modules without explicit scopes retain global DI. Constructor injection and provider lifecycle hooks are not supported.
+Implementation detail: provider pointers are allocated before module validation in the adapter-based path; the diagram above summarizes logical responsibilities, not exact instruction order. The legacy `net/http` path has separate initialization and dispatch code. Provider fields support exported pointer/interface injection; `nestgo:"optional"` allows an unresolved field. Explicit modules enforce imports/exports visibility, while legacy modules without explicit scopes retain global DI. Constructor injection is not supported. Adapter-based Application instances invoke optional provider/controller initialization and shutdown lifecycle hooks. Legacy http.Handler constructors do not.
 
 ## HTTP dispatch
 
 Adapter applications register `httpadapter.Route` closures during boot. The default `fasthttp` adapter performs route matching; the optional `net/http` adapter uses `http.ServeMux`. The legacy `runtime.New` APIs construct their own `http.ServeMux`. All handler routes decode `Body`, `Param`, and `Query` metadata, invoke controller methods and serialize JSON results, with implementation-specific details and parity gaps.
 
-Generated static invokers for eligible zero-argument routes are used by the legacy path only. The current adapter path invokes `reflect.Value.Call`.
+Generated static invokers for eligible zero-argument routes are used by both dispatch paths when metadata provides `StaticInvoke`; other handlers use `reflect.Value.Call`.
 
 ## Shutdown
 
-`Application.Shutdown(ctx)` delegates to the selected adapter, which shuts down the underlying HTTP server if started. There are no automatic signal handlers, provider cleanup hooks, or complete NestJS lifecycle phases. Integrations needing resource cleanup must coordinate it outside the framework.
+`Application.Shutdown(ctx)` delegates to the selected adapter, which shuts down the underlying HTTP server if started. There are no automatic signal handlers. Adapter-based applications invoke optional provider/controller cleanup hooks; legacy handler constructors do not. Full NestJS lifecycle and automatic resource-disposal semantics remain incomplete. Integrations needing resource cleanup must coordinate it outside the framework.
 
 ## Runtime constraints
 
