@@ -11,7 +11,9 @@ type sharedBootstrapDependency struct{}
 type sharedBootstrapConsumer struct {
 	Dependency *sharedBootstrapDependency `nestgo:"inject"`
 }
-type sharedBootstrapController struct{ Dependency *sharedBootstrapDependency }
+type sharedBootstrapController struct {
+	Dependency *sharedBootstrapDependency `nestgo:"inject"`
+}
 
 func TestSharedBootstrapGraphInjectsProvidersAndControllers(t *testing.T) {
 	pkg := metadata.Package{
