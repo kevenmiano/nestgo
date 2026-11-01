@@ -89,13 +89,9 @@ go test ./...
 ```
 
 
+### Automatic test generation and watch mode
 
-When compiling decorated `.mgo` packages, NestGo also creates compiler-owned wiring assertions and editable Go unit-test stubs. Each controller, provider, and decorated handler receives a TODO test scaffold only if that test name is not already defined. Later compiles add missing stubs without overwriting existing edits. See [Automatic test scaffolding](docs/COMPILER.md#automatic-test-scaffolding-from-compiled-wiring).
-
-
-### Automatic compilation and DTO test stubs
-
-Run `nestgo compile --watch ./myapp` during development. The compiler checks top-level `.mgo` sources and regenerates only on changes, preserving editable test stubs. Use `@Dto()` to opt a Go struct into serialization/deserialization TODO test stubs. A nonempty `validate` struct tag also adds a validation TODO. Existing tests are preserved; TODO stubs are skipped until you add assertions. Watch mode does not execute tests.
+During development, `nestgo compile --watch ./myapp` compiles immediately and recompiles when top-level `.mgo` sources change. The compiler generates a wiring contract test and creates editable test stubs for controllers and providers, without overwriting developer tests. Annotate a DTO with `@Dto()` to scaffold JSON serialization/deserialization TODO tests; a nonempty `validate` struct tag also adds a validation TODO. Stubs begin skipped, and the watch mode does not automatically run `go test`. See [Compiler](docs/COMPILER.md).
 
 ## Optional: decorators and modules
 
@@ -107,7 +103,7 @@ type UsersService struct{}
 
 @Controller("/users")
 type UsersController struct {
-    Service *UsersService
+    Service *UsersService `nestgo:"inject"`
 }
 
 @Get("/")
@@ -137,7 +133,7 @@ Pass `runtime.WithAdapter(nethttp.New())` to switch to the Go standard-library H
 ## Features
 
 - **Modular architecture:** declare controllers, providers, module imports and exports.
-- **Dependency injection:** resolve dependencies and validate module visibility at bootstrap.
+- **Dependency injection:** inject only explicitly tagged fields (`nestgo:"inject"` or `nestgo:"optional"`), validating module visibility at bootstrap.
 - **Compiler-free HTTP:** register ordinary Go functions with `runtime.WithRoutes(...)`.
 - **Optional decorator compiler:** generate standard Go files and metadata from `.mgo` sources.
 - **HTTP adapters:** use native fasthttp or net/http through a platform interface.

@@ -14,7 +14,7 @@ func TestCompiledCrossPackageModulesBootstrap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	module := "module example.com/nestgo-cross-package-test\n\ngo 1.23.0\n\nrequire github.com/kevenmiano/nestgo v0.0.0\n\nreplace github.com/kevenmiano/nestgo => " + filepath.ToSlash(repo) + "\n"
+	module := "module example.com/nestgo-cross-package-test\n\ngo 1.27.0\n\nrequire github.com/kevenmiano/nestgo v0.0.0\n\nreplace github.com/kevenmiano/nestgo => " + filepath.ToSlash(repo) + "\n"
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(module), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +81,14 @@ func TestCompiledCrossPackageBootstrap(t *testing.T) {
 		}
 	}
 	for _, dir := range []string{external, app} {
+		if dir == app {
+			cmd := exec.Command("go", "mod", "tidy")
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "GOWORK=off")
+			if output, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("resolve fixture module dependencies: %v\n%s", err, strings.TrimSpace(string(output)))
+			}
+		}
 		if err := CompileDir(dir); err != nil {
 			t.Fatalf("compile %s: %v", dir, err)
 		}
