@@ -1,7 +1,6 @@
 package diagnostics
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -30,10 +29,8 @@ func RunRegistered(output string, samples, iterations, coldSamples int, strict, 
 		packages = append(packages, registered[name])
 	}
 	if coldChild {
-		app, err := nestgoruntime.NewApp(context.Background(), nestgoruntime.WithPackages(packages...))
-		if err != nil {
-			return err
-		}
+		app, err := nestgoruntime.New(nestgoruntime.WithPackages(packages...))
+		if err != nil { return err }
 		return app.Close()
 	}
 	if coldSamples < 0 || coldSamples > 50 {
