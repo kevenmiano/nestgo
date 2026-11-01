@@ -96,10 +96,11 @@ func WithBootstrapMetrics(observer func(BootstrapMetrics)) Option {
 
 // Application owns one HTTP adapter and the lifecycle of its providers.
 type Application struct {
-	adapter     httpadapter.Adapter
-	lifecycle   *lifecycleRegistry
-	Config      *config.Service
-	Connections *database.Connections
+	adapter        httpadapter.Adapter
+	lifecycle      *lifecycleRegistry
+	lifecycleState lifecycleRegistry
+	Config         *config.Service
+	Connections    *database.Connections
 }
 
 // New is the single application factory. All HTTP platforms share DI and hooks.
@@ -146,7 +147,11 @@ func New(options ...Option) (*Application, error) {
 	if adapter == nil {
 		adapter = fastadapter.New()
 	}
-	registry := &lifecycleRegistry{}
+	// Co-locate the lifecycle owner with the application to avoid an
+	// additional heap allocation on every bootstrap.
+	app := &Application{adapter: adapter}
+	registry := &app.lifecycleState
+	app.lifecycle = registry
 	logger := cfg.logger
 	if logger != nil {
 		logger.Info(ctx, "NestFactory", "Starting NestGo application...")
@@ -214,7 +219,9 @@ func New(options ...Option) (*Application, error) {
 	if cfg.onBootstrap != nil {
 		cfg.onBootstrap(BootstrapMetrics{RouteRegistration: registrationDuration, LifecycleInitialization: time.Since(lifecycleStarted), Total: time.Since(started)})
 	}
-	return &Application{adapter: adapter, lifecycle: registry, Config: settings, Connections: connections}, nil
+	app.Config = settings
+	app.Connections = connections
+	return app, nil
 }
 
 // HTTPAdapter returns the configured transport adapter.
