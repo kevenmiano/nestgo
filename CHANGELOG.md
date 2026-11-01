@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/kevenmiano/nestgo/compare/v1.0.0...v1.0.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **release:** tidy published Go module consumer smoke test ([#165](https://github.com/kevenmiano/nestgo/issues/165)) ([25950c4](https://github.com/kevenmiano/nestgo/commit/25950c4757073e25ad8b7142555403d70a02c0f6))
+
 ## [1.0.0](https://github.com/kevenmiano/nestgo/compare/v0.1.0...v1.0.0) (2026-11-01)
 
 
