@@ -1,0 +1,50 @@
+name: Verify integrated NestGo request pipeline
+on:
+  push:
+    branches: [feat/http-request-pipeline]
+permissions:
+  contents: write
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/http-request-pipeline
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Format integration and regenerate metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          gofmt -w compiler/compiler.go metadata/registry.go runtime/application.go runtime/http_routes.go runtime/request_pipeline.go examples/pipeline/cmd/server/main.go examples/pipeline/pipeline_test.go
+          go run ./cmd/modforge compile ./examples/shop
+          go run ./cmd/modforge compile ./examples/pipeline
+          gofmt -w examples/shop/zz_modforge_metadata.go examples/pipeline/zz_modforge_metadata.go
+      - name: Publish formatted generated sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add compiler/compiler.go metadata/registry.go runtime/application.go runtime/http_routes.go runtime/request_pipeline.go examples/shop/zz_modforge_metadata.go examples/pipeline
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix(integration): regenerate and gofmt current NestGo pipeline'
+            git push origin HEAD:feat/http-request-pipeline
+          fi
+      - name: Go quality gates
+        run: |
+          go test ./... -count=1
+          go vet ./...
+      - name: Race detector and adapters
+        run: go test -race ./runtime ./httpadapter ./examples/pipeline/... -count=1
+      - name: Verify generated code is deterministic
+        run: |
+          go run ./cmd/modforge compile ./examples/shop
+          go run ./cmd/modforge compile ./examples/pipeline
+          git diff --exit-code -- examples/shop examples/pipeline
