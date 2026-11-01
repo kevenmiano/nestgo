@@ -196,7 +196,7 @@ func transformerSpec(argument string) (string, error) {
 	}
 	switch expression := expr.(type) {
 	case *ast.Ident:
-		if expression.Name == "_" {
+		if expression.Name == "_" || expression.Name == "nil" || expression.Name == "true" || expression.Name == "false" {
 			return "", fmt.Errorf("@Transform expects a function or struct instance")
 		}
 	case *ast.SelectorExpr:
