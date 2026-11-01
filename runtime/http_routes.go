@@ -46,7 +46,7 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			typ := method.Type()
 			contract, contractErr := compileRouteContract(controller.Prefix, route, typ)
 			if contractErr != nil {
-				return formatRouteContractError(contractErr, false)
+				return contractErr
 			}
 			path := contract.Path
 			key := contract.Key
