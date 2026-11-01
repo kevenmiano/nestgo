@@ -27,7 +27,7 @@ Inside the NestGo repository you can use `go run ./cmd/nestgo <command>` instead
 | `nestgo diagnose -example [flags]` | Export a diagnostic report for the built-in fixture |
 | `nestgo diagnose -app <package> [flags]` | Analyze an importable compiled Go package |
 | `nestgo completion <shell>` | Generate bash, zsh, fish or PowerShell completions |
-| `nestgo --version` | Display the CLI version (development builds say `dev`) |
+| `nestgo version` or `nestgo --version` | Display the CLI version (development builds say `dev`) |
 | `nestgo --help` | Show available commands; use `nestgo <command> --help` for flags |
 
 The command reference pages in the sidebar are **generated from the Cobra command definitions** at site start/build time. They are not maintained independently.

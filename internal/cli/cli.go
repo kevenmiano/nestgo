@@ -25,7 +25,7 @@ func New() *cobra.Command {
 			return cmd.Help()
 		},
 	}
-	root.AddCommand(newCompileCommand(), newDiagnoseCommand())
+	root.AddCommand(newCompileCommand(), newDiagnoseCommand(), newVersionCommand())
 	return root
 }
 

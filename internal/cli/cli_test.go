@@ -30,6 +30,8 @@ func TestRootAndSubcommandHelp(t *testing.T) {
 		{[]string{"diagnose", "--help"}, []string{"--app", "--cold-samples", "--strict"}},
 		{[]string{"completion", "--help"}, []string{"bash", "zsh", "fish", "powershell"}},
 		{[]string{"--version"}, []string{"dev"}},
+		{[]string{"version"}, []string{"dev"}},
+		{[]string{"version", "--help"}, []string{"Print the NestGo CLI version"}},
 	} {
 		output, err := executeForTest(tc.args...)
 		if err != nil {
@@ -115,5 +117,29 @@ func TestSingleDashDiagnosticFlagsRemainAccepted(t *testing.T) {
 	}
 	if _, err := executeForTest("diagnose", "--example", "--samples=1", "--iterations=1", "--cold-samples=0", "--out", t.TempDir()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCompileFixture(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join("..", "..", "examples", "shop", "users.mgo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "users.mgo"), source, 0644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := executeForTest("compile", dir)
+	if err != nil {
+		t.Fatalf("compile fixture: %v", err)
+	}
+	if !strings.Contains(out, "compiled") {
+		t.Errorf("missing successful compilation message: %q", out)
+	}
+	for _, name := range []string{"users_generated.go", "zz_modforge_metadata.go"} {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil || len(data) == 0 {
+			t.Fatalf("missing/empty %s: %v", name, err)
+		}
 	}
 }
