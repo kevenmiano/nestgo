@@ -73,3 +73,16 @@ Import `github.com/kevenmiano/nestgo/http` for transport-independent response he
 Controllers may return ordinary DTOs, `http.Response[DTO]` for typed response metadata,
 or `http.Result` for untyped response contracts. HTTP errors and status constants
 also live in this package; see [HTTP responses](HTTP_RESPONSES.md).
+
+## Real Nginx security regression suite
+
+The CI workflow `.github/workflows/security-nginx-proxy.yml` installs an actual Nginx binary on a disposable Linux runner, places it in front of both built-in NestGo HTTP engines, and tests only loopback addresses. The test is opt-in for local development:
+
+```sh
+# Install Nginx with your system package manager first.
+NESTGO_NGINX_E2E=1 go test ./runtime -run '^TestNginxProxySecurityBoundaries$' -count=1 -v
+```
+
+The suite creates its own Nginx configuration with `proxy_request_buffering on`, `proxy_http_version 1.1`, `Connection: close`, a 128-byte proxy body cap and a smaller 64-byte application body cap. It checks successful forwarding, upstream and proxy HTTP 413 responses, malformed request-line handling, contradictory Content-Length and Transfer-Encoding framing, duplicate lengths, oversized headers, and slow incomplete headers.
+
+**Scope:** This validates a representative, isolated Nginx reverse-proxy setup, **not** every deployment, intermediary chain, CDN or shared-cache configuration. No production endpoint is targeted. In production, test the **actual** edge/cache configuration and enforce compatible request framing and body/header limits before marking the overall release security gate complete. A passing response-parsing test does not itself prove that every class of request smuggling or cache poisoning is impossible.
