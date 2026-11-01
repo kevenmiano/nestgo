@@ -37,7 +37,6 @@ type OrdersModule struct{}
 	}
 }
 
-
 func TestPlainModuleOwnsGeneratedRepository(t *testing.T) {
 	dir := t.TempDir()
 	source := `package orders
