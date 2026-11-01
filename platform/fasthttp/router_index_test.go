@@ -63,6 +63,18 @@ func BenchmarkRouteLookup(b *testing.B) {
 				}
 				return false
 			}},
+			{"current_main", func() bool {
+				segments := segmentCount(target)
+				for _, route := range routes {
+					if segmentCount(route.Path) != segments || route.Method != "GET" {
+						continue
+					}
+					if _, ok := match(route.Path, target); ok {
+						return true
+					}
+				}
+				return false
+			}},
 			{"indexed", func() bool {
 				handler, _, _ := index.lookup("GET", target)
 				return handler != nil
