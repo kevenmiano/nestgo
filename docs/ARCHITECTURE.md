@@ -85,7 +85,7 @@ See [Runtime reference](RUNTIME.md) for signatures, errors, and injection constr
 
 ## Example end-to-end flow
 
-`examples/shop/users.mgo` defines a `UsersController`, `UsersService` and `UsersModule`. Compilation produces `users_generated.go` and `zz_modforge_metadata.go`. Importing the package registers its metadata. Calling `runtime.New(runtime.WithRegistry("shop"))("shop")` creates routes for:
+`examples/shop/users.mgo` defines a `UsersController`, `UsersService` and `UsersModule`. Compilation produces `users_generated.go` and `zz_modforge_metadata.go`. Importing the package registers its metadata. Calling `runtime.New(runtime.WithRegistry("shop"))` creates routes for:
 
 | Method | Pattern | Handler |
 | --- | --- | --- |
