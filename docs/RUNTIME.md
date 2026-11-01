@@ -27,6 +27,10 @@ flowchart TD
 
 Implementation detail: provider pointers are allocated before module validation in the adapter-based path; the diagram above summarizes logical responsibilities, not exact instruction order. The legacy `net/http` path has separate initialization and dispatch code. Provider fields support exported pointer/interface injection; `nestgo:"optional"` allows an unresolved field. Explicit modules enforce imports/exports visibility, while legacy modules without explicit scopes retain global DI. Constructor injection is not supported. Adapter-based Application instances invoke optional provider/controller initialization and shutdown lifecycle hooks. Legacy http.Handler constructors do not.
 
+## Startup timing
+
+`ApplicationOptions.OnBootstrap` optionally receives `BootstrapMetrics` containing route registration, initialization hook and total bootstrap durations. See `BenchmarkApplicationBootstrapProviders` for 1/10/100-provider allocation and latency benchmarks. This callback currently applies to adapter-based applications only.
+
 ## HTTP dispatch
 
 Adapter applications register `httpadapter.Route` closures during boot. The default `fasthttp` adapter performs route matching; the optional `net/http` adapter uses `http.ServeMux`. The legacy `runtime.New` APIs construct their own `http.ServeMux`. All handler routes decode `Body`, `Param`, and `Query` metadata, invoke controller methods and serialize JSON results, with implementation-specific details and parity gaps.
