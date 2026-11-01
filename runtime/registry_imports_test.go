@@ -51,22 +51,26 @@ func TestFromRegistryLoadsImportedPackage(t *testing.T) {
 	}
 }
 
+var registerInvalidImportedFixtures sync.Once
+
 func TestApplicationFromRegistryRejectsInvalidImportedPackage(t *testing.T) {
 	type externalModule struct{}
 	type rootModule struct{}
 	external := reflect.TypeOf((*externalModule)(nil))
-	metadata.Register("nestgo-app-invalid-import-test", metadata.Package{
-		Providers: []metadata.Provider{{Type: reflect.TypeOf(123)}},
-		Modules: []metadata.Module{{
-			Type:      external,
-			Providers: []reflect.Type{reflect.TypeOf(123)},
-		}},
-	})
-	metadata.Register("nestgo-app-import-root-test", metadata.Package{
-		Modules: []metadata.Module{{
-			Type:    reflect.TypeOf((*rootModule)(nil)),
-			Imports: []reflect.Type{external},
-		}},
+	registerInvalidImportedFixtures.Do(func() {
+		metadata.Register("nestgo-app-invalid-import-test", metadata.Package{
+			Providers: []metadata.Provider{{Type: reflect.TypeOf(123)}},
+			Modules: []metadata.Module{{
+				Type:      external,
+				Providers: []reflect.Type{reflect.TypeOf(123)},
+			}},
+		})
+		metadata.Register("nestgo-app-import-root-test", metadata.Package{
+			Modules: []metadata.Module{{
+				Type:    reflect.TypeOf((*rootModule)(nil)),
+				Imports: []reflect.Type{external},
+			}},
+		})
 	})
 	if _, err := ApplicationFromRegistry(ApplicationOptions{}, "nestgo-app-import-root-test"); err == nil || !strings.Contains(err.Error(), "invalid provider") {
 		t.Fatalf("invalid imported package must fail at application bootstrap: %v", err)
