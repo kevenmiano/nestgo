@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - 'runtime/release_scale_benchmark_test.go'
+      - 'platform/fasthttp/**'
       - '.github/workflows/release-scale.yml'
   push:
     branches: [main]
     paths:
       - 'runtime/release_scale_benchmark_test.go'
+      - 'platform/fasthttp/**'
       - '.github/workflows/release-scale.yml'
   workflow_dispatch:
 
