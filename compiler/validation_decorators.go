@@ -68,7 +68,7 @@ func validateDTOValidators(path string, field DTOField) error {
 		}
 		switch a.Name {
 		case "Min", "Max":
-			switch field.Type {
+			switch strings.TrimPrefix(field.Type, "*") {
 			case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "float32", "float64":
 			default:
 				return Diagnostic{path, a.Line, "@" + a.Name + " requires a numeric Go field"}
@@ -160,13 +160,14 @@ func generatedDTOValidation(file *File) string {
 			if !hasRules {
 				continue
 			}
+			jsonName, _, _ := strings.Cut(field.jsonName(), ",")
 			out.WriteString("{\n")
 			nullable := strings.HasPrefix(field.Type, "*")
 			if nullable {
 				if optional {
 					fmt.Fprintf(&out, "if value.%s != nil {\n", field.Name)
 				} else {
-					fmt.Fprintf(&out, "if value.%s == nil { issues = append(issues, __nestgo_validation.FieldError{Field:%q,Rule:%q,Message:%q}) } else {\n", field.Name, field.jsonName(), "IsDefined", "value is required")
+					fmt.Fprintf(&out, "if value.%s == nil { issues = append(issues, __nestgo_validation.FieldError{Field:%q,Rule:%q,Message:%q}) } else {\n", field.Name, jsonName, "IsDefined", "value is required")
 				}
 				fmt.Fprintf(&out, "item := *value.%s\n", field.Name)
 			} else {
@@ -191,16 +192,13 @@ func generatedDTOValidation(file *File) string {
 				case "Max":
 					expression = fmt.Sprintf("(item <= %s)", strings.TrimSpace(a.Argument))
 				case "Matches", "Regex":
-					pattern, _ := strconv.Unquote(a.Argument)
-					// Use a quoted pattern and a precompiled package variable below.
-					_ = pattern
 					expression = fmt.Sprintf("__nestgo_validation.MatchRegexp(item,__nestgo_re_%s_%s_%d)", dto.Name, field.Name, idx)
 				case "Validate":
 					fmt.Fprintf(&out, "if err := __nestgo_validation.ApplyFunc[%s](item,%s); err != nil {\n", strings.TrimPrefix(field.Type, "*"), strings.TrimSpace(a.Argument))
-					fmt.Fprintf(&out, "issues = append(issues, __nestgo_validation.FieldError{Field:%q,Rule:%q,Message:%q})\n}\n", field.jsonName(), name, "custom validation failed")
+					fmt.Fprintf(&out, "issues = append(issues, __nestgo_validation.FieldError{Field:%q,Rule:%q,Message:%q})\n}\n", jsonName, name, "custom validation failed")
 					continue
 				}
-				fmt.Fprintf(&out, "if !%s { issues = append(issues, __nestgo_validation.FieldError{Field:%q,Rule:%q,Message:%q}) }\n", expression, field.jsonName(), name, "validation failed: "+name)
+				fmt.Fprintf(&out, "if !%s { issues = append(issues, __nestgo_validation.FieldError{Field:%q,Rule:%q,Message:%q}) }\n", expression, jsonName, name, "validation failed: "+name)
 			}
 			if nullable {
 				out.WriteString("}\n")
