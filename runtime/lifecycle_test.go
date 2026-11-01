@@ -55,3 +55,4 @@ func TestApplicationLifecycleShutdownFailure(t *testing.T) {
     second:=app.Shutdown(context.Background())
     if first==nil || second==nil || first.Error()!=second.Error() {t.Fatalf("shutdown errors first=%v second=%v",first,second)}
 }
+
