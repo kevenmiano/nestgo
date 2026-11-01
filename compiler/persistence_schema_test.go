@@ -9,13 +9,13 @@ func TestValidateSchemaRelationsAndIndexes(t *testing.T) {
 	schema := Schema{Entities: []SchemaEntity{
 		{
 			Name: "User", Table: "users",
-			Columns: []SchemaColumn{{Name: "id", PrimaryKey: true}, {Name: "email"}},
-			Indexes: []SchemaIndex{{Name: "idx_users_email", Columns: []string{"email"}, Unique: true}},
+			Columns:   []SchemaColumn{{Name: "id", PrimaryKey: true}, {Name: "email"}},
+			Indexes:   []SchemaIndex{{Name: "idx_users_email", Columns: []string{"email"}, Unique: true}},
 			Relations: []SchemaRelation{{Name: "Posts", Kind: "one-to-many", Target: "Post", ForeignKey: "user_id"}},
 		},
 		{
 			Name: "Post", Table: "posts",
-			Columns: []SchemaColumn{{Name: "id", PrimaryKey: true}, {Name: "user_id"}},
+			Columns:   []SchemaColumn{{Name: "id", PrimaryKey: true}, {Name: "user_id"}},
 			Relations: []SchemaRelation{{Name: "User", Kind: "many-to-one", Target: "User", ForeignKey: "user_id"}},
 		},
 	}}
