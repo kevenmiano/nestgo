@@ -43,7 +43,7 @@ func (r *BillingRepository) Find(ctx context.Context, id int64) (*Invoice, error
 		t.Fatalf("compile with mixed SQL dialects: %v", err)
 	}
 	for name, want := range map[string]string{
-		"users_repository_generated.go": "WHERE id=$1",
+		"users_repository_generated.go":   "WHERE id=$1",
 		"billing_repository_generated.go": "WHERE id=?",
 	} {
 		data, err := os.ReadFile(filepath.Join(dir, name))
