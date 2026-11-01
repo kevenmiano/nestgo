@@ -53,3 +53,10 @@ func TestNewAppRejectsInvalidOptions(t *testing.T) {
 		t.Fatalf("expected context canceled, got %v", err)
 	}
 }
+
+func TestNewAppMissingRegistryFails(t *testing.T) {
+	_, err := NewApp(context.Background(), WithRegistry("not-registered"))
+	if err == nil {
+		t.Fatal("unknown metadata package accepted")
+	}
+}
