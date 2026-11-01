@@ -23,7 +23,7 @@ func TestGeneratedFactoryProviderInjected(t *testing.T) {
 		}},
 		{Type: reflect.TypeOf((*factoryConsumer)(nil))},
 	}}
-	if _, err := newHandler(handlerOptions{Instances: []any{source}}, pkg); err != nil {
+	if _, err := New(WithProvider(source), WithPackages(pkg)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -35,7 +35,7 @@ func TestGeneratedFactoryFailsClosed(t *testing.T) {
 			return nil, fmt.Errorf("database connections missing")
 		},
 	}}}
-	if _, err := newHandler(handlerOptions{}, pkg); err == nil || !strings.Contains(err.Error(), "database connections missing") {
+	if _, err := New(WithPackages(pkg)); err == nil || !strings.Contains(err.Error(), "database connections missing") {
 		t.Fatalf("factory error should stop bootstrap: %v", err)
 	}
 }
