@@ -15,10 +15,10 @@ func newCompileCommand() *cobra.Command {
 	var watch bool
 	var interval time.Duration
 	cmd := &cobra.Command{
-		Use:   "compile <directory|file.mgo>",
-		Short: "Compile .mgo decorators into ordinary Go sources and metadata",
-		Long: "Compile all .mgo files in a package directory. Passing a single .mgo file compiles its containing directory. With --watch, compile once, then recompile whenever the input sources change.",
-		Args:  cobra.ExactArgs(1),
+		Use:     "compile <directory|file.mgo>",
+		Short:   "Compile .mgo decorators into ordinary Go sources and metadata",
+		Long:    "Compile all .mgo files in a package directory. Passing a single .mgo file compiles its containing directory. With --watch, compile once, then recompile whenever the input sources change.",
+		Args:    cobra.ExactArgs(1),
 		Example: "  nestgo compile ./examples/shop\n  nestgo compile --watch ./myapp\n  nestgo compile ./myapp --watch",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := args[0]

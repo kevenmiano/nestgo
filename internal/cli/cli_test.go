@@ -3,11 +3,11 @@ package cli
 import (
 	"bytes"
 	"context"
-	"time"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra/doc"
 )
@@ -180,20 +180,26 @@ func TestCompileWatchCompilesAndExitsOnContextCancellation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		done := make(chan error, 1)
 		go func() { done <- cmd.ExecuteContext(ctx) }()
-		deadline := time.After(4*time.Second)
+		deadline := time.After(4 * time.Second)
 		compiled := filepath.Join(dir, "zz_nestgo_wiring_generated_test.go")
 		for {
-			if _, err := os.Stat(compiled); err == nil { break }
+			if _, err := os.Stat(compiled); err == nil {
+				break
+			}
 			select {
-			case <-deadline: cancel(); t.Fatal("watch did not generate wiring")
-			case <-time.After(10*time.Millisecond):
+			case <-deadline:
+				cancel()
+				t.Fatal("watch did not generate wiring")
+			case <-time.After(10 * time.Millisecond):
 			}
 		}
 		cancel()
 		select {
 		case err := <-done:
-			if err != nil { t.Fatal(err) }
-		case <-time.After(3*time.Second):
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(3 * time.Second):
 			t.Fatal("watch did not honor cancellation")
 		}
 	}
