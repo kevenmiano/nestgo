@@ -19,8 +19,7 @@ app, err := runtime.New(
             database.WithDSN(billingDSN),
         ),
     ),
-    runtime.WithRegistry("shop"),
-)
+    )
 if err != nil { return err }
 defer app.Close()
 adapter := app.HTTPAdapter()
