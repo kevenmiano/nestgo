@@ -43,7 +43,9 @@ function issueStatus(action, state) {
 
 function prStatus({ issueState, prState, merged, draft, closes, hasInProgress }) {
   if (issueState === 'closed') return 'Done';
-  if (merged && closes) return 'Done';
+  // GitHub issue state is authoritative: PR keywords alone never imply completion.
+  // GitHub may not have closed the issue (e.g. cross-branch PR or delayed events).
+  if (merged && closes) return hasInProgress ? 'In Progress' : null;
   // A partial PR (Refs #N) must never mark an open issue Done.
   // Use In Progress if the Project offers it, otherwise preserve Status.
   if (merged || prState === 'closed' || draft) {
