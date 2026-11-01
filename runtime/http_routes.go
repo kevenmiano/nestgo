@@ -2,29 +2,30 @@ package runtime
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/kevenmiano/nestgo/httpadapter"
-	"github.com/kevenmiano/nestgo/metadata"
 	"reflect"
 	"strings"
+
+	"github.com/kevenmiano/nestgo/httpadapter"
+	"github.com/kevenmiano/nestgo/metadata"
 )
 
 // registerRoutes resolves injectable fields once during bootstrap and registers
-// engine-independent handlers. Generated static invokers can replace reflect.Call.
+// engine-independent handlers. Generated static invokers bypass reflect.Call.
 func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) error {
 	return registerRoutesWithLifecycle(adapter, packages, nil)
 }
 
 func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
+	return registerRoutesWithPipeline(adapter, packages, lifecycle, requestPipelineConfig{})
+}
+
+func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, pipeline requestPipelineConfig) error {
+	if err := validatePipeline(pipeline); err != nil { return err }
 	var onProvider func(reflect.Type)
-	if lifecycle != nil {
-		onProvider = lifecycle.onProvider
-	}
+	if lifecycle != nil { onProvider = lifecycle.onProvider }
 	graph, err := prepareBootstrap(packages, onProvider, nil)
-	if err != nil {
-		return err
-	}
+	if err != nil { return err }
 	if lifecycle != nil {
 		for _, typ := range graph.orderedProviders {
 			lifecycle.instances = append(lifecycle.instances, graph.providers[typ].Interface())
@@ -33,125 +34,144 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 	seen := map[string]bool{}
 	for _, controller := range graph.controllers {
 		instance, err := graph.newController(controller.Type)
-		if err != nil {
-			return err
-		}
+		if err != nil { return err }
 		if lifecycle != nil {
 			lifecycle.instances = append(lifecycle.instances, instance.Interface())
-			if lifecycle.onController != nil {
-				lifecycle.onController(controller.Type, controller.Prefix)
-			}
+			if lifecycle.onController != nil { lifecycle.onController(controller.Type, controller.Prefix) }
 		}
+		controllerGuards, err := resolveGuards(&graph, controller.Type, controller.Guards)
+		if err != nil { return err }
+		controllerPipes, err := resolvePipes(&graph, controller.Type, controller.Pipes)
+		if err != nil { return err }
+		controllerFilters, err := resolveFilters(&graph, controller.Type, controller.Filters)
+		if err != nil { return err }
+
 		for _, route := range controller.Routes {
 			method := instance.MethodByName(route.Handler)
-			if !method.IsValid() {
-				return fmt.Errorf("handler %s not found", route.Handler)
-			}
+			if !method.IsValid() { return fmt.Errorf("handler %s not found", route.Handler) }
 			typ := method.Type()
 			contract, contractErr := compileRouteContract(controller.Prefix, route, typ)
-			if contractErr != nil {
-				return contractErr
-			}
-			path := contract.Path
+			if contractErr != nil { return contractErr }
 			key := contract.Key
-			if seen[key] {
-				return fmt.Errorf("duplicate route %s", key)
-			}
+			if seen[key] { return fmt.Errorf("duplicate route %s", key) }
 			seen[key] = true
+
+			localGuards, err := resolveGuards(&graph, controller.Type, route.Guards)
+			if err != nil { return err }
+			localPipes, err := resolvePipes(&graph, controller.Type, route.Pipes)
+			if err != nil { return err }
+			localFilters, err := resolveFilters(&graph, controller.Type, route.Filters)
+			if err != nil { return err }
+			guards := make([]httpadapter.Guard, 0, len(pipeline.guards)+len(controllerGuards)+len(localGuards))
+			guards = append(guards, pipeline.guards...)
+			guards = append(guards, controllerGuards...)
+			guards = append(guards, localGuards...)
+			pipes := make([]httpadapter.Pipe, 0, len(pipeline.pipes)+len(controllerPipes)+len(localPipes))
+			pipes = append(pipes, pipeline.pipes...)
+			pipes = append(pipes, controllerPipes...)
+			pipes = append(pipes, localPipes...)
+			filters := make([]httpadapter.ExceptionFilter, 0, len(localFilters)+len(controllerFilters)+len(pipeline.filters))
+			filters = append(filters, localFilters...)
+			filters = append(filters, controllerFilters...)
+			filters = append(filters, pipeline.filters...)
+			middlewares := append([]httpadapter.Middleware(nil), pipeline.middleware...)
+			middlewares = append(middlewares, pipeline.routeMiddleware[key]...)
+
 			bindings := contract.Bindings
 			handler := method
 			rt := route
-			params := bindings
 			methodType := typ
-			registrationErr := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
-				var result any
-				if rt.StaticHTTP != nil {
-					value, status, err := rt.StaticHTTP(instance.Interface(), ctx)
-					if err != nil {
-						if status == 0 {
-							status = 500
-						}
-						return respondError(ctx, status, err.Error())
+			controllerInstance := instance.Interface()
+			registered := httpadapter.Route{Method: rt.Method, Path: contract.Path, Handler: func(ctx httpadapter.Context) error {
+				exec := httpadapter.ExecutionContext{Request: ctx, Controller: controllerInstance, Handler: rt.Handler}
+				// Route filters see failures from guards, pipes and the controller.
+				routeExecution := func() error {
+					for _, guard := range guards {
+						allowed, err := guard.CanActivate(exec)
+						if err != nil { return err }
+						if !allowed { return httpadapter.NewHTTPException(403, "Forbidden") }
 					}
-					result = value
-				} else if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
-					value, err := rt.StaticInvoke(instance.Interface())
-					if err != nil {
-						return respondError(ctx, 500, err.Error())
-					}
-					result = value
-				} else {
-					args := make([]reflect.Value, methodType.NumIn())
-					for i := 0; i < methodType.NumIn(); i++ {
-						t := methodType.In(i)
-						v := reflect.New(t)
-						if p, ok := params[i]; ok {
-							switch p.Kind {
-							case "Body":
-								body := ctx.Body()
-								if len(body) > 1<<20 {
-									return respondError(ctx, 413, "request body too large")
-								}
-								if err := json.Unmarshal(body, v.Interface()); err != nil {
-									return respondError(ctx, 400, "invalid JSON: "+err.Error())
-								}
-							case "Param":
-								if t.Kind() != reflect.String {
-									return respondError(ctx, 500, "path parameter must be string")
-								}
-								v.Elem().SetString(ctx.Param(p.Name))
-							case "Query":
-								if t.Kind() != reflect.String {
-									return respondError(ctx, 500, "query parameter must be string")
-								}
-								v.Elem().SetString(ctx.Query(p.Name))
-							default:
-								return respondError(ctx, 500, "unsupported parameter decorator")
+					bindingContext := ctx
+					if len(pipes) != 0 { bindingContext = &pipeContext{Context: ctx, pipes: pipes} }
+					var result any
+					if rt.StaticHTTP != nil {
+						value, status, err := rt.StaticHTTP(controllerInstance, bindingContext)
+						if err != nil {
+							if status >= 400 && status <= 599 && httpadapter.StatusOf(err) == 500 {
+								return httpadapter.NewHTTPException(status, err.Error())
 							}
-						} else {
-							for _, part := range strings.Split(rt.Path, "/") {
-								if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
-									v.Elem().SetString(ctx.Param(strings.Trim(part, "{}")))
-									break
-								}
-							}
+							return err
 						}
-						args[i] = v.Elem()
-					}
-					results := handler.Call(args)
-					if len(results) == 2 && !results[1].IsNil() {
-						return respondError(ctx, 500, results[1].Interface().(error).Error())
-					}
-					result = results[0].Interface()
-				}
-				status := rt.Status
-				if status == 0 {
-					if rt.Method == "POST" {
-						status = 201
+						result = value
+					} else if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
+						value, err := rt.StaticInvoke(controllerInstance)
+						if err != nil { return err }
+						result = value
 					} else {
-						status = 200
+						args := make([]reflect.Value, methodType.NumIn())
+						for i := 0; i < methodType.NumIn(); i++ {
+							t := methodType.In(i)
+							v := reflect.New(t)
+							if p, ok := bindings[i]; ok {
+								switch p.Kind {
+								case "Body":
+									body := bindingContext.Body()
+									if len(body) > 1<<20 { return httpadapter.NewHTTPException(413, "request body too large") }
+									if err := json.Unmarshal(body, v.Interface()); err != nil {
+										return httpadapter.NewHTTPException(400, "invalid JSON: "+err.Error())
+									}
+								case "Param":
+									v.Elem().SetString(bindingContext.Param(p.Name))
+								case "Query":
+									v.Elem().SetString(bindingContext.Query(p.Name))
+								default:
+									return fmt.Errorf("unsupported parameter decorator")
+								}
+								transformed, err := httpadapter.ApplyPipes(bindingContext, v.Elem().Interface(), httpadapter.ArgumentMetadata{Index: i, Kind: p.Kind, Name: p.Name, Type: t})
+								if err != nil { return err }
+								value := reflect.ValueOf(transformed)
+								if !value.IsValid() || !value.Type().AssignableTo(t) {
+									return httpadapter.NewHTTPException(400, "pipe returned an incompatible parameter type")
+								}
+								v.Elem().Set(value)
+							} else {
+								for _, part := range strings.Split(rt.Path, "/") {
+									if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+										v.Elem().SetString(bindingContext.Param(strings.Trim(part, "{}")))
+										break
+									}
+								}
+							}
+							args[i] = v.Elem()
+						}
+						results := handler.Call(args)
+						if len(results) == 2 && !results[1].IsNil() { return results[1].Interface().(error) }
+						result = results[0].Interface()
 					}
+					status := rt.Status
+					if status == 0 {
+						if rt.Method == "POST" { status = 201 } else { status = 200 }
+					}
+					payload, err := json.Marshal(result)
+					if err != nil { return fmt.Errorf("failed to encode HTTP response: %w", err) }
+					ctx.Status(status)
+					ctx.SetHeader("Content-Type", "application/json")
+					return ctx.Write(append(payload, '\n'))
 				}
-				ctx.Status(status)
-				ctx.SetHeader("Content-Type", "application/json")
-				data, err := json.Marshal(result)
-				if err != nil {
-					return errors.New("failed to encode HTTP response: " + err.Error())
+				managedExecution := func() error {
+					return handleHTTPException(routeExecution(), exec, filters)
 				}
-				return ctx.Write(append(data, '\n'))
-			}})
-			if registrationErr != nil {
-				return fmt.Errorf("register %s: %w", key, registrationErr)
-			}
-			if lifecycle != nil && lifecycle.onRoute != nil {
-				lifecycle.onRoute(rt.Method, path)
-			}
+				// A middleware failure is intentionally handled by global filters
+				// only, as in NestJS.
+				return handleHTTPException(runMiddleware(ctx, middlewares, managedExecution), exec, pipeline.filters)
+			}}
+			if err := adapter.Register(registered); err != nil { return fmt.Errorf("register %s: %w", key, err) }
+			if lifecycle != nil && lifecycle.onRoute != nil { lifecycle.onRoute(rt.Method, contract.Path) }
 		}
 	}
 	return nil
 }
+
 func respondError(ctx httpadapter.Context, status int, message string) error {
-	ctx.Status(status)
-	ctx.SetHeader("Content-Type", "text/plain; charset=utf-8")
-	return ctx.Write([]byte(message + "\n"))
+	return httpadapter.WriteError(ctx, httpadapter.NewHTTPException(status, message))
 }
