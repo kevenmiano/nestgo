@@ -61,6 +61,7 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			bindings := contract.Bindings
 			handler := method
 			rt := route
+			typedString := compileStringRouteInvoker(method, rt, bindings)
 			params := bindings
 			methodType := typ
 			explicit, passthrough := false, false
@@ -96,6 +97,12 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 					if handlerError, ok := value.(error); ok && handlerError != nil {
 						return http.WriteError(ctx, handlerError)
 					}
+				} else if typedString != nil {
+					value, err := typedString(ctx)
+					if err != nil {
+						return http.WriteError(ctx, err)
+					}
+					result = value
 				} else {
 					args := make([]reflect.Value, methodType.NumIn())
 					for i := 0; i < methodType.NumIn(); i++ {
