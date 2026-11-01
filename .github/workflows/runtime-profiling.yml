@@ -1,0 +1,49 @@
+name: Go runtime profiling
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/**'
+      - 'platform/**'
+      - '.github/workflows/runtime-profiling.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  profiling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Capture Go environment
+        run: |
+          mkdir -p profiling
+          { go version; go env GOOS GOARCH GOMAXPROCS; uname -a; } > profiling/environment.txt
+      - name: CPU and allocation profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPInvocation$' -benchtime=3s -count=1 -benchmem -cpuprofile=profiling/invocation.cpu.pprof -memprofile=profiling/invocation.heap.pprof -memprofilerate=1 | tee profiling/invocation.txt
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPEngines$' -benchtime=2s -count=1 -benchmem -cpuprofile=profiling/engines.cpu.pprof -memprofile=profiling/engines.heap.pprof -memprofilerate=512 | tee profiling/engines.txt
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkAdapterBootstrap$' -benchtime=2s -count=1 -benchmem -cpuprofile=profiling/bootstrap.cpu.pprof -memprofile=profiling/bootstrap.heap.pprof | tee profiling/bootstrap.txt
+      - name: Generate hotspot summaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          for kind in invocation engines bootstrap; do
+            go tool pprof -top -nodecount=30 "profiling/$kind.cpu.pprof" > "profiling/$kind.cpu-top.txt"
+            go tool pprof -alloc_space -top -nodecount=30 "profiling/$kind.heap.pprof" > "profiling/$kind.alloc-top.txt"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-profiles-${{ github.sha }}
+          path: profiling/
+          retention-days: 30
