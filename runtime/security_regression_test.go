@@ -38,6 +38,10 @@ func (*securityRegressionController) NilPointer() (string, *pointerSecurityError
 func (*securityRegressionController) Regular() (string, error) {
 	return "", errors.New("PRIVATE_REGULAR_SENTINEL")
 }
+func (*securityRegressionController) TypedNil() (string, error) {
+	var err *pointerSecurityError
+	return "safe", err
+}
 
 func securityRegressionPackages() []metadata.Package {
 	return []metadata.Package{{Controllers: []metadata.Controller{{
@@ -45,6 +49,7 @@ func securityRegressionPackages() []metadata.Package {
 		Prefix: "/security",
 		Routes: []metadata.Route{
 			{Method: http.MethodGet, Path: "/regular", Handler: "Regular"},
+			{Method: http.MethodGet, Path: "/typed-nil", Handler: "TypedNil"},
 			{Method: http.MethodGet, Path: "/static", Handler: "Regular", StaticInvoke: func(any) (any, error) {
 				return nil, errors.New("PRIVATE_STATIC_SENTINEL")
 			}},
@@ -81,6 +86,7 @@ func TestSecurityReflectedErrorValueIsSafeForConcreteKinds(t *testing.T) {
 		{namedSecurityError("named"), "named"},
 		{structSecurityError{}, "PRIVATE_STRUCT_SENTINEL"},
 		{(*pointerSecurityError)(nil), ""},
+		{error((*pointerSecurityError)(nil)), ""},
 	} {
 		got := reflectedHandlerError(reflect.ValueOf(tc.value))
 		if tc.want == "" {
@@ -103,6 +109,7 @@ func TestSecurityAdapterErrorRedaction(t *testing.T) {
 		status int
 	}{
 		{"/regular", 500},
+		{"/typed-nil", 200},
 		{"/static", 500},
 		{"/static-http", 503},
 	} {
@@ -111,8 +118,12 @@ func TestSecurityAdapterErrorRedaction(t *testing.T) {
 			if err := a.routes[http.MethodGet+" /security"+tc.path](ctx); err != nil {
 				t.Fatal(err)
 			}
-			if ctx.status != tc.status || ctx.body != "Internal server error\n" {
-				t.Fatalf("status=%d body=%q, want status=%d", ctx.status, ctx.body, tc.status)
+			expected := "Internal server error\n"
+			if tc.path == "/typed-nil" {
+				expected = "\"safe\"\n"
+			}
+			if ctx.status != tc.status || ctx.body != expected {
+				t.Fatalf("status=%d body=%q, want status=%d body=%q", ctx.status, ctx.body, tc.status, expected)
 			}
 		})
 	}
@@ -123,9 +134,17 @@ func TestSecurityLegacyHTTPErrorRedaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	response := httptest.NewRecorder()
-	h.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/security/regular", nil))
-	if response.Code != http.StatusInternalServerError || strings.Contains(response.Body.String(), "PRIVATE_") {
-		t.Fatalf("unexpected HTTP response status=%d body=%q", response.Code, response.Body.String())
+	for _, tc := range []struct {
+		path, body string
+		status     int
+	}{
+		{"/regular", "Internal server error\n", 500},
+		{"/typed-nil", "\"safe\"\n", 200},
+	} {
+		response := httptest.NewRecorder()
+		h.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/security"+tc.path, nil))
+		if response.Code != tc.status || response.Body.String() != tc.body {
+			t.Fatalf("%s: unexpected status=%d body=%q", tc.path, response.Code, response.Body.String())
+		}
 	}
 }
