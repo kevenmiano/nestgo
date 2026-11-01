@@ -98,7 +98,7 @@ func FuzzBind(f *testing.F) {
 func TestEscapedSQLLiteralsAndComments(t *testing.T) {
 	for _, tc := range []struct {
 		name, query, want string
-		dialect Dialect
+		dialect           Dialect
 	}{
 		{"postgres E-string", `SELECT E'it\'s :hidden', :id`, `SELECT E'it\'s :hidden', $1`, PostgreSQL},
 		{"mysql single quote", `SELECT 'it\'s :hidden', :id`, `SELECT 'it\'s :hidden', ?`, Question},
