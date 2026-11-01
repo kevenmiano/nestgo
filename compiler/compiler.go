@@ -497,7 +497,7 @@ func generateMetadata(files []*File, allowPersistence bool, repositories ...Repo
 	if err := validateModuleProviderVisibility(files, moduleContracts); err != nil {
 		return nil, err
 	}
-	if err := validateTypedInterfaceDependencies(files, moduleContracts, providerNames, controllers); err != nil {
+	if err := validateTypedInterfaceDependencies(files, moduleContracts, providerNames, controllers, repositories...); err != nil {
 		return nil, err
 	}
 	qualifiedImports, err := qualifiedModuleImportPaths(files, moduleContracts)
