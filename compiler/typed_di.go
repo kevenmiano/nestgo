@@ -32,12 +32,13 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 	// do not exist in the annotated source yet. Include their declarations in
 	// the static type-check graph so concrete and interface injection is checked
 	// against the real generated method set rather than inferred by name.
+
 	for _, repository := range repositories {
-		generated, err := GenerateRepository(repository)
-		if err != nil {
-			return err
-		}
-		node, err := parser.ParseFile(fset, repository.Name+"_repository_generated.go", generated, 0)
+		// Only the public method set matters to interface resolution. The
+		// repository implementation imports NestGo's database package, which
+		// cannot be resolved when unit fixtures live outside any Go module.
+		// This local signature-only AST avoids runtime/import coupling.
+		node, err := parser.ParseFile(fset, repository.Name+"_di_typecheck.go", repositoryTypeCheckStub(repository), 0)
 		if err != nil {
 			return err
 		}
@@ -198,4 +199,26 @@ func moduleAwareImporter(fset *token.FileSet, dir string) types.Importer {
 		}
 		return os.Open(exportFile)
 	})
+}
+
+// repositoryTypeCheckStub mirrors the type signatures emitted by
+// GenerateRepository. It is never written or executed; this checks the
+// interface contract before implementation generation.
+func repositoryTypeCheckStub(repo RepositoryDefinition) string {
+	var out strings.Builder
+	fmt.Fprintf(&out, "package %s\nimport \"context\"\ntype %sGenerated struct{}\n", repo.Package, repo.Name)
+	for _, method := range repo.Methods {
+		fmt.Fprintf(&out, "func (*%sGenerated) %s(ctx context.Context", repo.Name, method.Name)
+		for _, parameter := range method.Parameters {
+			fmt.Fprintf(&out, ", %s %s", parameter.Name, parameter.Type)
+		}
+		result := "(*" + repo.Entity + ", error)"
+		if method.Exec {
+			result = "(int64, error)"
+		} else if method.Many {
+			result = "([]" + repo.Entity + ", error)"
+		}
+		fmt.Fprintf(&out, ") %s { panic(\"compile-time signature only\") }\n", result)
+	}
+	return out.String()
 }
