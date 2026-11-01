@@ -1,0 +1,96 @@
+name: Compare code-first bootstrap performance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/bootstrap_core.go'
+      - 'runtime/application.go'
+      - 'runtime/code_first_bootstrap_benchmark_test.go'
+      - 'database/connections.go'
+      - 'config/config.go'
+      - 'platform/fasthttp/adapter.go'
+      - '.github/workflows/code-first-bootstrap-compare.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          path: baseline
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: candidate/go.mod
+          cache: false
+      - name: Use identical benchmark source on both revisions
+        run: |
+          cp candidate/runtime/code_first_bootstrap_benchmark_test.go baseline/runtime/
+      - name: Benchmark before and after on the same runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          go version | tee results/environment.txt
+          uname -a | tee -a results/environment.txt
+          for variant in baseline candidate; do
+            (
+              cd "$variant"
+              GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkCodeFirstBootstrap$' -benchtime=250ms -count=5 -benchmem -timeout=10m
+            ) | tee "results/$variant.txt"
+          done
+      - name: Report medians with allocation counts
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import statistics
+
+          directory = pathlib.Path("results")
+          pattern = re.compile(r"^BenchmarkCodeFirstBootstrap/(routes_\d+)-\d+\s+\d+\s+([\d.]+) ns/op\s+(\d+) B/op\s+(\d+) allocs/op")
+          def parse(filename):
+              rows = {}
+              for line in (directory / filename).read_text().splitlines():
+                  match = pattern.match(line)
+                  if match:
+                      rows.setdefault(match[1], []).append(tuple(float(x) for x in match.groups()[1:]))
+              expected = {"routes_0", "routes_1", "routes_10", "routes_100"}
+              if set(rows) != expected or any(len(values) != 5 for values in rows.values()):
+                  raise SystemExit(f"incomplete benchmark series in {filename}: {rows}")
+              return {
+                  name: tuple(statistics.median(v[i] for v in values) for i in range(3))
+                  for name, values in rows.items()
+              }
+
+          baseline = parse("baseline.txt")
+          candidate = parse("candidate.txt")
+          lines = [
+              "| Routes | main ns/op | PR ns/op | Change | main B/op | PR B/op | main allocs/op | PR allocs/op |",
+              "|---|---:|---:|---:|---:|---:|---:|---:|",
+          ]
+          for count in (0, 1, 10, 100):
+              key = f"routes_{count}"
+              a, b = baseline[key], candidate[key]
+              change = (b[0] / a[0] - 1) * 100
+              lines.append(f"| {count} | {a[0]:.1f} | {b[0]:.1f} | {change:+.1f}% | {a[1]:.0f} | {b[1]:.0f} | {a[2]:.0f} | {b[2]:.0f} |")
+          output = "\n".join(lines) + "\n"
+          (directory / "comparison.md").write_text(output)
+          print(output)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: code-first-bootstrap-${{ github.run_id }}
+          path: results/
+          retention-days: 30

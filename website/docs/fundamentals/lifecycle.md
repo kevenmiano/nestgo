@@ -10,13 +10,13 @@ NestGo has **one application** abstraction and an engine-independent lifecycle. 
 ## Create an application
 
 ```go
-app, err := runtime.New(runtime.WithRegistry("shop"))
+app, err := runtime.New()
 if err != nil { log.Fatal(err) }
 
 log.Fatal(app.Listen(":8080"))
 ```
 
-The default engine is native fasthttp. To select the Go standard library, add `runtime.WithAdapter(nethttp.New())`. To pass metadata directly, use `runtime.WithPackages(packages...)`. Do not combine both metadata sources. Import generated Go packages so their `init()` registrations are linked.
+The default engine is native fasthttp. To select the Go standard library, add `runtime.WithAdapter(nethttp.New())`. To pass metadata directly, use `runtime.WithPackages(packages...)`. Compiled package metadata is discovered automatically; `WithPackages` overrides that discovery for explicit embedding and tests. Import the generated Go packages so their `init()` registrations are linked.
 
 The `*runtime.Application` provides `Listen`, `Serve`, `HTTPAdapter` and `Shutdown`. A bare HTTP handler is not a second framework lifecycle.
 
@@ -25,12 +25,13 @@ The `*runtime.Application` provides `Listen`, `Serve`, `HTTPAdapter` and `Shutdo
 ```mermaid
 flowchart TD
   Entry["runtime.New(options...)"] --> Source{"Metadata"}
-  Source -->|"WithRegistry"| Registry["Resolve registered package imports"]
+  Source -->|"auto-discovery"| Registry["Resolve registered package imports"]
   Source -->|"WithPackages"| Direct["Use explicit metadata"]
   Registry --> Graph["Validate modules and visibility"]
   Direct --> Graph
   Graph --> Provider["Allocate and inject providers"]
-  Provider --> Controller["Create and inject controllers"]
+  Provider --> Order["Dependency-first provider hooks, respecting module imports"]
+  Order --> Controller["Create and inject controllers"]
   Controller --> Route["Validate routes and register adapter handlers"]
   Route --> Init["OnModuleInit"]
   Init --> Ready["OnApplicationBootstrap"]
@@ -38,7 +39,7 @@ flowchart TD
   App --> Serve["Listen / Serve"]
 ```
 
-Module validation rejects missing imports, invalid exports, conflicting ownership and module import cycles. Provider injection supports exported pointer or interface fields, and `nestgo:"optional"` allows missing optional dependencies. Scope visibility honors `Imports`, `Providers` and `Exports`; no constructor injection is provided. Module import-cycle detection does not guarantee topological order of provider hooks.
+Module validation rejects missing imports, invalid exports, conflicting ownership and module import cycles. Provider injection supports exported pointer or interface fields, and `nestgo:"optional"` allows missing optional dependencies. Scope visibility honors `Imports`, `Providers` and `Exports`; no constructor injection is provided. Module import and resolved provider injection cycles are rejected before lifecycle hooks run. Provider hooks execute in dependency-first order (including interface and present optional injections); controllers run after providers. Dynamic dependencies used only inside generated provider factories cannot be inferred; expose lifecycle dependencies through explicitly injected fields.
 
 ## Request processing
 
@@ -74,7 +75,7 @@ sequenceDiagram
   App->>Hooks: OnApplicationShutdown(ctx)
 ```
 
-Initialization executes providers in deterministic type-name order, then controllers in metadata registration order. Shutdown hooks execute in reverse instance order. `app.Shutdown(ctx)` is idempotent and aggregates errors. If initialization fails, the application attempts cleanup, but registered adapter routes are not transactionally rolled back.
+Initialization executes providers in dependency-first topological order with imported modules first among independent providers, then controllers in module-aware stable order. Shutdown hooks execute in reverse instance order. `app.Shutdown(ctx)` is idempotent and aggregates errors. If initialization fails or the bootstrap context is canceled, the application attempts cleanup with a bounded independent context. Registered routes are not transactionally rolled back, but a failed application is never served.
 
 The application never automatically installs OS signal handlers. The caller provides the shutdown context and deadline. A successfully constructed Application does not imply a listening TCP socket.
 
@@ -86,6 +87,6 @@ Use `go test ./runtime -run '^$' -bench BenchmarkApplicationBootstrapProviders -
 
 ## Constraints
 
-Request-scoped providers, constructor injection, automatic signals, complete rollback, universal guards/interceptors/filters and full resource management are not implemented.
+Request-scoped providers, constructor injection, automatic signals, transactional route rollback, universal guards/interceptors/filters and arbitrary resource disposal are not implemented.
 
 See [runtime reference](https://github.com/kevenmiano/nestgo/blob/main/docs/RUNTIME.md) and [HTTP adapters](https://github.com/kevenmiano/nestgo/blob/main/docs/HTTP_ADAPTERS.md).

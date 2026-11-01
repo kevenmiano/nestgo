@@ -1,0 +1,24 @@
+name: Optional Viper configuration integration
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  viper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Test optional Viper module
+        working-directory: config/viper
+        run: |
+          go mod tidy
+          go test -race -count=1 ./...

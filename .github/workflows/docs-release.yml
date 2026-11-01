@@ -56,7 +56,12 @@ jobs:
           TAG_COMMIT: ${{ steps.version.outputs.commit }}
         run: git checkout --detach "$TAG_COMMIT"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -77,7 +82,7 @@ jobs:
           grep -q 'NestGo' website/build/index.html
 
       - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: website/build
 
@@ -94,7 +99,7 @@ jobs:
     steps:
       - name: Publish static website
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
       - name: Deployment summary
         env:

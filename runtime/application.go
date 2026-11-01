@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/kevenmiano/nestgo/config"
+	"github.com/kevenmiano/nestgo/database"
 	"github.com/kevenmiano/nestgo/httpadapter"
 	"github.com/kevenmiano/nestgo/logging"
 	"github.com/kevenmiano/nestgo/metadata"
@@ -19,13 +21,19 @@ import (
 type Option func(*applicationConfig)
 
 type applicationConfig struct {
-	adapter     httpadapter.Adapter
-	packages    []metadata.Package
-	routes      []Route
-	registry    []string
-	logger      *logging.Service
-	debug       bool
-	onBootstrap func(BootstrapMetrics)
+	adapter          httpadapter.Adapter
+	packages         []metadata.Package
+	routes           []Route
+	logger           *logging.Service
+	loggerConfigured bool
+	debug            bool
+	onBootstrap      func(BootstrapMetrics)
+	configOptions    []config.Option
+	databaseOptions  []database.Option
+	instances        []any
+	context          context.Context
+	contextSet       bool
+	pipeline         requestPipelineConfig
 }
 
 // WithPackages supplies already-generated metadata to the application.
@@ -36,22 +44,15 @@ func WithPackages(packages ...metadata.Package) Option {
 // Context is the HTTP-engine-independent request context.
 type Context = httpadapter.Context
 
-// Handler handles an HTTP request without generated controller metadata.
+// Handler processes an HTTP request without compiled controller metadata.
 type Handler = httpadapter.Handler
 
-// Route declares an HTTP endpoint without the NestGo compiler.
+// Route declares an HTTP endpoint directly in Go.
 type Route = httpadapter.Route
 
-// WithRoutes registers ordinary Go HTTP handlers on the selected adapter.
-// These routes participate in the same bootstrap error handling and shutdown.
+// WithRoutes registers direct handlers with the same namespace and lifecycle as compiled routes.
 func WithRoutes(routes ...Route) Option {
 	return func(c *applicationConfig) { c.routes = append(c.routes, routes...) }
-}
-
-// WithRegistry loads named registered packages and their transitive module imports.
-// Import the generated Go packages so their init functions register metadata.
-func WithRegistry(names ...string) Option {
-	return func(c *applicationConfig) { c.registry = append(c.registry, names...) }
 }
 
 // WithAdapter selects an HTTP engine; the default is fasthttp.
@@ -61,7 +62,7 @@ func WithAdapter(adapter httpadapter.Adapter) Option {
 
 // WithLogger enables structured framework bootstrap diagnostics.
 func WithLogger(logger *logging.Service) Option {
-	return func(c *applicationConfig) { c.logger = logger }
+	return func(c *applicationConfig) { c.logger = logger; c.loggerConfigured = true }
 }
 
 // WithDebug enables per-provider bootstrap diagnostics when a logger is configured.
@@ -69,20 +70,71 @@ func WithDebug(enabled bool) Option {
 	return func(c *applicationConfig) { c.debug = enabled }
 }
 
+// WithConfig supplies typed configuration loader options.
+func WithConfig(options ...config.Option) Option {
+	return func(c *applicationConfig) { c.configOptions = append(c.configOptions, options...) }
+}
+
+// WithDatabase configures independent named SQL connection pools.
+func WithDatabase(options ...database.Option) Option {
+	return func(c *applicationConfig) { c.databaseOptions = append(c.databaseOptions, options...) }
+}
+
+// WithProvider injects an already initialized external service.
+func WithProvider(instance any) Option {
+	return func(c *applicationConfig) { c.instances = append(c.instances, instance) }
+}
+
+// WithContext supplies a cancellable bootstrap context; it does not control HTTP shutdown.
+func WithContext(ctx context.Context) Option {
+	return func(c *applicationConfig) { c.context = ctx; c.contextSet = true }
+}
+
 // WithBootstrapMetrics registers an observer invoked after successful bootstrap.
 func WithBootstrapMetrics(observer func(BootstrapMetrics)) Option {
 	return func(c *applicationConfig) { c.onBootstrap = observer }
 }
 
+// WithMiddleware installs global HTTP middleware in registration order.
+func WithMiddleware(middlewares ...httpadapter.Middleware) Option {
+	return func(c *applicationConfig) { c.pipeline.middleware = append(c.pipeline.middleware, middlewares...) }
+}
+
+// WithRouteMiddleware adds middleware to a specific registered method and path.
+func WithRouteMiddleware(method, path string, middlewares ...httpadapter.Middleware) Option {
+	return func(c *applicationConfig) {
+		if c.pipeline.routeMiddleware == nil {
+			c.pipeline.routeMiddleware = make(map[string][]httpadapter.Middleware)
+		}
+		key := method + " " + path
+		c.pipeline.routeMiddleware[key] = append(c.pipeline.routeMiddleware[key], middlewares...)
+	}
+}
+
+func WithGuards(guards ...httpadapter.Guard) Option {
+	return func(c *applicationConfig) { c.pipeline.guards = append(c.pipeline.guards, guards...) }
+}
+
+func WithPipes(pipes ...httpadapter.Pipe) Option {
+	return func(c *applicationConfig) { c.pipeline.pipes = append(c.pipeline.pipes, pipes...) }
+}
+
+func WithFilters(filters ...httpadapter.ExceptionFilter) Option {
+	return func(c *applicationConfig) { c.pipeline.filters = append(c.pipeline.filters, filters...) }
+}
+
 // Application owns one HTTP adapter and the lifecycle of its providers.
 type Application struct {
-	adapter   httpadapter.Adapter
-	lifecycle *lifecycleRegistry
+	adapter        httpadapter.Adapter
+	lifecycle      *lifecycleRegistry
+	lifecycleState lifecycleRegistry
+	Config         *config.Service
+	Connections    *database.Connections
 }
 
 // New is the single application factory. All HTTP platforms share DI and hooks.
 //
-// Example: app, err := runtime.New(runtime.WithRegistry("shop"))
+// Example: app, err := runtime.New(runtime.WithDatabase(...))
 func New(options ...Option) (*Application, error) {
 	var cfg applicationConfig
 	for i, option := range options {
@@ -91,25 +143,44 @@ func New(options ...Option) (*Application, error) {
 		}
 		option(&cfg)
 	}
-	if len(cfg.registry) > 0 && len(cfg.packages) > 0 {
-		return nil, errors.New("WithRegistry and WithPackages cannot be combined")
+	if cfg.contextSet && cfg.context == nil {
+		return nil, errors.New("nil bootstrap context")
+	}
+	if cfg.loggerConfigured && cfg.logger == nil {
+		return nil, errors.New("runtime: nil logger")
 	}
 	packages := cfg.packages
-	if len(cfg.registry) > 0 {
+	if len(cfg.packages) == 0 {
+		// Compiled modules self-register at import time. Their unique root and
+		// transitive imports are discovered once during bootstrap.
 		var err error
-		packages, err = registryImportClosure(cfg.registry)
+		packages, err = discoverCompiledPackages()
 		if err != nil {
 			return nil, err
 		}
 	}
 
+	ctx := cfg.context
+	if ctx == nil {
+		ctx = context.Background()
+	} else if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	for _, instance := range cfg.instances {
+		if instance == nil {
+			return nil, errors.New("runtime: nil external provider")
+		}
+	}
 	started := time.Now()
 	adapter := cfg.adapter
 	if adapter == nil {
 		adapter = fastadapter.New()
 	}
-	registry := &lifecycleRegistry{}
-	ctx := context.Background()
+	// Co-locate lifecycle state with its application: one less heap
+	// allocation, with identical bootstrap, rollback and shutdown semantics.
+	app := &Application{adapter: adapter}
+	registry := &app.lifecycleState
+	app.lifecycle = registry
 	logger := cfg.logger
 	if logger != nil {
 		logger.Info(ctx, "NestFactory", "Starting NestGo application...")
@@ -129,10 +200,44 @@ func New(options ...Option) (*Application, error) {
 		if logger != nil {
 			logger.Error(ctx, "NestFactory", "Bootstrap failed", slog.String("error", err.Error()))
 		}
-		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
+		// Do not skip resource cleanup when the bootstrap context is canceled.
+		// Limit rollback separately from the caller's canceled context.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		return nil, errors.Join(err, registry.shutdown(cleanupCtx, adapter.Shutdown))
+	}
+	// No environment scan or SQL connection planning for applications that
+	// have not configured these features. Both services remain injectable.
+	settings := config.DeferredEnvironment()
+	if len(cfg.configOptions) > 0 {
+		var err error
+		settings, err = config.New(cfg.configOptions...)
+		if err != nil {
+			return fail(err)
+		}
+	}
+	connections := database.NewConnections()
+	if len(cfg.databaseOptions) > 0 {
+		module, err := database.NewModule(cfg.databaseOptions...)
+		if err != nil {
+			return fail(err)
+		}
+		connections, err = module.Open(ctx)
+		if err != nil {
+			return fail(err)
+		}
+		// Register first so pools close after provider lifecycle hooks.
+		registry.instances = append(registry.instances, &ownedSQLConnections{connections})
+	}
+	var instances []any
+	if len(packages) != 0 || len(cfg.instances) != 0 {
+		instances = append([]any{settings, connections}, cfg.instances...)
 	}
 	registrationStarted := time.Now()
-	if err := registerRoutesWithLifecycle(adapter, packages, registry, cfg.routes...); err != nil {
+	if err := validatePipeline(cfg.pipeline); err != nil {
+		return fail(err)
+	}
+	if err := registerRoutesWithPipeline(adapter, packages, registry, cfg.pipeline, instances, cfg.routes...); err != nil {
 		return fail(err)
 	}
 	registrationDuration := time.Since(registrationStarted)
@@ -150,7 +255,9 @@ func New(options ...Option) (*Application, error) {
 	if cfg.onBootstrap != nil {
 		cfg.onBootstrap(BootstrapMetrics{RouteRegistration: registrationDuration, LifecycleInitialization: time.Since(lifecycleStarted), Total: time.Since(started)})
 	}
-	return &Application{adapter: adapter, lifecycle: registry}, nil
+	app.Config = settings
+	app.Connections = connections
+	return app, nil
 }
 
 // HTTPAdapter returns the configured transport adapter.
@@ -179,3 +286,11 @@ func (a *Application) Shutdown(ctx context.Context) error {
 	}
 	return a.lifecycle.shutdown(ctx, a.adapter.Shutdown)
 }
+
+// ownedSQLConnections joins SQL pool ownership to the standard application lifecycle.
+type ownedSQLConnections struct{ pools *database.Connections }
+
+func (o *ownedSQLConnections) OnModuleDestroy(context.Context) error { return o.pools.Close() }
+
+// Close invokes the same idempotent shutdown path used by Shutdown(ctx).
+func (a *Application) Close() error { return a.Shutdown(context.Background()) }

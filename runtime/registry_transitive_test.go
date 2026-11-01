@@ -14,7 +14,7 @@ type transitiveExternalModule struct{}
 type transitiveRootModule struct{}
 type transitiveMiddleModule struct{}
 type transitiveConsumer struct {
-	Repo *externalmodule.Repository
+	Repo *externalmodule.Repository `nestgo:"inject"`
 }
 
 var transitiveFixtureOnce sync.Once
@@ -52,7 +52,7 @@ func TestRegistryImportClosureTraversesThreePackages(t *testing.T) {
 
 func TestRegistryTransitiveImportDoesNotLeakProviderVisibility(t *testing.T) {
 	registerTransitiveFixture()
-	_, err := New(WithRegistry("nestgo-transitive-root-test"))
+	_, err := registryTestApp("nestgo-transitive-root-test")
 	if err == nil || !strings.Contains(err.Error(), "missing required dependency") {
 		t.Fatalf("indirect import must not grant provider visibility: %v", err)
 	}

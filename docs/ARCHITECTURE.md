@@ -29,9 +29,9 @@ Developer                         Build time                          Runtime
                                                    |
                                          generated init() function
                                                    |
-                                            metadata.Register
+                                            metadata.RegisterCompiled
                                                    |
-                                            runtime.New(runtime.WithRegistry("shop"))
+                                            runtime.New()
                                                    |
                                     provider/controller construction
                                                    |
@@ -65,11 +65,11 @@ The `metadata` package defines:
 - `Module`: module type and name.
 - `Parameter`: method argument index, decorator kind and binding name.
 
-Generated `init()` functions call `metadata.Register(packageName, packageMetadata)`. A mutex protects the global registry. Duplicate package names cause a panic; `Lookup` and `All` expose registered packages. This is **registration metadata**, not a complete module dependency graph.
+Generated `init()` functions call `metadata.RegisterCompiled(packageName, packageMetadata)`. A mutex protects the global registry. Duplicate package names cause a panic; `Lookup` and `All` expose registered packages. This is **registration metadata**, not a complete module dependency graph.
 
 ## Runtime subsystem
 
-The `runtime` package exposes **one** constructor: `New(options ...Option) (*Application, error)`. Use `WithRegistry(names...)` or `WithPackages(packages...)` to select metadata, and `WithAdapter` to select the HTTP engine.
+The `runtime` package exposes **one** constructor: `New(options ...Option) (*Application, error)`. Compiled modules auto-register and the runtime discovers the single app root; `WithPackages(packages...)` remains for explicit metadata injection, and `WithAdapter` to select the HTTP engine.
 
 During application construction, the runtime:
 
@@ -85,7 +85,7 @@ See [Runtime reference](RUNTIME.md) for signatures, errors, and injection constr
 
 ## Example end-to-end flow
 
-`examples/shop/users.mgo` defines a `UsersController`, `UsersService` and `UsersModule`. Compilation produces `users_generated.go` and `zz_modforge_metadata.go`. Importing the package registers its metadata. Calling `runtime.New(runtime.WithRegistry("shop"))` creates routes for:
+`examples/shop/users.mgo` defines a `UsersController`, `UsersService` and `UsersModule`. Compilation produces `users_generated.go` and `zz_modforge_metadata.go`. Importing the package registers its metadata. Calling `runtime.New()` creates routes for:
 
 | Method | Pattern | Handler |
 | --- | --- | --- |

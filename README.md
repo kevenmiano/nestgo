@@ -14,7 +14,7 @@
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg" alt="Go quality" /></a>
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg" alt="Documentation build" /></a>
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml/badge.svg" alt="Go packages" /></a>
-  <img src="https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.23+" />
+  <img src="https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.27+" />
   <img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental" />
 </p>
 
@@ -72,11 +72,12 @@ func main() {
 }
 ```
 
-For optional NestJS-inspired decorators, install the compiler and generate Go metadata once during development/build:
+For optional NestJS-inspired decorators, install the CLI and generate Go metadata once during development/build:
 
 ```bash
 go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
 nestgo compile ./myapp
+nestgo --help
 ```
 
 To explore the included application:
@@ -87,6 +88,16 @@ cd nestgo
 go run ./cmd/nestgo compile ./examples/shop
 go test ./...
 ```
+
+### Watch source changes and scaffold tests
+
+```bash
+nestgo compile --watch ./myapp
+```
+
+`nestgo check ./myapp` verifies that compiler-owned artifacts match current source **without writing any files**. It exits nonzero on missing/stale output, making it suitable for CI after `nestgo compile` and before `go test`.
+
+The CLI fingerprints top-level `.mgo` sources and recompiles the package when they change; `--poll-interval` configures the default 250 ms check. It also generates a compiler-owned wiring test and **editable, skipped** test stubs for controllers/providers. Add `@Dto()` to opt into serialization/deserialization and tagged validation test TODOs. Existing developer tests are preserved. See [compiler tooling](docs/COMPILER.md).
 
 ## Optional: decorators and modules
 
@@ -116,7 +127,7 @@ type UsersModule struct{}
 Use the generated metadata with the application runtime. For example, after importing your generated package for registration:
 
 ```go
-app, err := runtime.New(runtime.WithRegistry("shop")) // native fasthttp by default
+app, err := runtime.New() // native fasthttp by default
 if err != nil {
     log.Fatal(err)
 }
@@ -124,6 +135,28 @@ log.Fatal(app.Listen(":8080"))
 ```
 
 Pass `runtime.WithAdapter(nethttp.New())` to switch to the Go standard-library HTTP engine. You can mix `WithRoutes(...)` with registered controllers; duplicate routes are rejected during bootstrap. Both adapters use the same bootstrap and lifecycle. See [HTTP adapters](docs/HTTP_ADAPTERS.md).
+
+## Request pipeline example
+
+NestGo supports NestJS-inspired middleware, guards, pipes and exception
+filters, with both decorated `.mgo` controllers and compiler-free routes:
+
+```bash
+go run ./cmd/modforge compile ./examples/pipeline
+export DEMO_API_KEY=local-demo-key
+go run ./examples/pipeline/cmd/server
+```
+
+```bash
+curl -i -H 'X-API-Key: local-demo-key' http://localhost:8080/users/ada
+```
+
+Read the [runnable example](examples/pipeline/README.md) or the
+separate guides on [middleware](website/docs/fundamentals/middleware.md),
+[guards](website/docs/fundamentals/guards.md),
+[pipes](website/docs/fundamentals/pipes.md) and
+[exception filters](website/docs/fundamentals/exception-filters.md).
+These are NestJS-inspired contracts; not all NestJS features are present.
 
 ## Features
 
@@ -133,6 +166,7 @@ Pass `runtime.WithAdapter(nethttp.New())` to switch to the Go standard-library H
 - **Optional decorator compiler:** generate standard Go files and metadata from `.mgo` sources.
 - **HTTP adapters:** use native fasthttp or net/http through a platform interface.
 - **Hybrid invocation:** statically invoke eligible handlers while retaining reflection for other cases.
+- **Request pipeline:** matched-route middleware, guards, pipes and filters for compiled controllers and direct HTTP handlers.
 - **Diagnostics:** inspect module graphs and collect startup measurements.
 
 Features are evolving. Constructor injection, request-scoped providers, guards, interceptors and full cross-package compilation support are not yet stable.
@@ -140,6 +174,8 @@ Features are evolving. Constructor injection, request-scoped providers, guards, 
 ## Documentation
 
 Read the [documentation portal](https://kevenmiano.github.io/nestgo/) or browse the [documentation sources](website/docs/). The site is built in CI; GitHub Pages publication currently happens through the separate release workflow.
+
+For all commands, diagnostic flags and shell completion, see the [CLI guide](website/docs/cli/overview.md). The Docusaurus command reference is generated from Cobra.
 
 Additional references: [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
 

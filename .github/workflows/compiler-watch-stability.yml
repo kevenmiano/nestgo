@@ -1,0 +1,35 @@
+name: Compiler watch stability
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'compiler/watch.go'
+      - 'compiler/watch_test.go'
+      - '.github/workflows/compiler-watch-stability.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'compiler/watch.go'
+      - 'compiler/watch_test.go'
+      - '.github/workflows/compiler-watch-stability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    name: Repeated watch and race regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Repeat source edit, invalid source recovery and cancellation tests
+        run: go test ./compiler -run '^TestWatchDirRecompilesOnChangesAndRecoversFromInvalidSource$' -count=50 -timeout=8m
+      - name: Watch regression with race detector
+        run: go test -race ./compiler -run '^TestWatchDirRecompilesOnChangesAndRecoversFromInvalidSource$' -count=10 -timeout=8m

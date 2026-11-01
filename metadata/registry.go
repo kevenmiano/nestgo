@@ -13,21 +13,32 @@ type Parameter struct {
 	Kind  string
 	Name  string
 }
+type Header struct{ Name, Value string }
 type Route struct {
 	StaticInvoke          func(any) (any, error)
 	StaticHTTP            func(any, httpadapter.Context) (any, int, error)
 	Method, Path, Handler string
 	Status                int
+	Headers               []Header
+	RedirectURL           string
+	RedirectStatus        int
 	Parameters            []Parameter
+	Guards                []reflect.Type
+	Pipes                 []reflect.Type
+	Filters               []reflect.Type
 }
 type Controller struct {
-	Type   reflect.Type
-	Prefix string
-	Routes []Route
+	Type    reflect.Type
+	Prefix  string
+	Guards  []reflect.Type
+	Pipes   []reflect.Type
+	Filters []reflect.Type
+	Routes  []Route
 }
 type Provider struct {
-	Type  reflect.Type
-	Scope string
+	Type    reflect.Type
+	Scope   string
+	Factory func(resolve func(reflect.Type) (any, bool)) (any, error)
 }
 
 // Module declares an optional static module dependency contract.
@@ -49,14 +60,41 @@ type Package struct {
 
 var mu sync.RWMutex
 var packages = map[string]Package{}
+var compiledPackages = map[string]bool{}
 
+// Register accepts explicitly supplied metadata (including test fixtures).
 func Register(name string, p Package) {
+	register(name, p, false)
+}
+
+// RegisterCompiled is emitted by the NestGo compiler. It makes modules
+// discoverable by runtime.New without asking the application for registry names.
+func RegisterCompiled(name string, p Package) {
+	register(name, p, true)
+}
+
+func register(name string, p Package, compiled bool) {
 	mu.Lock()
 	defer mu.Unlock()
 	if _, ok := packages[name]; ok {
 		panic(fmt.Sprintf("nestgo: duplicate metadata package %s", name))
 	}
 	packages[name] = p
+	if compiled {
+		compiledPackages[name] = true
+	}
+}
+
+// Compiled returns a snapshot of metadata linked into this executable by
+// generated packages. Explicit metadata.Register fixtures remain separate.
+func Compiled() map[string]Package {
+	mu.RLock()
+	defer mu.RUnlock()
+	result := make(map[string]Package, len(compiledPackages))
+	for name := range compiledPackages {
+		result[name] = packages[name]
+	}
+	return result
 }
 func Lookup(name string) (Package, bool) {
 	mu.RLock()

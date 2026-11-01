@@ -1,0 +1,56 @@
+name: Database integration (real PostgreSQL and MySQL)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'database/**'
+      - '.github/workflows/database-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sql-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nestgo
+          POSTGRES_USER: nestgo
+          POSTGRES_PASSWORD: integration_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nestgo -d nestgo"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: nestgo
+          MYSQL_USER: nestgo
+          MYSQL_PASSWORD: integration_only
+          MYSQL_ROOT_PASSWORD: root_integration_only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot_integration_only"
+          --health-interval 10s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Require both live database DSNs and run integration suite
+        working-directory: database/integration
+        env:
+          NESTGO_TEST_POSTGRES_DSN: postgres://nestgo:integration_only@127.0.0.1:5432/nestgo?sslmode=disable
+          NESTGO_TEST_MYSQL_DSN: nestgo:integration_only@tcp(127.0.0.1:3306)/nestgo?parseTime=true
+        run: |
+          set -euo pipefail
+          go mod tidy
+          go test -race -count=1 -v ./...

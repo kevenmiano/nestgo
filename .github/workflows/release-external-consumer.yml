@@ -1,0 +1,67 @@
+name: Release gate - external Go consumer
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+      - 'runtime/**'
+      - 'compiler/**'
+      - 'httpadapter/**'
+      - 'metadata/**'
+      - 'platform/**'
+      - '.github/acceptance/**'
+      - '.github/scripts/test-external-consumer.sh'
+      - '.github/workflows/release-external-consumer.yml'
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Published version tag to verify through Go public proxy (e.g. v0.1.0)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  source-consumer:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: External consumer from candidate checkout SHA
+        run: bash .github/scripts/test-external-consumer.sh source
+
+  published-consumer:
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Validate tag points to an ancestor of main
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+        run: bash .github/scripts/verify-release-tag.sh "$RELEASE_TAG"
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: External consumer via public proxy and checksum database
+        env:
+          GOPROXY: https://proxy.golang.org
+          GOSUMDB: sum.golang.org
+        run: bash .github/scripts/test-external-consumer.sh tag "${{ steps.release.outputs.tag }}"

@@ -136,8 +136,15 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 					out[k] = ' '
 				}
 			}
-			if name == "Body" || name == "Param" || name == "Query" || name == "Headers" {
-				if argument != "" {
+			if name == "Body" || name == "Param" || name == "Headers" || name == "Res" || name == "Response" || (name == "Query" && strings.TrimSpace(string(src[lineBeginning(src, start):start])) != "") {
+				if name == "Res" || name == "Response" {
+					if argument != "" && argument != "{passthrough:true}" {
+						return "", nil, nil, nil, Diagnostic{path, startLine, "@Res expects no argument or {passthrough:true}"}
+					}
+					if argument != "" {
+						argument = "passthrough"
+					}
+				} else if argument != "" {
 					v, e := strconv.Unquote(argument)
 					if e != nil {
 						return "", nil, nil, nil, Diagnostic{path, startLine, "parameter decorator expects quoted string"}
@@ -145,16 +152,16 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 					argument = v
 				}
 				params = append(params, marker{start, name, argument})
-			} else if name == "Expose" || name == "Exclude" || name == "ExcludeInput" || name == "ExcludeOutput" || name == "Transform" || name == "TransformInput" || name == "TransformOutput" || name == "Type" || isDTOValidator(name) {
-				lineStart := start
-				for lineStart > 0 && src[lineStart-1] != '\n' {
-					lineStart--
-				}
+			} else if name == "Expose" || name == "Exclude" || name == "ExcludeInput" ||
+				name == "ExcludeOutput" || name == "Transform" || name == "TransformInput" ||
+				name == "TransformOutput" || name == "Type" || isDTOValidator(name) {
+				lineStart := lineBeginning(src, start)
 				lineEnd := i
 				for lineEnd < len(src) && src[lineEnd] != '\n' {
 					lineEnd++
 				}
-				if strings.TrimSpace(string(src[lineStart:start])) != "" || strings.TrimSpace(string(src[i:lineEnd])) != "" {
+				if strings.TrimSpace(string(src[lineStart:start])) != "" ||
+					strings.TrimSpace(string(src[i:lineEnd])) != "" {
 					return "", nil, nil, nil, Diagnostic{path, startLine, "property decorator must be on its own line"}
 				}
 				properties = append(properties, marker{start, name, argument})
@@ -189,4 +196,13 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 		panic(fmt.Sprintf("offset drift %d != %d", len(out), len(src)))
 	}
 	return string(out), annotations, params, properties, nil
+}
+
+// lineBeginning returns the start of the source line containing a decorator.
+// @Query is a method decorator only when it starts its own line.
+func lineBeginning(src []byte, offset int) int {
+	for offset > 0 && src[offset-1] != '\n' {
+		offset--
+	}
+	return offset
 }
