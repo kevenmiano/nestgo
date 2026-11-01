@@ -5,7 +5,8 @@ NestGo usa construtores idiomáticos com **Functional Options** (`New` / `With..
 ## API pública canônica
 
 ```go
-app, err := runtime.NewApp(ctx,
+app, err := runtime.New(
+    runtime.WithContext(ctx),
     runtime.WithConfig(config.WithEnvFile(".env")),
     runtime.WithDatabase(
         database.WithConnection("users",
@@ -22,11 +23,11 @@ app, err := runtime.NewApp(ctx,
 )
 if err != nil { return err }
 defer app.Close()
-handler := app.HTTPHandler()
-_ = handler
+adapter := app.HTTPAdapter()
+_ = adapter
 ```
 
-O `NewApp` inicializa as configurações, abre os pools e registra `*config.Service` e `*database.Connections` no DI. Caso ocorra falha no bootstrap, os pools previamente abertos são encerrados.
+O `New` inicializa as configurações, abre os pools e registra `*config.Service` e `*database.Connections` no DI. Caso ocorra falha no bootstrap, os pools previamente abertos são encerrados.
 
 ## Uso sem o runtime
 
@@ -72,7 +73,7 @@ O gerador suporta `SELECT` para `*Entity` / `[]Entity` e `INSERT`, `UPDATE` e `D
 
 - `database.Native(db)` e `database.New(executor)` não tomam posse do executor.
 - `Connections.Register(name, db)` transfere a propriedade em caso de sucesso; `Connections.Close()` fecha os pools.
-- `App.Close()` fecha pools abertos por `NewApp`; o servidor HTTP externo continua responsabilidade do chamador.
+- `Application.Close()` fecha pools abertos por `New`; o servidor HTTP externo continua responsabilidade do chamador.
 - Os adaptadores HTTP ainda serão unificados na issue #103.
 
 Veja também [guia de persistência SQL](DATABASE.md). A PR #82 deve permanecer draft até passar CI e resolver conflitos.
