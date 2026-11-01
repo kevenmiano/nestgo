@@ -86,6 +86,42 @@ registration. The `transform` package also exports
 `PlainToInstance[T]`, `InstanceToPlain[T]`,
 `Marshal[T]` and `Unmarshal[T]` for non-HTTP code.
 
+## Using existing transformation libraries
+
+The HTTP codec uses Go's standard `encoding/json` and generated DTO
+methods. This avoids introducing mapstructure reflection in the request path.
+`transform.PlainToInstance[T]` accepts JSON bytes, plain maps, slices and
+other JSON-serializable values, and always respects DTO JSON hooks (including
+nested DTOs).
+
+For dynamic maps, configurations and non-HTTP conversion, the opt-in
+`transform/mapcodec` package wraps the maintained
+[`go-viper/mapstructure/v2`](https://github.com/go-viper/mapstructure):
+```go
+import (
+    "time"
+    "github.com/kevenmiano/nestgo/transform/mapcodec"
+    mapstructure "github.com/go-viper/mapstructure/v2"
+)
+
+type Settings struct {
+    Timeout time.Duration `json:"timeout"`
+}
+
+settings, err := mapcodec.Decode[Settings](
+    map[string]any{"timeout": "30s"},
+    mapcodec.WithDecodeHook(mapstructure.StringToTimeDurationHookFunc()),
+    mapcodec.WithStrictFields(),
+)
+```
+
+The mapcodec adapter also offers `WithWeakTyping()`; it is disabled by
+default. **Important:** mapcodec follows mapstructure's own conversion rules
+and does not run generated JSON property decorators. For decorated DTOs,
+prefer `transform.PlainToInstance` and the regular HTTP JSON pipeline.
+This keeps JSON security and transformation behavior consistent while allowing
+advanced dynamic decoding only when explicitly requested.
+
 ## Constraints and security
 
 - Decorators occupy separate lines before one exported struct field.
