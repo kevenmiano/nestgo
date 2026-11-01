@@ -131,6 +131,25 @@ func TestHTTPAdapterResourceLimitsLoopback(t *testing.T) {
 				}
 			})
 
+			t.Run("slow-incomplete-body", func(t *testing.T) {
+				conn, err := net.DialTimeout("tcp", ln.Addr().String(), time.Second)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer conn.Close()
+				if _, err := io.WriteString(conn, "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Length: 10\r\n\r\nx"); err != nil {
+					t.Fatal(err)
+				}
+				if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+					t.Fatal(err)
+				}
+				buf := make([]byte, 1)
+				_, err = conn.Read(buf)
+				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+					t.Fatalf("slow-body connection did not reach server deadline: %v", err)
+				}
+			})
+
 			t.Run("slow-incomplete-header", func(t *testing.T) {
 				conn, err := net.DialTimeout("tcp", ln.Addr().String(), time.Second)
 				if err != nil {
