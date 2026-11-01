@@ -3,6 +3,7 @@ package runtime
 import (
 	"encoding/json"
 	"errors"
+	"github.com/kevenmiano/nestgo/validation"
 	"fmt"
 	"github.com/kevenmiano/nestgo/httpadapter"
 	"github.com/kevenmiano/nestgo/metadata"
@@ -74,6 +75,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 						if status >= 500 {
 							return respondError(ctx, status, "Internal server error")
 						}
+						if status == 400 {
+							return respondValidationError(ctx, err)
+						}
 						return respondError(ctx, status, err.Error())
 					}
 					result = value
@@ -97,6 +101,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 								}
 								if err := json.Unmarshal(body, v.Interface()); err != nil {
 									return respondError(ctx, 400, "invalid JSON: "+err.Error())
+								}
+								if err := validation.Check(v.Elem().Interface()); err != nil {
+									return respondValidationError(ctx, err)
 								}
 							case "Param":
 								if t.Kind() != reflect.String {
@@ -176,4 +183,21 @@ func respondError(ctx httpadapter.Context, status int, message string) error {
 	ctx.Status(status)
 	ctx.SetHeader("Content-Type", "text/plain; charset=utf-8")
 	return ctx.Write([]byte(message + "\n"))
+}
+
+func respondValidationError(ctx httpadapter.Context, err error) error {
+	var fields validation.Errors
+	if !errors.As(err, &fields) {
+		return respondError(ctx, 400, err.Error())
+	}
+	ctx.Status(400)
+	ctx.SetHeader("Content-Type", "application/json")
+	payload := struct {
+		StatusCode int `json:"statusCode"`
+		Error string `json:"error"`
+		Fields validation.Errors `json:"fields"`
+	}{400, "Bad Request", fields}
+	data, marshalErr := json.Marshal(payload)
+	if marshalErr != nil { return respondError(ctx, 500, "Internal server error") }
+	return ctx.Write(append(data, '\n'))
 }
