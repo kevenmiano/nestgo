@@ -1,7 +1,7 @@
 package shop
-import("github.com/kevenmiano/nestgo/runtime";"net/http/httptest";"strings";"testing")
+import("context";"github.com/kevenmiano/nestgo/runtime";"net/http/httptest";"strings";"testing")
 func TestGeneratedRoutes(t *testing.T){
- h,err:=runtime.FromRegistry("shop");if err!=nil{t.Fatal(err)}
+ app,err:=runtime.NewApp(context.Background(),runtime.WithRegistry("shop"));if err!=nil{t.Fatal(err)};defer app.Close();h:=app.HTTPHandler()
  for _,tc:=range []struct{method,path,body,want string;status int}{
  {"GET","/users/","","Ada",200},
  {"GET","/users/abc","","abc",200},
