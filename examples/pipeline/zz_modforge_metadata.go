@@ -7,6 +7,11 @@ import (
 	"reflect"
 )
 
+var _ httpadapter.Guard = (*ApiKeyGuard)(nil)
+var _ httpadapter.Pipe = (*RequiredPipe)(nil)
+var _ httpadapter.Pipe = (*TrimPipe)(nil)
+var _ httpadapter.ExceptionFilter = (*BadRequestFilter)(nil)
+
 func init() {
 	metadata.RegisterCompiled("pipeline", metadata.Package{
 		Controllers: []metadata.Controller{
