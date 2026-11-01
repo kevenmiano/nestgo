@@ -1,7 +1,6 @@
 package fasthttp
 
 import (
-	"sort"
 	"strings"
 
 	"github.com/kevenmiano/nestgo/httpadapter"
@@ -55,11 +54,20 @@ func (idx routeIndex) lookup(method, path string) (httpadapter.Handler, map[stri
 	if bucket == nil {
 		return nil, nil, false
 	}
-	candidates := append([]routeEntry(nil), bucket.literal[parts[0]]...)
-	candidates = append(candidates, bucket.wildcard...)
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].index < candidates[j].index })
+	// Merge the two pre-ordered candidate lists without allocating or sorting.
+	literals := bucket.literal[parts[0]]
+	wildcards := bucket.wildcard
+	li, wi := 0, 0
 	foundPath := false
-	for _, entry := range candidates {
+	for li < len(literals) || wi < len(wildcards) {
+		var entry routeEntry
+		if wi == len(wildcards) || (li < len(literals) && literals[li].index < wildcards[wi].index) {
+			entry = literals[li]
+			li++
+		} else {
+			entry = wildcards[wi]
+			wi++
+		}
 		matched := true
 		for i, part := range entry.parts {
 			if !isParam(part) && part != parts[i] {
