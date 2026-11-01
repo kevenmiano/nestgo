@@ -1,0 +1,38 @@
+name: Route lookup performance comparison
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'platform/fasthttp/**'
+      - '.github/workflows/route-lookup-benchmarks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run router correctness tests
+        run: go test ./platform/fasthttp ./runtime -count=1
+      - name: Compare linear and indexed lookup on identical workloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p benchmark-results
+          go version | tee benchmark-results/environment.txt
+          GOMAXPROCS=2 go test ./platform/fasthttp -run '^$' -bench '^BenchmarkRouteLookup$' -benchmem -count=5 -benchtime=300ms | tee benchmark-results/router.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: router-comparison-${{ github.sha }}
+          path: benchmark-results/
+          retention-days: 30
