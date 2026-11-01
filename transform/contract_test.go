@@ -7,11 +7,13 @@ import (
 )
 
 type Trim struct{}
+
 func (Trim) Transform(value string) (string, error) {
 	return strings.TrimSpace(value), nil
 }
 
 type Uppercase struct{}
+
 func (*Uppercase) Transform(value string) (string, error) {
 	return strings.ToUpper(value), nil
 }

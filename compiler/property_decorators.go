@@ -255,15 +255,21 @@ func transformerQualifier(name string) string {
 	switch value := expr.(type) {
 	case *ast.SelectorExpr:
 		id, ok := value.X.(*ast.Ident)
-		if ok { return id.Name }
+		if ok {
+			return id.Name
+		}
 	case *ast.CompositeLit:
 		if valueType, ok := value.Type.(*ast.SelectorExpr); ok {
-			if id, ok := valueType.X.(*ast.Ident); ok { return id.Name }
+			if id, ok := valueType.X.(*ast.Ident); ok {
+				return id.Name
+			}
 		}
 	case *ast.UnaryExpr:
 		if literal, ok := value.X.(*ast.CompositeLit); ok {
 			if valueType, ok := literal.Type.(*ast.SelectorExpr); ok {
-				if id, ok := valueType.X.(*ast.Ident); ok { return id.Name }
+				if id, ok := valueType.X.(*ast.Ident); ok {
+					return id.Name
+				}
 			}
 		}
 	}
