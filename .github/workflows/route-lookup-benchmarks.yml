@@ -6,6 +6,11 @@ on:
     paths:
       - 'platform/fasthttp/**'
       - '.github/workflows/route-lookup-benchmarks.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'platform/fasthttp/**'
+      - '.github/workflows/route-lookup-benchmarks.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,7 +25,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - name: Run router correctness tests
         run: go test ./platform/fasthttp ./runtime -count=1
       - name: Compare linear and indexed lookup on identical workloads
