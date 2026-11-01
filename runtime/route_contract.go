@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/kevenmiano/nestgo/metadata"
 	"github.com/kevenmiano/nestgo/httpresponse"
+	"github.com/kevenmiano/nestgo/metadata"
 )
 
 // routeContract is the transport-independent route validation result.
