@@ -1,0 +1,52 @@
+name: Reconcile DTO integration against current main
+
+on:
+  push:
+    branches: [feat/dto-property-transformers]
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/dto-property-transformers
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Format Go and tidy module
+        run: |
+          gofmt -w compiler/*.go httpadapter/*.go runtime/*.go transform/*.go transform/mapcodec/*.go validation/*.go
+          go mod tidy
+      - name: Regenerate canonical example output
+        run: |
+          go run ./cmd/nestgo compile ./examples/shop
+          go run ./cmd/nestgo compile ./examples/pipeline
+      - name: Commit deterministic formatting and generated output
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add compiler httpadapter runtime transform validation go.mod go.sum examples/shop examples/pipeline
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix(dto): format integrated compiler and update generated outputs'
+            git push origin HEAD:feat/dto-property-transformers
+          fi
+      - name: Run complete tests
+        run: go test ./... -count=1
+      - name: Run vet
+        run: go vet ./...
+      - name: Check read-only compiler artifacts
+        run: |
+          go run ./cmd/nestgo check ./examples/shop
+          go run ./cmd/nestgo check ./examples/pipeline
+      - name: Verify race safety
+        run: go test -race ./compiler ./runtime ./httpadapter ./transform/... ./validation/... -count=1
+      - name: DTO benchmarks
+        run: go test ./transform/... ./validation/... -run '^$' -bench 'Benchmark' -benchtime=100x
