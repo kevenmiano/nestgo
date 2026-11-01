@@ -1,0 +1,24 @@
+name: Format shared runtime validation
+on:
+  push:
+    branches: [feat/runtime-shared-bootstrap-100]
+    paths: [runtime/route_contract_test.go]
+permissions:
+  contents: write
+jobs:
+  gofmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/runtime-shared-bootstrap-100
+      - name: Normalize Go changes
+        run: |
+          gofmt -w runtime/route_contract.go runtime/route_contract_test.go runtime/bootstrap_core.go runtime/http_routes.go runtime/runtime.go
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add runtime/route_contract.go runtime/route_contract_test.go runtime/bootstrap_core.go runtime/http_routes.go runtime/runtime.go
+            git commit -m "style(runtime): normalize shared route validation"
+            git push origin HEAD:feat/runtime-shared-bootstrap-100
+          fi
