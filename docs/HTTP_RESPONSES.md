@@ -1,31 +1,31 @@
 # Engine-independent HTTP responses
 
-NestGo controllers can return ordinary values, return a typed `httpresponse.Response`, or
+NestGo controllers can return ordinary values, return a typed `http.Response`, or
 write explicitly through `@Res()`. These operations use a transport-neutral contract; your
 controller does **not** import the fasthttp or net/http engine.
 
 ## Return values and helpers
 
 ```go
-import "github.com/kevenmiano/nestgo/httpresponse"
+import "github.com/kevenmiano/nestgo/http"
 
 @Controller("/users")
 type UsersController struct{}
 
 @Get("/{id}")
-func (c *UsersController) FindOne(@Param("id") id string) httpresponse.Response {
-    return httpresponse.OK(map[string]string{"id": id}).
+func (c *UsersController) FindOne(@Param("id") id string) http.Response {
+    return http.OK(map[string]string{"id": id}).
         WithHeader("Cache-Control", "no-store")
 }
 
 @Post("/")
-func (c *UsersController) Create(@Body() dto UserDTO) httpresponse.Response {
-    return httpresponse.Created(dto)
+func (c *UsersController) Create(@Body() dto UserDTO) http.Response {
+    return http.Created(dto)
 }
 
 @Delete("/{id}")
-func (c *UsersController) Remove(@Param("id") id string) httpresponse.Response {
-    return httpresponse.NoContent()
+func (c *UsersController) Remove(@Param("id") id string) http.Response {
+    return http.NoContent()
 }
 ```
 
@@ -36,7 +36,7 @@ Responses are immutable-by-convention: fluent methods return a modified **copy**
 A typed response takes precedence over a route's default status.
 
 Ordinary values remain JSON-serialized, including plain strings. Use
-`httpresponse.Text("hello")` to send a `text/plain` body.
+`http.Text("hello")` to send a `text/plain` body.
 GET defaults to 200; POST defaults to 201. Status 204, 304 and informational
 responses are sent without a body.
 
@@ -56,21 +56,21 @@ func (c *UsersController) Moved() string { return "" }
 `@Header(name, value)` accepts two **quoted string literals**, may repeat, and is
 applied before the handler executes; a dynamic writer can override a header.
 `@Redirect(url, code)` accepts a quoted URL and optional 3xx integer status
-(default 302). A returned `httpresponse.Redirect(...)` can override a
+(default 302). A returned `http.Redirect(...)` can override a
 static decorator redirect. Invalid decorator arguments fail compilation.
 
 ## Explicit response writing
 
 ```go
 @Get("/download")
-func (c *UsersController) Download(@Res() res *httpresponse.Writer) error {
+func (c *UsersController) Download(@Res() res *http.Writer) error {
     return res.Status(200).
         Header("Content-Disposition", "attachment; filename=hello.txt").
         Send("hello")
 }
 
 @Get("/preview")
-func (c *UsersController) Preview(@Res({passthrough:true}) res *httpresponse.Writer) any {
+func (c *UsersController) Preview(@Res({passthrough:true}) res *http.Writer) any {
     res.Status(202).Header("X-Preview", "yes")
     return map[string]bool{"ready": true}
 }
@@ -81,13 +81,13 @@ response; NestGo **does not** automatically serialize its return value.
 If the handler completes without writing, the runtime responds with a 500
 instead of leaving the request hanging. Use `@Res({passthrough:true})` to
 set headers/status/cookies and still use automatic serialization.
-`httpresponse.Writer` supports `Status`, `Header`, `Cookie`, `JSON`,
+`http.Writer` supports `Status`, `Header`, `Cookie`, `JSON`,
 `Send`, `End`, and `Redirect`; writing twice returns an error.
 
-Cookies use `httpresponse.Cookie` with standard fields such as `Name`,
+Cookies use `http.Cookie` with standard fields such as `Name`,
 `Value`, `Path`, `MaxAge`, `HTTPOnly`, `Secure` and `SameSite`.
 Multiple `Set-Cookie` values require adapter support for the optional
-`httpresponse.HeaderAppender` contract, implemented by both bundled engines.
+`http.HeaderAppender` contract, implemented by both bundled engines.
 
 ## Typed HTTP exceptions
 
@@ -95,7 +95,7 @@ Multiple `Set-Cookie` values require adapter support for the optional
 @Get("/{id}")
 func (c *UsersController) FindOne(@Param("id") id string) (any, error) {
     if id == "" {
-        return nil, httpresponse.BadRequest("id is required")
+        return nil, http.BadRequest("id is required")
     }
     return map[string]string{"id": id}, nil
 }
@@ -111,7 +111,7 @@ opaque 500 JSON response; internal details are not exposed to clients.
 
 ```mermaid
 flowchart LR
-    C["Controller / decorators"] --> R["Response metadata + httpresponse"]
+    C["Controller / decorators"] --> R["Response metadata + http"]
     R --> H["Runtime response dispatcher"]
     H --> A["httpadapter.Context"]
     A --> F["Native fasthttp"]
@@ -130,3 +130,18 @@ promise them for every engine. Request-body limits and panic/filter pipelines
 remain separate concerns. Use integration tests for your custom adapter.
 
 See [HTTP adapters](HTTP_ADAPTERS.md) and [NestJS controller reference](https://docs.nestjs.com/controllers).
+
+### Name collision with Go's standard library
+
+This package is imported as `http`. When using both NestGo HTTP helpers and Go's `net/http`
+in the same Go file, use an alias for the standard library:
+
+```go
+import (
+    "github.com/kevenmiano/nestgo/http"
+    stdhttp "net/http"
+)
+
+_ = http.OK("ready")
+_ = stdhttp.StatusCreated
+```

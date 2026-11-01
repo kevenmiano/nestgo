@@ -8,26 +8,26 @@ Controllers group HTTP handlers. NestGo supports `@Controller`,
 `@HttpCode`, `@Header` and `@Redirect`.
 
 ```go
-import "github.com/kevenmiano/nestgo/httpresponse"
+import "github.com/kevenmiano/nestgo/http"
 
 @Controller("/users")
 type UsersController struct{}
 
 @Get("/{id}")
 @Header("Cache-Control", "no-store")
-func (c *UsersController) FindOne(@Param("id") id string) httpresponse.Response {
-    return httpresponse.OK(map[string]string{"id":id})
+func (c *UsersController) FindOne(@Param("id") id string) http.Response {
+    return http.OK(map[string]string{"id":id})
 }
 
 @Post("/")
-func (c *UsersController) Create(@Body() dto UserDTO) httpresponse.Response {
-    return httpresponse.Created(dto)
+func (c *UsersController) Create(@Body() dto UserDTO) http.Response {
+    return http.Created(dto)
 }
 ```
 
 `@Body`, `@Param`, `@Query`, `@Headers`, `@Res` and `@Response`
 bind parameters. `@Res()` injects a transport-independent
-`*httpresponse.Writer`; `@Res({passthrough:true})` allows a handler
+`*http.Writer`; `@Res({passthrough:true})` allows a handler
 to set response metadata while returning a value for automatic serialization.
 
 The same controllers run with native fasthttp (default), net/http or any

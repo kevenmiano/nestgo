@@ -1,11 +1,11 @@
-// Package httpresponse provides platform-independent HTTP response values and helpers.
-package httpresponse
+// Package http provides platform-independent response types and helpers, independent of the selected HTTP engine.
+package http
 
 import (
-	"encoding/json"
+"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
+	stdhttp "net/http"
 )
 
 // Transport is the minimal response-writing contract implemented by every HTTP engine.
@@ -23,11 +23,11 @@ type Cookie struct {
 	Name, Value, Path, Domain string
 	MaxAge                    int
 	HTTPOnly, Secure          bool
-	SameSite                  http.SameSite
+	SameSite                  stdhttp.SameSite
 }
 
 func (c Cookie) String() string {
-	return (&http.Cookie{Name: c.Name, Value: c.Value, Path: c.Path, Domain: c.Domain,
+	return (&stdhttp.Cookie{Name: c.Name, Value: c.Value, Path: c.Path, Domain: c.Domain,
 		MaxAge: c.MaxAge, HttpOnly: c.HTTPOnly, Secure: c.Secure, SameSite: c.SameSite}).String()
 }
 
@@ -45,12 +45,12 @@ func JSON(body any) Response { return Response{Body: body} }
 func Text(body string) Response {
 	return Response{Body: body, ContentType: "text/plain; charset=utf-8"}
 }
-func OK(body any) Response       { return JSON(body).WithStatus(http.StatusOK) }
-func Created(body any) Response  { return JSON(body).WithStatus(http.StatusCreated) }
-func Accepted(body any) Response { return JSON(body).WithStatus(http.StatusAccepted) }
-func NoContent() Response        { return Response{StatusCode: http.StatusNoContent} }
+func OK(body any) Response       { return JSON(body).WithStatus(stdhttp.StatusOK) }
+func Created(body any) Response  { return JSON(body).WithStatus(stdhttp.StatusCreated) }
+func Accepted(body any) Response { return JSON(body).WithStatus(stdhttp.StatusAccepted) }
+func NoContent() Response        { return Response{StatusCode: stdhttp.StatusNoContent} }
 func Redirect(url string, status ...int) Response {
-	code := http.StatusFound
+	code := stdhttp.StatusFound
 	if len(status) > 0 {
 		code = status[0]
 	}
@@ -87,16 +87,16 @@ func (e *HTTPError) Unwrap() error { return e.Cause }
 func NewHTTPError(status int, message string) *HTTPError {
 	return &HTTPError{StatusCode: status, Message: message}
 }
-func BadRequest(message string) *HTTPError   { return NewHTTPError(http.StatusBadRequest, message) }
-func Unauthorized(message string) *HTTPError { return NewHTTPError(http.StatusUnauthorized, message) }
-func Forbidden(message string) *HTTPError    { return NewHTTPError(http.StatusForbidden, message) }
-func NotFound(message string) *HTTPError     { return NewHTTPError(http.StatusNotFound, message) }
-func Conflict(message string) *HTTPError     { return NewHTTPError(http.StatusConflict, message) }
+func BadRequest(message string) *HTTPError   { return NewHTTPError(stdhttp.StatusBadRequest, message) }
+func Unauthorized(message string) *HTTPError { return NewHTTPError(stdhttp.StatusUnauthorized, message) }
+func Forbidden(message string) *HTTPError    { return NewHTTPError(stdhttp.StatusForbidden, message) }
+func NotFound(message string) *HTTPError     { return NewHTTPError(stdhttp.StatusNotFound, message) }
+func Conflict(message string) *HTTPError     { return NewHTTPError(stdhttp.StatusConflict, message) }
 func UnprocessableEntity(message string) *HTTPError {
-	return NewHTTPError(http.StatusUnprocessableEntity, message)
+	return NewHTTPError(stdhttp.StatusUnprocessableEntity, message)
 }
 func InternalServerError(message string) *HTTPError {
-	return NewHTTPError(http.StatusInternalServerError, message)
+	return NewHTTPError(stdhttp.StatusInternalServerError, message)
 }
 
 func validStatus(status int) bool { return status >= 100 && status <= 599 }
@@ -130,13 +130,13 @@ func Write(ctx Transport, value any, defaultStatus int) error {
 		r = JSON(value)
 	}
 	if r.RedirectURL != "" && r.StatusCode == 0 {
-		r.StatusCode = http.StatusFound
+		r.StatusCode = stdhttp.StatusFound
 	}
 	if r.StatusCode == 0 {
 		r.StatusCode = defaultStatus
 	}
 	if r.StatusCode == 0 {
-		r.StatusCode = http.StatusOK
+		r.StatusCode = stdhttp.StatusOK
 	}
 	if !validStatus(r.StatusCode) {
 		return fmt.Errorf("invalid HTTP status: %d", r.StatusCode)
@@ -144,7 +144,7 @@ func Write(ctx Transport, value any, defaultStatus int) error {
 	if r.RedirectURL != "" && (r.StatusCode < 300 || r.StatusCode > 399) {
 		return fmt.Errorf("redirect status must be 3xx: %d", r.StatusCode)
 	}
-	noBody := r.StatusCode == http.StatusNoContent || r.StatusCode == http.StatusNotModified || (r.StatusCode >= 100 && r.StatusCode < 200)
+	noBody := r.StatusCode == stdhttp.StatusNoContent || r.StatusCode == stdhttp.StatusNotModified || (r.StatusCode >= 100 && r.StatusCode < 200)
 	var payload []byte
 	if !noBody && r.RedirectURL == "" {
 		if r.ContentType == "text/plain; charset=utf-8" {
@@ -195,11 +195,11 @@ func WriteError(ctx Transport, err error) error {
 	if errors.As(err, &httpErr) {
 		status := httpErr.StatusCode
 		if !validStatus(status) {
-			status = http.StatusInternalServerError
+			status = stdhttp.StatusInternalServerError
 		}
 		message := httpErr.Message
 		if message == "" {
-			message = http.StatusText(status)
+			message = stdhttp.StatusText(status)
 		}
 		return Write(ctx, JSON(struct {
 			StatusCode int    `json:"statusCode"`
@@ -209,10 +209,10 @@ func WriteError(ctx Transport, err error) error {
 	return Write(ctx, JSON(struct {
 		StatusCode int    `json:"statusCode"`
 		Message    string `json:"message"`
-	}{http.StatusInternalServerError, "Internal server error"}).WithStatus(http.StatusInternalServerError), http.StatusInternalServerError)
+	}{stdhttp.StatusInternalServerError, "Internal server error"}).WithStatus(stdhttp.StatusInternalServerError), stdhttp.StatusInternalServerError)
 }
 
-// Writer supports explicit @Res() operations without exposing fasthttp or net/http.
+// Writer supports explicit @Res() operations without exposing fasthttp or net/stdhttp.
 type Writer struct {
 	ctx     Transport
 	status  int

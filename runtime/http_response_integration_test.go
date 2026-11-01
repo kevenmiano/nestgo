@@ -1,18 +1,18 @@
 package runtime
 
 import (
-	"context"
+"context"
 	"errors"
 	"io"
 	"net"
-	"net/http"
+	stdhttp "net/http"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/kevenmiano/nestgo/http"
 	"github.com/kevenmiano/nestgo/httpadapter"
-	"github.com/kevenmiano/nestgo/httpresponse"
 	"github.com/kevenmiano/nestgo/metadata"
 	fastadapter "github.com/kevenmiano/nestgo/platform/fasthttp"
 	"github.com/kevenmiano/nestgo/platform/nethttp"
@@ -20,30 +20,30 @@ import (
 
 type responseTestController struct{}
 
-func (*responseTestController) Typed() httpresponse.Response {
-	return httpresponse.Created(map[string]string{"name": "Ada"}).WithHeader("X-Result", "typed").WithCookie(httpresponse.Cookie{Name: "one", Value: "1"})
+func (*responseTestController) Typed() http.Response {
+	return http.Created(map[string]string{"name": "Ada"}).WithHeader("X-Result", "typed").WithCookie(http.Cookie{Name: "one", Value: "1"})
 }
 func (*responseTestController) Decorated(header string) string { return header }
 func (*responseTestController) StaticRedirect() string         { return "ignored" }
-func (*responseTestController) DynamicRedirect() httpresponse.Response {
-	return httpresponse.Redirect("/override", 307)
+func (*responseTestController) DynamicRedirect() http.Response {
+	return http.Redirect("/override", 307)
 }
-func (*responseTestController) Explicit(w *httpresponse.Writer) {
+func (*responseTestController) Explicit(w *http.Writer) {
 	_ = w.Status(202).Header("X-Writer", "yes").Send("accepted")
 }
-func (*responseTestController) Passthrough(w *httpresponse.Writer) string {
+func (*responseTestController) Passthrough(w *http.Writer) string {
 	w.Status(202).Header("X-Pass", "yes")
 	return "from-handler"
 }
-func (*responseTestController) Cookies() httpresponse.Response {
-	return httpresponse.OK("cookie").WithCookie(httpresponse.Cookie{Name: "a", Value: "1"}).WithCookie(httpresponse.Cookie{Name: "b", Value: "2"})
+func (*responseTestController) Cookies() http.Response {
+	return http.OK("cookie").WithCookie(http.Cookie{Name: "a", Value: "1"}).WithCookie(http.Cookie{Name: "b", Value: "2"})
 }
 func (*responseTestController) Failure() (string, error) {
-	return "", httpresponse.NotFound("user missing")
+	return "", http.NotFound("user missing")
 }
 func (*responseTestController) GenericFailure() (string, error) { return "", errors.New("secret") }
 
-func (*responseTestController) MissingWrite(w *httpresponse.Writer) {}
+func (*responseTestController) MissingWrite(w *http.Writer) {}
 func responseTestPackage() metadata.Package {
 	return metadata.Package{Controllers: []metadata.Controller{{
 		Type:   reflect.TypeOf((*responseTestController)(nil)),
@@ -101,7 +101,7 @@ func TestLegacyHTTPResponseParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &http.Server{Handler: h}
+	s := &stdhttp.Server{Handler: h}
 	done := make(chan error, 1)
 	go func() { done <- s.Serve(l) }()
 	defer func() {
@@ -114,7 +114,7 @@ func TestLegacyHTTPResponseParity(t *testing.T) {
 }
 func checkResponseCases(t *testing.T, base string) {
 	t.Helper()
-	client := &http.Client{Timeout: 3 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	client := &stdhttp.Client{Timeout: 3 * time.Second, CheckRedirect: func(*stdhttp.Request, []*stdhttp.Request) error { return stdhttp.ErrUseLastResponse }}
 	for _, tt := range []struct {
 		name, path, input                   string
 		status                              int
@@ -133,7 +133,7 @@ func checkResponseCases(t *testing.T, base string) {
 		{"missing-write", "/missing-write", "", 500, `{"statusCode":500,"message":"explicit @Res() handler did not write a response"}` + "\n", "", "", "", 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			req, err := http.NewRequest("GET", base+"/response"+tt.path, nil)
+			req, err := stdhttp.NewRequest("GET", base+"/response"+tt.path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -1,11 +1,11 @@
 package runtime
 
 import (
-	"fmt"
+"fmt"
 	"reflect"
 	"strings"
 
-	"github.com/kevenmiano/nestgo/httpresponse"
+	"github.com/kevenmiano/nestgo/http"
 	"github.com/kevenmiano/nestgo/metadata"
 )
 
@@ -48,7 +48,7 @@ func formatRouteContractError(err error, legacy bool) error {
 	case "decorator":
 		return fmt.Errorf("unsupported parameter decorator at index %d of %s", e.index, e.handler)
 	case "response":
-		return fmt.Errorf("@Res argument must accept *httpresponse.Writer exactly once in %s", e.handler)
+		return fmt.Errorf("@Res argument must accept *http.Writer exactly once in %s", e.handler)
 	case "missing":
 		if legacy {
 			return fmt.Errorf("missing decorator for argument %d of %s", e.index, e.handler)
@@ -82,7 +82,7 @@ func compileRouteContract(prefix string, route metadata.Route, typ reflect.Type)
 				return routeContract{}, &routeContractError{kind: "type", handler: route.Handler, index: p.Index}
 			}
 		case "Res", "Response":
-			if reflect.TypeOf((*httpresponse.Writer)(nil)) != typ.In(p.Index) {
+			if reflect.TypeOf((*http.Writer)(nil)) != typ.In(p.Index) {
 				return routeContract{}, &routeContractError{kind: "response", handler: route.Handler, index: p.Index}
 			}
 		default:

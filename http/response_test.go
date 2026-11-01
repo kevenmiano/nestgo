@@ -1,7 +1,7 @@
-package httpresponse
+package http
 
 import (
-	"errors"
+"errors"
 	"strings"
 	"testing"
 )

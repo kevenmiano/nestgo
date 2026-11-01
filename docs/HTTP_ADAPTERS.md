@@ -47,6 +47,6 @@ can operate unchanged on fasthttp; use platform-aware integration when needed.
 
 ## Response contracts
 
-The `httpresponse` package provides transport-independent response values,
+The `http` package provides transport-independent response values,
 explicit `@Res()` writers, redirects, cookies and typed HTTP exceptions.
 See [HTTP responses](HTTP_RESPONSES.md) for API and engine-parity examples.

@@ -1,10 +1,10 @@
 package runtime
 
 import (
-	"encoding/json"
+"encoding/json"
 	"fmt"
+	"github.com/kevenmiano/nestgo/http"
 	"github.com/kevenmiano/nestgo/httpadapter"
-	"github.com/kevenmiano/nestgo/httpresponse"
 	"github.com/kevenmiano/nestgo/metadata"
 	"reflect"
 	"strings"
@@ -63,7 +63,7 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				}
 			}
 			registrationErr := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
-				writer := httpresponse.NewWriter(ctx)
+				writer := http.NewWriter(ctx)
 				routeResponseHeaders(ctx, rt)
 				var result any
 				var resultStatus int
@@ -73,20 +73,20 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 						if status != 0 {
 							return respondError(ctx, status, err.Error())
 						}
-						return httpresponse.WriteError(ctx, err)
+						return http.WriteError(ctx, err)
 					}
 					result, resultStatus = value, status
 					if handlerError, ok := value.(error); ok && handlerError != nil {
-						return httpresponse.WriteError(ctx, handlerError)
+						return http.WriteError(ctx, handlerError)
 					}
 				} else if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
 					value, err := rt.StaticInvoke(instance.Interface())
 					if err != nil {
-						return httpresponse.WriteError(ctx, err)
+						return http.WriteError(ctx, err)
 					}
 					result = value
 					if handlerError, ok := value.(error); ok && handlerError != nil {
-						return httpresponse.WriteError(ctx, handlerError)
+						return http.WriteError(ctx, handlerError)
 					}
 				} else {
 					args := make([]reflect.Value, methodType.NumIn())
@@ -135,12 +135,12 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 					}
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
-						return httpresponse.WriteError(ctx, results[1].Interface().(error))
+						return http.WriteError(ctx, results[1].Interface().(error))
 					}
 					errType := reflect.TypeOf((*error)(nil)).Elem()
 					if len(results) == 1 && results[0].Type().Implements(errType) {
 						if !results[0].IsNil() {
-							return httpresponse.WriteError(ctx, results[0].Interface().(error))
+							return http.WriteError(ctx, results[0].Interface().(error))
 						}
 					} else if len(results) > 0 {
 						result = results[0].Interface()

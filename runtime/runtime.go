@@ -1,21 +1,21 @@
 package runtime
 
 import (
-	"context"
+"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kevenmiano/nestgo/httpresponse"
+	"github.com/kevenmiano/nestgo/http"
 	"github.com/kevenmiano/nestgo/logging"
 	"github.com/kevenmiano/nestgo/metadata"
 	"github.com/kevenmiano/nestgo/platform/nethttp"
 	"log/slog"
-	"net/http"
+	stdhttp "net/http"
 	"reflect"
 	"strings"
 	"time"
 )
 
-func New(packages ...metadata.Package) (http.Handler, error) {
+func New(packages ...metadata.Package) (stdhttp.Handler, error) {
 	return NewWithOptions(Options{}, packages...)
 }
 
@@ -25,7 +25,7 @@ type Options struct {
 	Debug  bool
 }
 
-func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler, error) {
+func NewWithOptions(options Options, packages ...metadata.Package) (stdhttp.Handler, error) {
 	logger := options.Logger
 	if logger == nil {
 		logger = logging.New(logging.Config{MinLevel: logging.LevelInfo})
@@ -33,7 +33,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	ctx := context.Background()
 	boot := time.Now()
 	logger.Info(ctx, "NestFactory", "Starting NestGo application...")
-	fail := func(err error) (http.Handler, error) {
+	fail := func(err error) (stdhttp.Handler, error) {
 		logger.Error(ctx, "NestFactory", "Bootstrap failed", slog.String("error", err.Error()))
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	}
 	logger.Startup(ctx, "InstanceLoader", "Provider dependencies resolved", diStart)
 	routeStart := time.Now()
-	mux := http.NewServeMux()
+	mux := stdhttp.NewServeMux()
 	seen := map[string]bool{}
 	for _, c := range graph.controllers {
 		instance, err := graph.newController(c.Type)
@@ -86,9 +86,9 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 			}
 			handler := method
 			spec := route
-			mux.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
+			mux.HandleFunc(key, func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 				responseCtx := nethttp.NewContext(w, r)
-				writer := httpresponse.NewWriter(responseCtx)
+				writer := http.NewWriter(responseCtx)
 				routeResponseHeaders(responseCtx, spec)
 				replyRoute := spec
 				args := make([]reflect.Value, typ.NumIn())
@@ -99,32 +99,32 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 						if p, ok := bindings[i]; ok {
 							switch p.Kind {
 							case "Body":
-								if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(v.Interface()); err != nil {
-									http.Error(w, "invalid JSON: "+err.Error(), 400)
+								if err := json.NewDecoder(stdhttp.MaxBytesReader(w, r.Body, 1<<20)).Decode(v.Interface()); err != nil {
+									stdhttp.Error(w, "invalid JSON: "+err.Error(), 400)
 									return
 								}
 							case "Param":
 								if t.Kind() != reflect.String {
-									http.Error(w, "path parameter must be string", 500)
+									stdhttp.Error(w, "path parameter must be string", 500)
 									return
 								}
 								v.Elem().SetString(r.PathValue(p.Name))
 							case "Query":
 								if t.Kind() != reflect.String {
-									http.Error(w, "query parameter must be string", 500)
+									stdhttp.Error(w, "query parameter must be string", 500)
 									return
 								}
 								v.Elem().SetString(r.URL.Query().Get(p.Name))
 							case "Headers":
 								if t.Kind() != reflect.String {
-									http.Error(w, "header parameter must be string", 500)
+									stdhttp.Error(w, "header parameter must be string", 500)
 									return
 								}
 								v.Elem().SetString(r.Header.Get(p.Name))
 							case "Res", "Response":
 								v.Elem().Set(reflect.ValueOf(writer))
 							default:
-								http.Error(w, "unsupported parameter decorator", 500)
+								stdhttp.Error(w, "unsupported parameter decorator", 500)
 								return
 							}
 						} else {
@@ -145,13 +145,13 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 						if status != 0 {
 							_ = respondError(responseCtx, status, err.Error())
 						} else {
-							_ = httpresponse.WriteError(responseCtx, err)
+							_ = http.WriteError(responseCtx, err)
 						}
 						return
 					}
 					result = value
 					if handlerError, ok := value.(error); ok && handlerError != nil {
-						_ = httpresponse.WriteError(responseCtx, handlerError)
+						_ = http.WriteError(responseCtx, handlerError)
 						return
 					}
 					if status != 0 {
@@ -160,24 +160,24 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				} else if spec.StaticInvoke != nil && typ.NumIn() == 0 {
 					value, err := spec.StaticInvoke(instance.Interface())
 					if err != nil {
-						_ = httpresponse.WriteError(responseCtx, err)
+						_ = http.WriteError(responseCtx, err)
 						return
 					}
 					result = value
 					if handlerError, ok := value.(error); ok && handlerError != nil {
-						_ = httpresponse.WriteError(responseCtx, handlerError)
+						_ = http.WriteError(responseCtx, handlerError)
 						return
 					}
 				} else {
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
-						_ = httpresponse.WriteError(responseCtx, results[1].Interface().(error))
+						_ = http.WriteError(responseCtx, results[1].Interface().(error))
 						return
 					}
 					errType := reflect.TypeOf((*error)(nil)).Elem()
 					if len(results) == 1 && results[0].Type().Implements(errType) {
 						if !results[0].IsNil() {
-							_ = httpresponse.WriteError(responseCtx, results[0].Interface().(error))
+							_ = http.WriteError(responseCtx, results[0].Interface().(error))
 							return
 						}
 					} else if len(results) > 0 {
@@ -185,7 +185,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 					}
 				}
 				if err := finishHTTPResponse(responseCtx, replyRoute, result, writer, explicit, passthrough); err != nil {
-					_ = httpresponse.WriteError(responseCtx, err)
+					_ = http.WriteError(responseCtx, err)
 				}
 			})
 			logger.Info(ctx, "RouterExplorer", "Mapped route", slog.String("method", route.Method), slog.String("path", path))
@@ -195,7 +195,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	logger.Startup(ctx, "NestApplication", "Application handler initialized", boot)
 	return mux, nil
 }
-func FromRegistry(names ...string) (http.Handler, error) {
+func FromRegistry(names ...string) (stdhttp.Handler, error) {
 	pkgs, err := registryImportClosure(names)
 	if err != nil {
 		return nil, err
