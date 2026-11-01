@@ -24,15 +24,15 @@ func TestCompiledRootDiscoveryLoadsTransitiveModules(t *testing.T) {
 	billing := moduleType[autoBillingModule]()
 	app := moduleType[autoAppModule]()
 	registered := map[string]metadata.Package{
-		"users": {Modules: []metadata.Module{{Type: users}}},
-		"billing": {Modules: []metadata.Module{{Type: billing, Imports: []reflect.Type{users}}}},
-		"app": {Modules: []metadata.Module{{Type: app, Imports: []reflect.Type{billing}}}},
+		"users":                  {Modules: []metadata.Module{{Type: users}}},
+		"billing":                {Modules: []metadata.Module{{Type: billing, Imports: []reflect.Type{users}}}},
+		"app":                    {Modules: []metadata.Module{{Type: app, Imports: []reflect.Type{billing}}}},
 		"unrelated-test-fixture": {Providers: []metadata.Provider{{Type: reflect.TypeOf(42)}}},
 	}
 	compiled := map[string]metadata.Package{
-		"users": registered["users"],
+		"users":   registered["users"],
 		"billing": registered["billing"],
-		"app": registered["app"],
+		"app":     registered["app"],
 	}
 	packages, err := compiledRootClosure(compiled, registered)
 	if err != nil {
@@ -48,7 +48,7 @@ func TestCompiledRootDiscoveryLoadsTransitiveModules(t *testing.T) {
 
 func TestCompiledRootDiscoveryRejectsMultipleIndependentApps(t *testing.T) {
 	registered := map[string]metadata.Package{
-		"app": {Modules: []metadata.Module{{Type: moduleType[autoAppModule]()}}},
+		"app":   {Modules: []metadata.Module{{Type: moduleType[autoAppModule]()}}},
 		"other": {Modules: []metadata.Module{{Type: moduleType[autoOtherRoot]()}}},
 	}
 	_, err := compiledRootClosure(registered, registered)
@@ -60,7 +60,7 @@ func TestCompiledRootDiscoveryRejectsMultipleIndependentApps(t *testing.T) {
 func TestCompiledRootDiscoveryRejectsUnreachablePackage(t *testing.T) {
 	app := moduleType[autoAppModule]()
 	registered := map[string]metadata.Package{
-		"app": {Modules: []metadata.Module{{Type: app}}},
+		"app":    {Modules: []metadata.Module{{Type: app}}},
 		"orphan": {Providers: []metadata.Provider{{Type: moduleType[autoOtherRoot]()}}},
 	}
 	if _, err := compiledRootClosure(registered, registered); err == nil || !strings.Contains(err.Error(), "not reachable") {
