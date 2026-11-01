@@ -10,6 +10,30 @@ request logging, tracing headers or early termination. This follows the
 uses a transport-neutral `httpadapter.Context` instead of Express/Fastify
 request and response types.
 
+## Class-based middleware with a static contract
+
+Reusable middleware can implement `httpadapter.MiddlewareHandler`:
+
+```go
+type AuditMiddleware struct{}
+
+func (*AuditMiddleware) Use(ctx httpadapter.Context, next httpadapter.Next) error {
+    ctx.SetHeader("X-Audit", "enabled")
+    return next()
+}
+
+// The Go compiler rejects a missing or mismatched Use method.
+var _ httpadapter.MiddlewareHandler = (*AuditMiddleware)(nil)
+
+app, err := runtime.New(runtime.WithMiddlewareHandlers(&AuditMiddleware{}))
+// Or: runtime.WithRouteMiddlewareHandlers("GET", "/users/{id}", &AuditMiddleware{})
+```
+
+Class-based middleware is registered at global or route scope and runs in
+the same sequence as functional middleware. It is resolved once during
+application construction and adds no reflection to the request path.
+Instances are reused concurrently; typed-nil handlers fail at bootstrap.
+
 ## Functional middleware
 
 ```go
@@ -57,7 +81,7 @@ NestJS supports module middleware via `MiddlewareConsumer.apply().forRoutes()`
 and global pre-routing middleware. NestGo currently runs framework
 middleware **only after route matching**: it does not execute for 404/405.
 It does not implement `exclude()`, wildcard application, or
-module-bound middleware classes. Errors from middleware reach only global
+module-bound middleware decorators. Errors from middleware reach only global
 [exception filters](./exception-filters.md).
 :::
 

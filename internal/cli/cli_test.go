@@ -28,7 +28,8 @@ func TestRootAndSubcommandHelp(t *testing.T) {
 		want []string
 	}{
 		{[]string{"--help"}, []string{"compile", "diagnose", "completion"}},
-		{[]string{"compile", "--help"}, []string{"<directory|file.mgo>", "Compile"}},
+		{[]string{"compile", "--help"}, []string{"<directory|file.mgo>", "Compile", "--format"}},
+		{[]string{"check", "--help"}, []string{"<directory|file.mgo>", "--format"}},
 		{[]string{"diagnose", "--help"}, []string{"--app", "--cold-samples", "--strict"}},
 		{[]string{"completion", "--help"}, []string{"bash", "zsh", "fish", "powershell"}},
 		{[]string{"--version"}, []string{"dev"}},
@@ -88,7 +89,7 @@ func TestGeneratedCLIReference(t *testing.T) {
 	if err := doc.GenMarkdownTree(root, directory); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"nestgo.md", "nestgo_compile.md", "nestgo_diagnose.md", "nestgo_completion.md"} {
+	for _, name := range []string{"nestgo.md", "nestgo_compile.md", "nestgo_check.md", "nestgo_diagnose.md", "nestgo_completion.md"} {
 		contents, err := os.ReadFile(filepath.Join(directory, name))
 		if err != nil || !strings.Contains(string(contents), "nestgo") {
 			t.Errorf("missing CLI reference page %s: %v", name, err)

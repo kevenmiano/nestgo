@@ -105,8 +105,25 @@ type UsersModule struct{}
 and methods. Their arguments are local `@Injectable` classes. Comma
 separated names and arrays are accepted: `@UseGuards(AuthGuard, RoleGuard)`
 or `@UseGuards([AuthGuard, RoleGuard])`. The compiler validates names
-and generates `reflect.Type` metadata; the runtime validates actual Go
-interfaces and module visibility before serving.
+and generates `reflect.Type` metadata plus static interface assertions.
+Invalid guard/pipe/filter method signatures fail at Go compile time. The
+runtime still checks module visibility and externally supplied metadata.
+
+Generated registry source includes deduplicated checks such as:
+
+```go
+var _ httpadapter.Guard = (*AuthGuard)(nil)
+var _ httpadapter.Pipe = (*TrimPipe)(nil)
+var _ httpadapter.ExceptionFilter = (*ErrorFilter)(nil)
+```
+
+Class-based middleware uses `httpadapter.MiddlewareHandler` and `Use(Context, Next) error`,
+with the same explicit Go interface assertion pattern:
+
+```go
+var _ httpadapter.MiddlewareHandler = (*AuditMiddleware)(nil)
+// runtime.WithMiddlewareHandlers(&AuditMiddleware{})
+```
 
 Components are singletons, with ordinary NestGo field injection. They **must
 be concurrency-safe**. For global components, use functional options:

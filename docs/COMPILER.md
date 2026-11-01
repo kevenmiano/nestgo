@@ -120,6 +120,59 @@ nestgo check ./myapp
 
 Developer-owned `zz_nestgo_stubs_test.go` is intentionally excluded from equality checks: the compiler must not overwrite handwritten assertions or insist on a specific test body. A successful check verifies compiler-owned outputs, **not** behavioral correctness, and does not run `go test`. SQL dialect defaults match `CompileDir`; dedicated CLI dialect flags are not yet available.
 
+## Structured compiler diagnostics (JSON schema v1)
+
+`nestgo compile` and `nestgo check` accept `--format=json` for single-shot commands.
+The default `--format=text` remains unchanged. JSON produces **exactly one JSON
+object on stdout**, even when validation fails; the process still exits with a
+nonzero code on failure and does not print a duplicate error message to stderr.
+Cobra argument/unknown flag parsing failures occur before command execution
+and still use standard textual usage errors.
+
+```bash
+nestgo compile --format=json ./myapp
+nestgo check --format=json ./myapp
+```
+
+Example: a missing compiler-owned artifact.
+
+```json
+{
+  "schema_version": 1,
+  "command": "check",
+  "ok": false,
+  "diagnostics": [
+    {
+      "code": "NG2001",
+      "severity": "error",
+      "message": "generated artifact missing",
+      "file": "myapp/zz_modforge_metadata.go"
+    }
+  ]
+}
+```
+
+The `diagnostics` field is **always an array**, including on success. Paths
+use the directory/file spelling passed to the CLI (not necessarily absolute).
+Go source diagnostics contain `file`, 1-based `line` and, for parser errors,
+1-based `column` when available. Absent coordinates are omitted rather than guessed.
+Generated artifacts in `check` are ordered by file path.
+
+| Code | Meaning |
+| --- | --- |
+| `NG1001` | NestGo decorator/semantic compiler diagnostic |
+| `NG1002` | Go parser syntax diagnostic |
+| `NG2001` | Compiler-owned artifact missing |
+| `NG2002` | Compiler-owned artifact outdated |
+| `NG2003` | Compiler-owned artifact obsolete |
+| `NG9000` | Other error (I/O, arguments or currently unclassified error) |
+
+`compiler.OutdatedError` also exposes typed `Artifacts` with `Path` and
+`Reason` fields and preserves `errors.Is(err, compiler.ErrOutdated)`.
+This is a v1 CLI **output contract**, not a declaration that every compiler
+error has granular semantic classifications. `--format=json` is deliberately
+rejected alongside `--watch`: watch remains a textual stream, not JSON/NDJSON.
+
 ## Known limitations
 
 - No recursive directory compilation.

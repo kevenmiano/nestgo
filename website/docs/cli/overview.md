@@ -70,6 +70,27 @@ go test ./...
 
 You can run it against a `.mgo` file; like `compile`, it operates on the containing directory. Use the same compiler version for generation and checking. It is not a substitute for `go test`, and does not start application processes or execute application `init()` functions.
 
+## Machine-readable diagnostics
+
+Use `--format=json` for single-shot compilation and read-only checks:
+
+```bash
+nestgo compile --format=json ./myapp
+nestgo check --format=json ./myapp
+```
+
+Both commands produce one versioned JSON object containing `schema_version`,
+`command`, `ok` and a `diagnostics` array. A failing compiler/check still
+returns an unsuccessful process exit code; it does not add a second unstructured
+error line to stderr. JSON is intended for CI, editor integrations and
+automation. It identifies decorator errors, Go parser errors and missing,
+outdated or obsolete generated artifacts using stable codes.
+
+The full [compiler diagnostics contract](https://github.com/kevenmiano/nestgo/blob/main/docs/COMPILER.md)
+documents all codes, source coordinates and the schema.
+`compile --watch` remains text-only; JSON is **not** an NDJSON watch protocol.
+Ordinary argument parsing errors from Cobra are still textual.
+
 ## Diagnose dependencies and startup
 
 Run with the built-in fixture:
