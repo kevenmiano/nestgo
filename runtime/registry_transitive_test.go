@@ -10,6 +10,7 @@ import (
 	"github.com/kevenmiano/nestgo/runtime/testdata/externalmodule"
 )
 
+type transitiveExternalModule struct{}
 type transitiveRootModule struct{}
 type transitiveMiddleModule struct{}
 type transitiveConsumer struct {
@@ -21,7 +22,7 @@ var transitiveFixtureOnce sync.Once
 func registerTransitiveFixture() {
 	transitiveFixtureOnce.Do(func() {
 		repoType := reflect.TypeOf((*externalmodule.Repository)(nil))
-		externalType := reflect.TypeOf((*externalmodule.Module)(nil))
+		externalType := reflect.TypeOf((*transitiveExternalModule)(nil))
 		middleType := reflect.TypeOf((*transitiveMiddleModule)(nil))
 		consumerType := reflect.TypeOf((*transitiveConsumer)(nil))
 		metadata.Register("nestgo-transitive-provider-test", metadata.Package{
