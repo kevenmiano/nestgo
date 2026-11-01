@@ -3,7 +3,8 @@ package runtime
 import (
 	"fmt"
 	"reflect"
-	"sort"
+	"slices"
+	"strings"
 
 	"github.com/kevenmiano/nestgo/metadata"
 )
@@ -52,8 +53,8 @@ func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type)
 		return bootstrapGraph{}, err
 	}
 	graph.visibility = visibility
-	sort.Slice(graph.orderedProviders, func(i, j int) bool {
-		return graph.orderedProviders[i].String() < graph.orderedProviders[j].String()
+	slices.SortFunc(graph.orderedProviders, func(a, b reflect.Type) int {
+		return strings.Compare(a.String(), b.String())
 	})
 	for _, typ := range graph.orderedProviders {
 		if err := graph.inject(graph.providers[typ]); err != nil {
