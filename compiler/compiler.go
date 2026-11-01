@@ -7,6 +7,7 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"github.com/kevenmiano/nestgo/database/sqlgen"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -171,6 +172,10 @@ func arg(a Annotation, def string) (string, error) {
 	return s, nil
 }
 func Generate(files []*File) ([]byte, error) {
+	return generateMetadata(files, false)
+}
+
+func generateMetadata(files []*File, allowPersistence bool) ([]byte, error) {
 	if len(files) == 0 {
 		return nil, fmt.Errorf("no source files")
 	}
@@ -186,7 +191,7 @@ func Generate(files []*File) ([]byte, error) {
 	for _, file := range files {
 		for _, declaration := range file.Declarations {
 			for _, annotation := range declaration.Annotations {
-				if annotation.Name == "Entity" || annotation.Name == "Repository" || (annotation.Name == "Query" && declaration.Kind == "func") {
+				if !allowPersistence && (annotation.Name == "Entity" || annotation.Name == "Repository" || (annotation.Name == "Query" && declaration.Kind == "func")) {
 					return nil, Diagnostic{File: file.Path, Line: annotation.Line, Message: "persistence code generation is not yet implemented; refusing to silently ignore @" + annotation.Name}
 				}
 			}
@@ -470,7 +475,23 @@ func CompileDir(dir string) error {
 		}
 		files = append(files, file)
 	}
-	registry, err := Generate(files)
+	repositoryFiles := make(map[string][]byte)
+	for _, file := range files {
+		hasRepo := false
+		for _, declaration := range file.Declarations {
+			for _, annotation := range declaration.Annotations {
+				if annotation.Name == "Repository" { hasRepo = true }
+			}
+		}
+		if hasRepo {
+			def, err := RepositoryFromMGO(file, sqlgen.PostgreSQL)
+			if err != nil { return err }
+			generated, err := GenerateRepository(def)
+			if err != nil { return err }
+			repositoryFiles[strings.TrimSuffix(file.Path, ".mgo")+"_repository_generated.go"] = generated
+		}
+	}
+	registry, err := generateMetadata(files, true)
 	if err != nil {
 		return err
 	}
@@ -492,7 +513,11 @@ func CompileDir(dir string) error {
 			return err
 		}
 	}
-	return writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry)
+	if err := writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry); err != nil { return err }
+	for target, source := range repositoryFiles {
+		if err := writeIfChanged(target, source); err != nil { return err }
+	}
+	return nil
 }
 func writeIfChanged(path string, content []byte) error {
 	old, err := os.ReadFile(path)
