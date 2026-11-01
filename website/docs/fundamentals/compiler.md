@@ -36,6 +36,14 @@ nestgo check ./myapp
 
 `check` is a read-only consistency gate for compiler-owned Go and metadata outputs. It detects missing or outdated generated files and prints a recompile instruction. Developer-edited test scaffolds are excluded by design. Use it in CI alongside `go test ./...`.
 
+## Structured errors
+
+For integrations and CI, run `nestgo check --format=json ./myapp` or
+`nestgo compile --format=json ./myapp`. The CLI emits a single schema-v1
+JSON result, with stable error codes for decorators, Go syntax, and generated
+artifact drift. Failed checks preserve nonzero exit status. Watch mode
+continues to use readable terminal messages.
+
 ## Validation and invocation
 
 The compiler validates declared module references, local dependency graphs, interface matching in supported cases and malformed annotations. It generates optional `StaticInvoke` wrappers for conservative, zero-argument, single-result routes. Other method signatures use the reflective runtime path. The direct path is an optimization, not a removal of dynamic execution.
