@@ -186,3 +186,13 @@ func (s *Service) Decode(prefix string, target any) error {
 	}
 	return nil
 }
+
+// FromValues creates an immutable configuration snapshot from a loader such as Viper.
+// The caller's map is copied to avoid subsequent configuration mutations.
+func FromValues(input map[string]string) *Service {
+	values := make(map[string]string, len(input))
+	for key, value := range input {
+		values[key] = value
+	}
+	return &Service{values: values}
+}
