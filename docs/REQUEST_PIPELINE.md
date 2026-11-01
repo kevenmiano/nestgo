@@ -1,5 +1,14 @@
 # HTTP request pipeline
 
+> **Guides:** [Middleware](../website/docs/fundamentals/middleware.md) ·
+> [Guards](../website/docs/fundamentals/guards.md) ·
+> [Pipes](../website/docs/fundamentals/pipes.md) ·
+> [Exception filters](../website/docs/fundamentals/exception-filters.md) ·
+> [Executable example](../examples/pipeline/README.md)
+>
+> Inspired by the [NestJS request lifecycle](https://docs.nestjs.com/faq/request-lifecycle);
+> this guide documents the actual NestGo contracts and their limitations.
+
 NestGo compiles a NestJS-inspired HTTP request pipeline at startup. It is
 independent of the HTTP engine (fasthttp by default; net/http is supported).
 Pipelines use singleton providers for class-based components and reuse the
@@ -40,6 +49,9 @@ HTTP adapter selects the route before invoking it. Unlike app-wide
 Express middleware, it does not execute on 404/405 responses.
 
 ## Class-based guards, pipes and filters
+
+The decorated sample below belongs in a **`.mgo` file**. Standard Go
+source does not accept NestGo decorators; compile it first.
 
 ```go
 package users
@@ -134,6 +146,12 @@ Unhandled errors produce HTTP 500 with a redacted message. Explicit
 message. The default response is currently plain text; the separate HTTP
 response contracts change will define common response formatting.
 
+**Important differences from NestJS:** Pipes run on each argument in
+handler-declaration order, not NestJS's reverse-parameter order. Custom
+exception filters can delegate by returning `handled=false`. Code-first
+handlers must explicitly call `httpadapter.BindParam`, `BindQuery` or
+`DecodeBodyAt[T]` to trigger pipes.
+
 **Current scope:** No parameter-specific `@UsePipes`, interceptors, request
 scopes, wildcard/module middleware consumer, or middleware on unmatched
 routes. These are deliberately separate features; no engine-specific
@@ -141,3 +159,16 @@ request objects are exposed by this pipeline.
 
 Run `go test ./...`, `go test -race ./runtime ./httpadapter`, and the
 HTTP benchmarks to verify behavior and overhead.
+
+## Runnable example and verification
+
+The [`examples/pipeline`](../examples/pipeline/README.md) directory
+contains a complete guard, two pipes, an exception filter, middleware,
+a code-first health route and an E2E test on both HTTP adapters.
+
+```bash
+go run ./cmd/modforge compile ./examples/pipeline
+export DEMO_API_KEY=local-demo-key
+go run ./examples/pipeline/cmd/server
+go test ./examples/pipeline/... -v
+```
