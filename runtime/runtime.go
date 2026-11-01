@@ -59,6 +59,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 		orderedProviders = append(orderedProviders, value.Type())
 	}
 	declaredProviders := map[reflect.Type]bool{}
+	factoryProviders := map[reflect.Type]metadata.Provider{}
 	for _, pkg := range packages {
 		moduleStart := time.Now()
 		for _, p := range pkg.Providers {
@@ -69,6 +70,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				return fail(fmt.Errorf("duplicate provider: %v", p.Type))
 			}
 			declaredProviders[p.Type] = true
+			if p.Factory != nil { factoryProviders[p.Type] = p }
 			if existing, ok := providers[p.Type]; !ok {
 				providers[p.Type] = reflect.New(p.Type.Elem())
 				orderedProviders = append(orderedProviders, p.Type)
@@ -79,6 +81,21 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 		}
 		controllers = append(controllers, pkg.Controllers...)
 		logger.Startup(ctx, "InstanceLoader", "Package providers registered", moduleStart)
+	}
+	for _, providerType := range orderedProviders {
+		factory, ok := factoryProviders[providerType]
+		if !ok { continue }
+		instance, err := factory.Factory(func(t reflect.Type) (any, bool) {
+			v, exists := providers[t]
+			if !exists || !v.IsValid() { return nil, false }
+			return v.Interface(), true
+		})
+		if err != nil { return fail(fmt.Errorf("provider factory %s: %w", providerType, err)) }
+		value := reflect.ValueOf(instance)
+		if !value.IsValid() || value.Type() != providerType || value.IsNil() {
+			return fail(fmt.Errorf("provider factory %s returned wrong or nil type", providerType))
+		}
+		providers[providerType] = value
 	}
 	visibility, err := moduleVisibility(packages)
 	if err != nil {
