@@ -16,11 +16,11 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 	return registerRoutesWithLifecycle(adapter, packages, nil)
 }
 
-func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
-	return registerRoutesWithLifecycleAndInstances(adapter, packages, lifecycle, nil)
+func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, direct ...httpadapter.Route) error {
+	return registerRoutesWithLifecycleAndInstances(adapter, packages, lifecycle, nil, direct...)
 }
 
-func registerRoutesWithLifecycleAndInstances(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, instances []any) error {
+func registerRoutesWithLifecycleAndInstances(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, instances []any, direct ...httpadapter.Route) error {
 	var onProvider func(reflect.Type)
 	if lifecycle != nil {
 		onProvider = lifecycle.onProvider
@@ -150,6 +150,22 @@ func registerRoutesWithLifecycleAndInstances(adapter httpadapter.Adapter, packag
 			if lifecycle != nil && lifecycle.onRoute != nil {
 				lifecycle.onRoute(rt.Method, path)
 			}
+		}
+	}
+	for _, route := range direct {
+		if route.Handler == nil || route.Method == "" || !strings.HasPrefix(route.Path, "/") {
+			return fmt.Errorf("invalid direct route %s %s: method, absolute path and handler are required", route.Method, route.Path)
+		}
+		key := route.Method + " " + route.Path
+		if seen[key] {
+			return fmt.Errorf("duplicate route %s", key)
+		}
+		seen[key] = true
+		if err := adapter.Register(route); err != nil {
+			return fmt.Errorf("register %s: %w", key, err)
+		}
+		if lifecycle != nil && lifecycle.onRoute != nil {
+			lifecycle.onRoute(route.Method, route.Path)
 		}
 	}
 	return nil
