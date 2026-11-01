@@ -1,62 +1,48 @@
-# HTTP runtime and dependency injection
+# Runtime and application lifecycle
 
-The `runtime` package converts generated metadata into a standard `net/http` handler.
+NestGo supports two runtime entry points with different HTTP execution paths. For the authoritative illustrated walkthrough, see the [Docusaurus application lifecycle guide](../website/docs/fundamentals/lifecycle.md).
 
-## Entry points
+## Supported entry points
 
-```go
-handler, err := runtime.FromRegistry("shop")
-if err != nil {
-    log.Fatal(err)
-}
-log.Fatal(http.ListenAndServe(":8080", handler))
+| Entry point | Return type | HTTP engine | Shutdown owner |
+| --- | --- | --- | --- |
+| `runtime.ApplicationFromRegistry(options, names...)` | `*runtime.Application` | fasthttp by default; adapter selectable | `app.Shutdown(ctx)` |
+| `runtime.NewApplication(options, packages...)` | `*runtime.Application` | fasthttp by default; adapter selectable | `app.Shutdown(ctx)` |
+| `runtime.FromRegistry(names...)` | `http.Handler` | standard net/http | caller |
+| `runtime.New(packages...)` | `http.Handler` | standard net/http | caller |
+
+All registry-based paths require generated metadata to be registered via Go package initialization. `ApplicationFromRegistry` / `FromRegistry` resolve transitive package imports before bootstrapping.
+
+## Application bootstrap
+
+```mermaid
+flowchart TD
+  R["Generated metadata"] --> P["Package closure (registry entry points)"]
+  P --> V["Module graph and visibility"]
+  V --> I["Provider allocation and field injection"]
+  I --> C["Controller allocation and field injection"]
+  C --> H["Handler validation and route registration"]
+  H --> S["Application ready to Serve"]
 ```
 
-Import the generated `shop` package somewhere in your application so its `init()` registration runs before calling `FromRegistry`. The package name used by `FromRegistry` is the Go package name, not the module annotation.
+Implementation detail: provider pointers are allocated before module validation in the adapter-based path; the diagram above summarizes logical responsibilities, not exact instruction order. The legacy `net/http` path has separate initialization and dispatch code. Provider fields support exported pointer/interface injection; `nestgo:"optional"` allows an unresolved field. Explicit modules enforce imports/exports visibility, while legacy modules without explicit scopes retain global DI. Constructor injection is not supported. Adapter-based Application instances invoke optional provider/controller initialization and shutdown lifecycle hooks. Legacy http.Handler constructors do not.
 
-Alternatively, call `runtime.New(packages ...metadata.Package)` with explicit metadata.
+## Startup timing
 
-## Routing
+`ApplicationOptions.OnBootstrap` optionally receives `BootstrapMetrics` containing route registration, initialization hook and total bootstrap durations. See `BenchmarkApplicationBootstrapProviders` for 1/10/100-provider allocation and latency benchmarks. This callback currently applies to adapter-based applications only.
 
-Routes are registered with Go 1.23 `http.ServeMux` method patterns. The runtime combines the controller prefix and route path. For example, `@Controller("/users")` and `@Get("/{id}")` produce `GET /users/{id}`.
+## HTTP dispatch
 
-The runtime rejects duplicate method/path registrations. It uses reflection to find the handler method by its generated metadata name.
+Adapter applications register `httpadapter.Route` closures during boot. The default `fasthttp` adapter performs route matching; the optional `net/http` adapter uses `http.ServeMux`. The legacy `runtime.New` APIs construct their own `http.ServeMux`. All handler routes decode `Body`, `Param`, and `Query` metadata, invoke controller methods and serialize JSON results, with implementation-specific details and parity gaps.
 
-## Request parameters
+Generated static invokers for eligible zero-argument routes are used by both dispatch paths when metadata provides `StaticInvoke`; other handlers use `reflect.Value.Call`.
 
-| Decorator | Runtime behavior |
-| --- | --- |
-| `@Body()` | Decodes one JSON value into the method argument; body size is limited to 1 MiB |
-| `@Param("id")` | Reads `r.PathValue("id")`; method argument must be `string` |
-| `@Query("name")` | Reads `r.URL.Query().Get("name")`; method argument must be `string` |
-| `@Headers("name")` | **Not implemented**; request returns an unsupported decorator error |
+## Shutdown
 
-For undecorated `string` parameters, the runtime attempts to bind the first path variable found in the route pattern. Prefer explicit decorators for clarity.
+`Application.Shutdown(ctx)` delegates to the selected adapter, which shuts down the underlying HTTP server if started. There are no automatic signal handlers. Adapter-based applications invoke optional provider/controller cleanup hooks; legacy handler constructors do not. Full NestJS lifecycle and automatic resource-disposal semantics remain incomplete. Integrations needing resource cleanup must coordinate it outside the framework.
 
-## Responses and errors
+## Runtime constraints
 
-- A handler must return one value or a value plus an `error`.
-- Successful results are serialized as JSON.
-- The default status is `201 Created` for POST and `200 OK` for other methods.
-- `@HttpCode` overrides the default status.
-- Invalid JSON bodies return HTTP 400.
-- Non-nil handler errors return HTTP 500.
-- Unsupported parameter decorators or parameter types can produce HTTP 500.
+There is no complete built-in authentication/authorization, request-scoped injection, global validation/interceptor/filter pipeline, or automatic dependency resource disposal in these runtime paths. Errors during bootstrap are returned. Adapter applications attempt best-effort lifecycle and transport cleanup on failure, but registered adapter routes cannot currently be rolled back. Both HTTP paths now share the field dependency-injection resolver; their bootstrap orchestration and dispatch still differ. Test and harden both HTTP paths before production exposure.
 
-These are implementation behaviors, not a finalized public API. There is currently no built-in error mapping, validation pipeline or response interception.
-
-## Dependency injection
-
-Provider types registered by `@Injectable()` are instantiated as pointers to structs. The runtime then injects matching provider instances into exported pointer or interface fields on providers and controllers.
-
-- Pointer fields match registered provider types exactly.
-- Interface fields match a provider that implements the interface.
-- Multiple matching providers for one interface are rejected as ambiguous.
-- Duplicate provider types are rejected.
-- There is no constructor injection, request scope, lifecycle hook or automatic cycle detection.
-
-The metadata registry is process-global and protected by a mutex. Registering the same package name twice causes a panic.
-
-## Security and production considerations
-
-The runtime is an experimental prototype. It does not include authentication, authorization, request validation, rate limiting, structured error responses, observability or production hardening. Do not deploy untrusted public workloads without additional application-level safeguards.
+See also [HTTP adapters](HTTP_ADAPTERS.md), [architecture](ARCHITECTURE.md) and [lifecycle documentation](../website/docs/fundamentals/lifecycle.md).

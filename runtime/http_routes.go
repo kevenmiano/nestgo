@@ -14,6 +14,10 @@ import (
 // registerRoutes resolves injectable fields once during bootstrap and registers
 // engine-independent handlers. Generated static invokers can replace reflect.Call.
 func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) error {
+	return registerRoutesWithLifecycle(adapter, packages, nil)
+}
+
+func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
 	providers := map[reflect.Type]reflect.Value{}
 	controllers := []metadata.Controller{}
 	for _, pkg := range packages {
@@ -40,48 +44,16 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 		return orderedProviders[i].String() < orderedProviders[j].String()
 	})
 	inject := func(v reflect.Value) error {
-		allowed, scoped := visibility[v.Type()]
-		for i := 0; i < v.Elem().NumField(); i++ {
-			field := v.Elem().Field(i)
-			sf := v.Elem().Type().Field(i)
-			if sf.Anonymous || !field.CanSet() || (field.Kind() != reflect.Ptr && field.Kind() != reflect.Interface) {
-				continue
-			}
-			dep, found := providers[field.Type()]
-			if scoped && !allowed[field.Type()] {
-				found = false
-			}
-			if !found && field.Kind() == reflect.Interface {
-				for _, candidateType := range orderedProviders {
-					if scoped && !allowed[candidateType] {
-						continue
-					}
-					candidate := providers[candidateType]
-					if candidate.Type().Implements(field.Type()) {
-						if found {
-							return fmt.Errorf("ambiguous dependency %s.%s", v.Elem().Type(), sf.Name)
-						}
-						dep = candidate
-						found = true
-					}
-				}
-			}
-			if !found {
-				if sf.Tag.Get("nestgo") == "optional" {
-					continue
-				}
-				return fmt.Errorf("missing required dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
-			}
-			if !dep.IsValid() || (dep.Kind() == reflect.Ptr && dep.IsNil()) {
-				return fmt.Errorf("nil dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
-			}
-			field.Set(dep)
-		}
-		return nil
+		return injectFields(v, providers, orderedProviders, visibility)
 	}
 	for _, providerType := range orderedProviders {
 		if err := inject(providers[providerType]); err != nil {
 			return err
+		}
+	}
+	if lifecycle != nil {
+		for _, typ := range orderedProviders {
+			lifecycle.instances = append(lifecycle.instances, providers[typ].Interface())
 		}
 	}
 	seen := map[string]bool{}
@@ -92,6 +64,9 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 		instance := reflect.New(controller.Type.Elem())
 		if err := inject(instance); err != nil {
 			return err
+		}
+		if lifecycle != nil {
+			lifecycle.instances = append(lifecycle.instances, instance.Interface())
 		}
 		for _, route := range controller.Routes {
 			method := instance.MethodByName(route.Handler)

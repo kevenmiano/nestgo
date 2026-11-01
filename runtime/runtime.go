@@ -64,44 +64,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 		return fail(err)
 	}
 	inject := func(v reflect.Value) error {
-		allowed, scoped := visibility[v.Type()]
-		for i := 0; i < v.Elem().NumField(); i++ {
-			f := v.Elem().Field(i)
-			sf := v.Elem().Type().Field(i)
-			if sf.Anonymous || !f.CanSet() || (f.Kind() != reflect.Ptr && f.Kind() != reflect.Interface) {
-				continue
-			}
-			dep, ok := providers[f.Type()]
-			if scoped && !allowed[f.Type()] {
-				ok = false
-			}
-			if !ok && f.Kind() == reflect.Interface {
-				for _, candidateType := range orderedProviders {
-					if scoped && !allowed[candidateType] {
-						continue
-					}
-					candidate := providers[candidateType]
-					if candidate.Type().Implements(f.Type()) {
-						if ok {
-							return fmt.Errorf("ambiguous dependency %s", sf.Name)
-						}
-						dep = candidate
-						ok = true
-					}
-				}
-			}
-			if !ok {
-				if sf.Tag.Get("nestgo") == "optional" {
-					continue
-				}
-				return fmt.Errorf("missing required dependency %s.%s (%s)", v.Elem().Type(), sf.Name, f.Type())
-			}
-			if !dep.IsValid() || (dep.Kind() == reflect.Ptr && dep.IsNil()) {
-				return fmt.Errorf("nil dependency %s.%s (%s)", v.Elem().Type(), sf.Name, f.Type())
-			}
-			f.Set(dep)
-		}
-		return nil
+		return injectFields(v, providers, orderedProviders, visibility)
 	}
 	diStart := time.Now()
 	for _, providerType := range orderedProviders {

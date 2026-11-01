@@ -51,6 +51,26 @@ func TestHTTPAdapterConformance(t *testing.T) {
 			if resp.StatusCode != 201 || string(body) != "ada:ok" || resp.Header.Get("X-Engine-Parity") != "yes" {
 				t.Fatalf("unexpected HTTP result: status=%d body=%q header=%q", resp.StatusCode, body, resp.Header.Get("X-Engine-Parity"))
 			}
+			for _, tc := range []struct {
+				method, path string
+				want         int
+			}{
+				{http.MethodGet, "/does-not-exist", http.StatusNotFound},
+				{http.MethodPost, "/hello/ada", http.StatusMethodNotAllowed},
+			} {
+				request, err := http.NewRequest(tc.method, "http://"+listener.Addr().String()+tc.path, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				response, err := client.Do(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_ = response.Body.Close()
+				if response.StatusCode != tc.want {
+					t.Errorf("%s %s: status %d, want %d", tc.method, tc.path, response.StatusCode, tc.want)
+				}
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 			if err := a.Shutdown(ctx); err != nil {
