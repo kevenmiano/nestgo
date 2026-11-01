@@ -169,6 +169,16 @@ func Write(ctx Transport, value any, defaultStatus int) error {
 	for key, val := range r.Headers {
 		ctx.SetHeader(key, val)
 	}
+	if len(r.Cookies) > 1 {
+		if _, ok := ctx.(HeaderAppender); !ok {
+			return errors.New("multiple cookies require HeaderAppender adapter support")
+		}
+	}
+	for _, cookie := range r.Cookies {
+		if cookie.Name == "" {
+			return errors.New("cookie name cannot be empty")
+		}
+	}
 	for _, cookie := range r.Cookies {
 		if err := appendCookie(ctx, cookie); err != nil {
 			return err
@@ -207,14 +217,26 @@ type Writer struct {
 	ctx     Transport
 	status  int
 	written bool
+	cookies int
 }
 
 func NewWriter(ctx Transport) *Writer               { return &Writer{ctx: ctx} }
 func (w *Writer) Status(code int) *Writer           { w.status = code; return w }
 func (w *Writer) Header(name, value string) *Writer { w.ctx.SetHeader(name, value); return w }
-func (w *Writer) Cookie(cookie Cookie) *Writer {
-	_ = appendCookie(w.ctx, cookie)
-	return w
+func (w *Writer) Cookie(cookie Cookie) error {
+	if w.written {
+		return errors.New("HTTP response already written")
+	}
+	if w.cookies > 0 {
+		if _, ok := w.ctx.(HeaderAppender); !ok {
+			return errors.New("multiple cookies require HeaderAppender adapter support")
+		}
+	}
+	if err := appendCookie(w.ctx, cookie); err != nil {
+		return err
+	}
+	w.cookies++
+	return nil
 }
 func (w *Writer) Written() bool   { return w.written }
 func (w *Writer) StatusCode() int { return w.status }

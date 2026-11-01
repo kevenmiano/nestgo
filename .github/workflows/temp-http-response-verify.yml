@@ -1,0 +1,28 @@
+name: HTTP response branch verification
+on:
+  push:
+    branches: [feat/http-response-contract]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Go tests and static analysis
+        run: |
+          go test ./...
+          go vet ./...
+      - name: Verify gofmt and generated examples
+        run: |
+          unformatted="$(gofmt -l httpresponse compiler runtime platform metadata)"
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            exit 1
+          fi
+          go run ./cmd/modforge compile ./examples/shop
+          git diff --exit-code -- examples/shop
