@@ -94,7 +94,7 @@ func TestSecurityRuntimeServerErrorsDoNotLeak(t *testing.T) {
 		{"/regular", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
 		{"/typed-nil", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
 		{"/static", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
-		{"/static-http", 503, "Internal server error\n"},
+		{"/static-http", 503, `{"statusCode":503,"message":"Internal server error"}` + "\n"},
 		{"/static-http-invalid-status", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
 	} {
 		t.Run(tc.path, func(t *testing.T) {

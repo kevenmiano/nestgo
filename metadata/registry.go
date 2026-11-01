@@ -23,11 +23,17 @@ type Route struct {
 	RedirectURL           string
 	RedirectStatus        int
 	Parameters            []Parameter
+	Guards                []reflect.Type
+	Pipes                 []reflect.Type
+	Filters               []reflect.Type
 }
 type Controller struct {
-	Type   reflect.Type
-	Prefix string
-	Routes []Route
+	Type    reflect.Type
+	Prefix  string
+	Guards  []reflect.Type
+	Pipes   []reflect.Type
+	Filters []reflect.Type
+	Routes  []Route
 }
 type Provider struct {
 	Type    reflect.Type

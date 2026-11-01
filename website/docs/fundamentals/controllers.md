@@ -36,3 +36,32 @@ compatible HTTP adapter.
 For status codes, headers, redirects, cookies, typed HTTP exceptions,
 explicit responses and examples, see the
 [HTTP responses guide](https://github.com/kevenmiano/nestgo/blob/main/docs/HTTP_RESPONSES.md).
+
+## Route pipeline
+
+Use class-based decorators on controllers and methods:
+
+```go
+@UseGuards(ApiKeyGuard)
+@UsePipes(TrimPipe)
+@Controller("/users")
+type UsersController struct{}
+
+@UsePipes(RequiredPipe)
+@UseFilters(BadRequestFilter)
+@Post("/")
+func (c *UsersController) Create(@Body() dto CreateUserDTO) (CreateUserDTO, error) {
+    return dto, nil
+}
+```
+
+These types must implement the relevant `httpadapter` Go interfaces,
+carry `@Injectable()` and belong to the module's provider list.
+Components are constructed once at bootstrap.
+
+Read [middleware](./middleware.md), [guards](./guards.md),
+[pipes](./pipes.md) and [exception filters](./exception-filters.md),
+or follow the [request lifecycle](./request-pipeline.md).
+
+For a complete example, see
+[examples/pipeline](https://github.com/kevenmiano/nestgo/tree/main/examples/pipeline).

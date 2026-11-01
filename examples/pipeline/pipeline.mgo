@@ -1,0 +1,100 @@
+package pipeline
+
+import (
+	"encoding/json"
+	"os"
+	"strings"
+
+	"github.com/kevenmiano/nestgo/httpadapter"
+)
+
+// ApiKeyGuard illustrates authorization. Configure DEMO_API_KEY externally.
+// This example is not a production authentication implementation.
+@Injectable()
+type ApiKeyGuard struct{}
+
+func (*ApiKeyGuard) CanActivate(ctx httpadapter.ExecutionContext) (bool, error) {
+	secret := os.Getenv("DEMO_API_KEY")
+	return secret != "" && ctx.Request.Header("X-API-Key") == secret, nil
+}
+
+// TrimPipe runs before RequiredPipe and preserves the declared Go types.
+@Injectable()
+type TrimPipe struct{}
+
+func (*TrimPipe) Transform(value any, _ httpadapter.ArgumentMetadata) (any, error) {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v), nil
+	case CreateUserDTO:
+		v.Name = strings.TrimSpace(v.Name)
+		return v, nil
+	default:
+		return value, nil
+	}
+}
+
+@Injectable()
+type RequiredPipe struct{}
+
+func (*RequiredPipe) Transform(value any, meta httpadapter.ArgumentMetadata) (any, error) {
+	switch v := value.(type) {
+	case string:
+		if meta.Kind == "Param" && v == "" {
+			return nil, httpadapter.NewHTTPException(400, "id is required")
+		}
+	case CreateUserDTO:
+		if strings.TrimSpace(v.Name) == "" {
+			return nil, httpadapter.NewHTTPException(400, "name is required")
+		}
+	}
+	return value, nil
+}
+
+// BadRequestFilter customizes 400 responses for methods that opt in.
+@Injectable()
+type BadRequestFilter struct{}
+
+func (*BadRequestFilter) Catch(err error, ctx httpadapter.ExecutionContext) (bool, error) {
+	if httpadapter.StatusOf(err) != 400 {
+		return false, nil
+	}
+	payload, encodeErr := json.Marshal(map[string]any{
+		"statusCode": 400,
+		"message": err.Error(),
+	})
+	if encodeErr != nil {
+		return false, encodeErr
+	}
+	ctx.Request.Status(400)
+	ctx.Request.SetHeader("Content-Type", "application/json")
+	return true, ctx.Request.Write(payload)
+}
+
+type CreateUserDTO struct {
+	Name string `json:"name"`
+}
+
+@UseGuards(ApiKeyGuard)
+@UsePipes(TrimPipe)
+@Controller("/users")
+type UsersController struct{}
+
+// The controller's TrimPipe runs before the method's RequiredPipe.
+@UsePipes(RequiredPipe)
+@Get("/{id}")
+func (*UsersController) FindOne(@Param("id") id string) map[string]string {
+	return map[string]string{"id": id}
+}
+
+// The filter handles validation errors; unhandled failures use the safe
+// default HTTP error response.
+@UsePipes(RequiredPipe)
+@UseFilters(BadRequestFilter)
+@Post("/")
+func (*UsersController) Create(@Body() dto CreateUserDTO) (CreateUserDTO, error) {
+	return dto, nil
+}
+
+@Module({controllers: [UsersController], providers: [ApiKeyGuard, TrimPipe, RequiredPipe, BadRequestFilter]})
+type UsersModule struct{}

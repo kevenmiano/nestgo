@@ -45,7 +45,7 @@ type File struct {
 	Declarations          []Declaration
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Header": true, "Redirect": true, "Res": true, "Response": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Entity": true, "Repository": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Header": true, "Redirect": true, "Res": true, "Response": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Entity": true, "Repository": true, "UseGuards": true, "UsePipes": true, "UseFilters": true}
 
 func Parse(path string, src []byte) (*File, error) {
 	source, annotations, paramMarkers, err := lexDecorators(path, src)
@@ -88,7 +88,7 @@ func Parse(path string, src []byte) (*File, error) {
 			}
 			d := Declaration{Name: spec.Name.Name, Kind: "type", Annotations: ann}
 			for _, a := range ann {
-				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" && a.Name != "Imports" && a.Name != "Exports" && a.Name != "Entity" && a.Name != "Repository" {
+				if a.Name != "Controller" && a.Name != "Module" && a.Name != "Injectable" && a.Name != "Imports" && a.Name != "Exports" && a.Name != "Entity" && a.Name != "Repository" && a.Name != "UseGuards" && a.Name != "UsePipes" && a.Name != "UseFilters" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a type"}
 				}
 			}
@@ -108,7 +108,7 @@ func Parse(path string, src []byte) (*File, error) {
 				}
 			}
 			for _, a := range ann {
-				if !isRoute(a.Name) && a.Name != "HttpCode" && a.Name != "Header" && a.Name != "Redirect" && a.Name != "Query" {
+				if !isRoute(a.Name) && a.Name != "HttpCode" && a.Name != "Header" && a.Name != "Redirect" && a.Name != "Query" && a.Name != "UseGuards" && a.Name != "UsePipes" && a.Name != "UseFilters" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a function"}
 				}
 			}
@@ -215,15 +215,15 @@ func typedHTTPInvoker(d Declaration) string {
 			if !token.IsIdentifier(typ) || typ == "any" || typ == "interface{}" {
 				return ""
 			}
-			fmt.Fprintf(&body, "%s,code,err:=httpadapter.DecodeBody[%s](ctx);if err!=nil{return nil,code,err};", identifier, typ)
+			fmt.Fprintf(&body, "%s,code,err:=httpadapter.DecodeBodyAt[%s](ctx,%d);if err!=nil{return nil,code,err};", identifier, typ, i)
 		case "Param", "Query":
 			if typ != "string" {
 				return ""
 			}
 			if mark.Kind == "Param" {
-				fmt.Fprintf(&body, "%s:=ctx.Param(%q);", identifier, mark.Name)
+				fmt.Fprintf(&body, "%s,code,err:=httpadapter.BindParam(ctx,%q,%d);if err!=nil{return nil,code,err};", identifier, mark.Name, i)
 			} else {
-				fmt.Fprintf(&body, "%s:=ctx.Query(%q);", identifier, mark.Name)
+				fmt.Fprintf(&body, "%s,code,err:=httpadapter.BindQuery(ctx,%q,%d);if err!=nil{return nil,code,err};", identifier, mark.Name, i)
 			}
 		default:
 			return ""
@@ -291,6 +291,7 @@ func generateMetadata(files []*File, allowPersistence bool, repositories ...Repo
 	providerNames := map[string]bool{}
 	routes := map[string][]string{}
 	needsHTTPAdapter := false
+	controllerPipeline := map[string]string{}
 	for _, f := range files {
 		for _, d := range f.Declarations {
 			if d.Kind != "type" {
@@ -323,6 +324,24 @@ func generateMetadata(files []*File, allowPersistence bool, repositories ...Repo
 		}
 		providerNames[generatedType] = true
 		providers = append(providers, fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)),Scope:"singleton",Factory:func(resolve func(reflect.Type)(any,bool))(any,error){value,ok:=resolve(reflect.TypeOf((*database.Connections)(nil)));if !ok{return nil,fmt.Errorf("repository %s: database connections not initialized")};return New%sGeneratedFromConnections(value.(*database.Connections))}}`, generatedType, repository.Name, repository.Name))
+	}
+	for _, f := range files {
+		for _, d := range f.Declarations {
+			if d.Kind != "type" {
+				continue
+			}
+			_, isController := controllers[d.Name]
+			bindings, err := pipelineMetadata(f.Path, d.Annotations, providerNames)
+			if err != nil {
+				return nil, err
+			}
+			if !isController && bindings != "" {
+				return nil, Diagnostic{File: f.Path, Line: d.Annotations[0].Line, Message: "@UseGuards/@UsePipes/@UseFilters require @Controller"}
+			}
+			if isController {
+				controllerPipeline[d.Name] = bindings
+			}
+		}
 	}
 	if err := validateRequiredConcreteDependencies(files, providerNames, controllers); err != nil {
 		return nil, err
@@ -530,7 +549,11 @@ func generateMetadata(files []*File, allowPersistence bool, repositories ...Repo
 					staticInvoke = typed
 					needsHTTPAdapter = true
 				}
-				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Headers:[]metadata.Header{%s},RedirectURL:%q,RedirectStatus:%d,Parameters:[]metadata.Parameter{%s}%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(headers, ","), redirectURL, redirectStatus, strings.Join(params, ","), staticInvoke))
+				pipelineFields, err := pipelineMetadata(f.Path, d.Annotations, providerNames)
+				if err != nil {
+					return nil, err
+				}
+				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Headers:[]metadata.Header{%s},RedirectURL:%q,RedirectStatus:%d,Parameters:[]metadata.Parameter{%s}%s%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(headers, ","), redirectURL, redirectStatus, strings.Join(params, ","), pipelineFields, staticInvoke))
 			}
 			if routeCount > 1 {
 				return nil, fmt.Errorf("%s: multiple HTTP method decorators on %s", f.Path, d.Name)
@@ -558,7 +581,7 @@ func generateMetadata(files []*File, allowPersistence bool, repositories ...Repo
 	}
 	sortStrings(names)
 	for _, name := range names {
-		out.WriteString(fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)),Prefix:%q,Routes:[]metadata.Route{%s}},`, name, controllers[name], strings.Join(routes[name], ",")))
+		out.WriteString(fmt.Sprintf(`{Type:reflect.TypeOf((*%s)(nil)),Prefix:%q%s,Routes:[]metadata.Route{%s}},`, name, controllers[name], controllerPipeline[name], strings.Join(routes[name], ",")))
 	}
 	out.WriteString("},\nProviders: []metadata.Provider{")
 	out.WriteString(strings.Join(providers, ","))

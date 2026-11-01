@@ -40,6 +40,11 @@ log.Fatal(app.Listen(":8080"))
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
+| `WithMiddleware(...)` | Register global matched-route middleware |
+| `WithRouteMiddleware(method,path,...)` | Exact-route middleware |
+| `WithGuards(...)` | Global guards |
+| `WithPipes(...)` | Global argument pipes |
+| `WithFilters(...)` | Global exception filters |
 | `WithContext(ctx)` | Supply a cancellable bootstrap context |
 | `WithDebug(true)` | Enable detailed per-provider diagnostics |
 | `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
@@ -79,3 +84,5 @@ Use `WithBootstrapMetrics` for route registration, lifecycle initialization and 
 Constructor injection, request scopes, automatic OS signals, universal filters/guards/interceptors and arbitrary resource disposal are not implemented. Successful application construction does not mean the HTTP port is bound.
 
 See [HTTP adapters](HTTP_ADAPTERS.md) and [lifecycle guide](../website/docs/fundamentals/lifecycle.md).
+
+See [the request pipeline](REQUEST_PIPELINE.md) for middleware, guard, pipe, and exception filter contracts.
