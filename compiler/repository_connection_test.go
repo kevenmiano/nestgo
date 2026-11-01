@@ -18,13 +18,13 @@ func TestRepositoryNamedConnectionBinding(t *testing.T) {
 		}
 	}
 	output, err := GenerateRepository(RepositoryDefinition{
-		Package: "users",
-		Name: "UsersRepository",
-		Entity: "User",
+		Package:    "users",
+		Name:       "UsersRepository",
+		Entity:     "User",
 		Connection: "users",
-		Fields: []RepositoryField{{Name: "ID"}},
-		Methods: []RepositoryMethod{{Name: "Find", SQL: "SELECT id FROM users WHERE id=:id", Parameters: []RepositoryParameter{{Name: "id", Type: "int64"}}}},
-		Dialect: sqlgen.PostgreSQL,
+		Fields:     []RepositoryField{{Name: "ID"}},
+		Methods:    []RepositoryMethod{{Name: "Find", SQL: "SELECT id FROM users WHERE id=:id", Parameters: []RepositoryParameter{{Name: "id", Type: "int64"}}}},
+		Dialect:    sqlgen.PostgreSQL,
 	})
 	if err != nil {
 		t.Fatal(err)
