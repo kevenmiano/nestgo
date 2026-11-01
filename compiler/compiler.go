@@ -42,12 +42,13 @@ type Parameter struct {
 type File struct {
 	Path, Package, Source string
 	Declarations          []Declaration
+	DTOs                  []DTO
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Expose": true, "Exclude": true, "Transform": true, "Type": true}
 
 func Parse(path string, src []byte) (*File, error) {
-	source, annotations, paramMarkers, err := lexDecorators(path, src)
+	source, annotations, paramMarkers, propertyMarkers, err := lexDecorators(path, src)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +57,9 @@ func Parse(path string, src []byte) (*File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	result := &File{Path: path, Package: file.Name.Name, Source: source}
+	dtos, err := collectDTOs(path, file, fset, propertyMarkers)
+	if err != nil { return nil, err }
+	result := &File{Path: path, Package: file.Name.Name, Source: source, DTOs: dtos}
 	typeNames := map[string]bool{}
 	for _, node := range file.Decls {
 		if gen, ok := node.(*ast.GenDecl); ok {
