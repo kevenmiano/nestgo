@@ -6,8 +6,8 @@ import (
 	"os"
 
 	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/kevenmiano/nestgo/database/integrationtests/examples/sql"
 	"github.com/kevenmiano/nestgo/database"
+	_ "github.com/kevenmiano/nestgo/database/integrationtests/examples/sql"
 	"github.com/kevenmiano/nestgo/runtime"
 	_ "github.com/lib/pq"
 )
@@ -24,7 +24,9 @@ func main() {
 			database.WithConnection("billing", database.WithDriver("mysql"), database.WithDSN(mysqlDSN)),
 		),
 	)
-	if err != nil { log.Fatal(err) }
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer app.Close()
 	log.Print("SQL example listening on :8080; GET /sql-users/postgres/{id} or /sql-users/mysql/{id}")
 	log.Fatal(app.Listen(":8080"))
