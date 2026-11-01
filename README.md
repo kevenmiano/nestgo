@@ -14,7 +14,7 @@
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg" alt="Go quality" /></a>
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg" alt="Documentation build" /></a>
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml/badge.svg" alt="Go packages" /></a>
-  <img src="https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.23+" />
+  <img src="https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.27+" />
   <img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental" />
 </p>
 
@@ -72,11 +72,12 @@ func main() {
 }
 ```
 
-For optional NestJS-inspired decorators, install the compiler and generate Go metadata once during development/build:
+For optional NestJS-inspired decorators, install the CLI and generate Go metadata once during development/build:
 
 ```bash
 go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
 nestgo compile ./myapp
+nestgo --help
 ```
 
 To explore the included application:
@@ -140,6 +141,8 @@ Features are evolving. Constructor injection, request-scoped providers, guards, 
 ## Documentation
 
 Read the [documentation portal](https://kevenmiano.github.io/nestgo/) or browse the [documentation sources](website/docs/). The site is built in CI; GitHub Pages publication currently happens through the separate release workflow.
+
+For all commands, diagnostic flags and shell completion, see the [CLI guide](website/docs/cli/overview.md). The Docusaurus command reference is generated from Cobra.
 
 Additional references: [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
 

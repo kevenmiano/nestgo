@@ -23,7 +23,7 @@ go run ./cmd/nestgo diagnose -app ./examples/shop -out diagnostics-real -samples
 
 The CLI compiles a temporary, linked Go diagnostic runner and imports the application's generated metadata registration. It does not edit user files. The package must be importable (not `package main`), and its generated metadata must register with NestGo. **Importing that package executes its `init()` functions**; analyze trusted application code only.
 
-The current metadata only exposes provider/controller and module descriptors; module import/export edges are not yet defined. Thus the provider graph is real, but it is **not yet a complete NestJS-style module graph**.
+The report includes provider and module dependency graph descriptors. Supported `.mgo` module decorators can emit typed imports and exports, but cross-package graph validation and complete NestJS module semantics remain under development. See the [CLI guide](./cli/overview.md) for the command flags, diagnostics modes and output files.
 
 ## Files
 
@@ -61,7 +61,7 @@ Full module imports/exports validation, cold-process startup, large provider/rou
 
 The analyzer now produces `modules.json` and `modules.dot` alongside the provider graph. Explicit `metadata.Module.Imports` and `metadata.Module.Exports` describe directed module imports and exported provider types. It reports module cycles and missing or invalid references in the same HTML report.
 
-Existing `@Module("users")` generated metadata is compatible and appears as a module node. **The compiler does not yet generate imports/exports**, and runtime module visibility is not enforced; use explicit programmatic module metadata to model those relationships. See the [diagnostics GSD guide](https://github.com/kevenmiano/nestgo/blob/main/docs/DIAGNOSTICS.md).
+Existing `@Module("users")` generated metadata is compatible and appears as a module node. The compiler can generate imports and exports from supported `@Module({...})` declarations and `@Imports`/`@Exports` decorators. Runtime module visibility enforcement and full cross-package validation remain incomplete. See the [diagnostics GSD guide](https://github.com/kevenmiano/nestgo/blob/main/docs/DIAGNOSTICS.md).
 
 ## Declare module relationships in `.mgo`
 
