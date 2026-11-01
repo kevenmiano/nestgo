@@ -24,7 +24,7 @@ func BenchmarkCodeFirstInvocation(b *testing.B) {
 		WithAdapter(adapter),
 		WithRoutes(Route{
 			Method: http.MethodGet,
-			Path: "/bench/ready",
+			Path:   "/bench/ready",
 			Handler: func(ctx Context) error {
 				ctx.Status(http.StatusOK)
 				return ctx.Write([]byte("\"ok\"\n"))
@@ -53,7 +53,7 @@ func BenchmarkCodeFirstInvocation(b *testing.B) {
 func BenchmarkCodeFirstHTTPEngines(b *testing.B) {
 	engines := []struct {
 		name string
-		new func() httpadapter.Adapter
+		new  func() httpadapter.Adapter
 	}{
 		{"fasthttp", func() httpadapter.Adapter { return fastadapter.New() }},
 		{"nethttp", func() httpadapter.Adapter { return netadapter.New() }},
@@ -65,7 +65,7 @@ func BenchmarkCodeFirstHTTPEngines(b *testing.B) {
 				if mode == "code_first" {
 					options = append(options, WithRoutes(Route{
 						Method: http.MethodGet,
-						Path: "/bench/ready",
+						Path:   "/bench/ready",
 						Handler: func(ctx Context) error {
 							ctx.Status(http.StatusOK)
 							ctx.SetHeader("Content-Type", "application/json")
@@ -94,16 +94,16 @@ func BenchmarkCodeFirstHTTPEngines(b *testing.B) {
 					listener.Close()
 					select {
 					case <-done:
-					case <-time.After(5*time.Second):
+					case <-time.After(5 * time.Second):
 						b.Error("HTTP server did not stop")
 					}
 				}()
 				client := &http.Client{
 					Timeout: 5 * time.Second,
 					Transport: &http.Transport{
-						MaxIdleConns: 128,
+						MaxIdleConns:        128,
 						MaxIdleConnsPerHost: 128,
-						MaxConnsPerHost: 128,
+						MaxConnsPerHost:     128,
 					},
 				}
 				defer client.CloseIdleConnections()
@@ -161,4 +161,3 @@ func BenchmarkCodeFirstHTTPEngines(b *testing.B) {
 		}
 	}
 }
-
