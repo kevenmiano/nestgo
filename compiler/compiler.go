@@ -41,7 +41,7 @@ type File struct {
 	Declarations          []Declaration
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Entity": true, "Repository": true}
 
 func Parse(path string, src []byte) (*File, error) {
 	source, annotations, paramMarkers, err := lexDecorators(path, src)
@@ -104,12 +104,12 @@ func Parse(path string, src []byte) (*File, error) {
 				}
 			}
 			for _, a := range ann {
-				if !isRoute(a.Name) && a.Name != "HttpCode" {
+				if !isRoute(a.Name) && a.Name != "HttpCode" && a.Name != "Query" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a function"}
 				}
 			}
 			if d.Receiver == "" || !typeNames[d.Receiver] {
-				return nil, Diagnostic{path, line, "route decorator requires local controller method"}
+				return nil, Diagnostic{path, line, "decorated method requires local receiver type"}
 			}
 			index := 0
 			if n.Type.Params != nil {
