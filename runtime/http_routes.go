@@ -171,10 +171,18 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 					}
 					args[i] = v.Elem()
 				}
-				results := handler.Call(args)
-				if len(results) == 2 && !results[1].IsNil() {
-					return respondError(ctx, 500, results[1].Interface().(error).Error())
-				}
+				var result any
+                if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
+                    value, err := rt.StaticInvoke(instance.Interface())
+                    if err != nil { return respondError(ctx, 500, err.Error()) }
+                    result = value
+                } else {
+                    results := handler.Call(args)
+                    if len(results) == 2 && !results[1].IsNil() {
+                        return respondError(ctx, 500, results[1].Interface().(error).Error())
+                    }
+                    result = results[0].Interface()
+                }
 				status := rt.Status
 				if status == 0 {
 					if rt.Method == "POST" {
@@ -185,7 +193,7 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				}
 				ctx.Status(status)
 				ctx.SetHeader("Content-Type", "application/json")
-				data, err := json.Marshal(results[0].Interface())
+				data, err := json.Marshal(result)
 				if err != nil {
 					return errors.New("failed to encode HTTP response: " + err.Error())
 				}
