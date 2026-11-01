@@ -118,10 +118,10 @@ func TestPropertyDecoratorDiagnostics(t *testing.T) {
 	tests := []struct{ name, source, errText string }{
 		{"outside-struct", "package demo\n@Exclude()\ntype User struct{}", "property decorator"},
 		{"missing-field", "package demo\ntype User struct {\n@Expose()\n}", "must precede"},
-		{"bad-transform", "package demo\ntype User struct {\n@Transform(something())\nName string\n}", "function identifier"},
+		{"bad-transform", "package demo\ntype User struct {\n@Transform(something())\nName string\n}", "function or struct instance"},
 		{"conflict", "package demo\ntype User struct {\n@Expose()\n@Exclude()\nName string\n}", "cannot decorate"},
 		{"type-mismatch", "package demo\ntype User struct {\n@Type(int)\nName string\n}", "must match"},
-		{"old-direction-removed", "package demo\ntype User struct {\n@Transform(Fn, \"toPlainOnly\")\nName string\n}", "one function identifier"},
+		{"old-direction-removed", "package demo\ntype User struct {\n@Transform(Fn, \"toPlainOnly\")\nName string\n}", "function or struct instance"},
 		{"exclude-direction-removed", "package demo\ntype User struct {\n@Exclude(\"toClassOnly\")\nName string\n}", "takes no arguments"},
 		{"duplicate-exclude-input", "package demo\ntype User struct {\n@ExcludeInput()\n@ExcludeInput()\nName string\n}", "duplicate @ExcludeInput"},
 		{"conflicting-exclusion", "package demo\ntype User struct {\n@Exclude()\n@ExcludeOutput()\nName string\n}", "cannot be combined"},
