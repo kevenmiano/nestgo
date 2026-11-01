@@ -50,7 +50,7 @@ func TestCrossPackageConcreteProviderExportBoundary(t *testing.T) {
 				}}},
 			}
 			cases := []struct {
-				name string
+				name  string
 				start func() error
 			}{
 				{name: "legacy", start: func() error {
