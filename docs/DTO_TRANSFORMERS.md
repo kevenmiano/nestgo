@@ -20,7 +20,7 @@ type UserDTO struct {
     @Exclude()
     Password string `json:"password"`
 
-    @Transform(NormalizeEmail, "toClassOnly")
+    @TransformInput(NormalizeEmail)
     Email string `json:"email"`
 
     @Type(AddressDTO)
@@ -49,18 +49,23 @@ binder and response encoder honor these automatically, including nested DTOs.
 | `@Expose()` | Include a property with its existing Go JSON name |
 | `@Expose("public_name")` | Override the JSON name |
 | `@Exclude()` | Exclude incoming and outgoing JSON |
-| `@Exclude("toPlainOnly")` | Exclude outgoing JSON only |
-| `@Exclude("toClassOnly")` | Ignore incoming JSON only |
+| `@ExcludeOutput()` | Exclude outgoing JSON only |
+| `@ExcludeInput()` | Ignore incoming JSON only |
 | `@Transform(MyFunc)` | Call the custom function on both directions |
-| `@Transform(MyFunc, "toClassOnly")` | Transform only on input |
-| `@Transform(MyFunc, "toPlainOnly")` | Transform only on output |
+| `@TransformInput(MyFunc)` | Transform only on input |
+| `@TransformOutput(MyFunc)` | Transform only on output |
 | `@Type(AddressDTO)` | Assert the statically declared nested Go type |
+
+**Direction names are explicit:** `Input` means JSON to DTO (decode), while
+`Output` means DTO to JSON (encode). These decorators take no JavaScript-style
+direction string options. `@Exclude()` hides a field in both directions,
+and `@Transform(MyFunc)` applies the same function in both directions.
 
 Each custom callback has the signature `func(T) (T, error)`,
 where `T` is the Go field type. Multiple `@Transform`
 decorators execute in declaration order. Local functions and qualified
 imported functions are supported (for example
-`@Transform(url.PathUnescape, "toClassOnly")`).
+`@TransformInput(url.PathUnescape)`).
 Transformer failures propagate as JSON encode/decode errors.
 
 Go struct types already determine nested JSON decoding; `@Type`
@@ -125,7 +130,7 @@ advanced dynamic decoding only when explicitly requested.
 ## Constraints and security
 
 - Decorators occupy separate lines before one exported struct field.
-- `@Expose` and `@Exclude` cannot decorate one field.
+- `@Expose` and `@Exclude` cannot decorate one field; `@Exclude` cannot be combined with `@ExcludeInput` or `@ExcludeOutput`.
 - Undecorated exported fields honor Go's ordinary JSON tags and options.
 - Anonymous embedded fields are not supported in a decorated DTO.
 - A DTO cannot declare its own JSON marshal/unmarshal methods alongside
@@ -137,4 +142,4 @@ advanced dynamic decoding only when explicitly requested.
   substitute for input validation or authorization.
 
 Use `@Exclude()` to keep a field off both JSON boundaries.
-`@Exclude("toPlainOnly")` permits incoming values intentionally.
+`@ExcludeOutput()` permits incoming values intentionally.
