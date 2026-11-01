@@ -156,4 +156,3 @@ func TestCompileDirRejectsInvalidUserTestBeforeAppend(t *testing.T) {
 		t.Fatal("expected malformed existing test to be reported")
 	}
 }
-
