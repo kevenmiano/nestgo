@@ -85,7 +85,7 @@ func BenchmarkBootstrapLogging(b *testing.B) {
 	}
 }
 
-type missingRequired struct{ Dependency *lifecycleA }
+type missingRequired struct{ Dependency *lifecycleA `nestgo:"inject"` }
 type optionalRequired struct {
 	Dependency *lifecycleA `nestgo:"optional"`
 }
