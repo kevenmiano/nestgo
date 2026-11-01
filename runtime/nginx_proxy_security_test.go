@@ -133,7 +133,7 @@ http {
 				_ = cmd.Wait()
 			})
 			client := &http.Client{
-				Timeout: 2 * time.Second,
+				Timeout:   2 * time.Second,
 				Transport: &http.Transport{DisableKeepAlives: true},
 			}
 			t.Cleanup(client.CloseIdleConnections)
