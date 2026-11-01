@@ -151,3 +151,4 @@ func (a *Application) Shutdown(ctx context.Context) error {
 	if a.lifecycle == nil { return a.adapter.Shutdown(ctx) }
 	return a.lifecycle.shutdown(ctx, a.adapter.Shutdown)
 }
+
