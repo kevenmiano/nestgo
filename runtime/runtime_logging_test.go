@@ -90,7 +90,7 @@ type optionalRequired struct {
 	Dependency *lifecycleA `nestgo:"optional"`
 }
 type missingInterface interface{ Missing() }
-type missingInterfaceProvider struct{ Dependency missingInterface }
+type missingInterfaceProvider struct{ Dependency missingInterface `nestgo:"inject"` }
 
 func TestMissingRequiredDependencyBlocksBootstrap(t *testing.T) {
 	p := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*missingRequired)(nil))}}}
