@@ -530,7 +530,7 @@ func generateMetadata(files []*File, allowPersistence bool, repositories ...Repo
 	for _, imported := range qualifiedImports {
 		out.WriteString("import " + imported + "\n")
 	}
-	out.WriteString("func init() { metadata.Register(")
+	out.WriteString("func init() { metadata.RegisterCompiled(")
 	out.WriteString(strconv.Quote(pkg))
 	out.WriteString(", metadata.Package{\nControllers: []metadata.Controller{\n")
 	names := make([]string, 0, len(controllers))
