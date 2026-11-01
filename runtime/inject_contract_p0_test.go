@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -150,5 +151,27 @@ func TestP0InterfaceInjectionScopedVisibility(t *testing.T) {
 	}
 	if target.Printer == nil || target.Printer.String() != "a" {
 		t.Fatalf("wrong scoped dependency: %v", target.Printer)
+	}
+}
+
+func TestP0InjectionErrorHasStableContext(t *testing.T) {
+	target := &explicitRequired{}
+	err := injectFields(reflect.ValueOf(target), nil, nil, nil)
+	var injection *InjectionError
+	if !errors.As(err, &injection) {
+		t.Fatalf("expected structured InjectionError, got %T: %v", err, err)
+	}
+	if injection.Code != "missing_dependency" ||
+		injection.Target != reflect.TypeOf(*target) ||
+		injection.Field != "Missing" ||
+		injection.Dependency != reflect.TypeOf((*absentRepo)(nil)) {
+		t.Fatalf("wrong injection context: %+v", injection)
+	}
+
+	_, err = prepareBootstrap([]metadata.Package{{
+		Providers: []metadata.Provider{{Type: reflect.TypeOf((*explicitRequired)(nil))}},
+	}}, nil, nil)
+	if !errors.As(err, &injection) || injection.Code != "missing_dependency" {
+		t.Fatalf("bootstrap must preserve structured DI failure: %v", err)
 	}
 }

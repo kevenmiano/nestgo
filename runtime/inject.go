@@ -5,6 +5,25 @@ import (
 	"reflect"
 )
 
+// InjectionError carries stable programmatic context for a rejected field
+// binding. Errors expose no provider values or request data.
+type InjectionError struct {
+	Code       string
+	Target     reflect.Type
+	Field      string
+	Dependency reflect.Type
+	Message    string
+}
+
+func (e *InjectionError) Error() string { return e.Message }
+
+func rejectInjection(code string, target reflect.Type, field string, dependency reflect.Type, format string, args ...any) error {
+	return &InjectionError{
+		Code: code, Target: target, Field: field,
+		Dependency: dependency, Message: fmt.Sprintf(format, args...),
+	}
+}
+
 // injectionAssignment is applied only after all fields have been validated.
 // A malformed dependency must not leave a partially constructed provider.
 type injectionAssignment struct {
@@ -37,7 +56,7 @@ func nilDependency(v reflect.Value) bool {
 // are never treated as dependencies; every injection must be explicitly marked.
 func injectFields(v reflect.Value, providers map[reflect.Type]reflect.Value, order []reflect.Type, visibility map[reflect.Type]map[reflect.Type]bool) error {
 	if !v.IsValid() || v.Kind() != reflect.Ptr || v.IsNil() || v.Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("invalid injection target: expected non-nil pointer to struct")
+		return rejectInjection("invalid_target", nil, "", nil, "invalid injection target: expected non-nil pointer to struct")
 	}
 	allowed, scoped := visibility[v.Type()]
 	var assignments []injectionAssignment
@@ -48,20 +67,20 @@ func injectFields(v reflect.Value, providers map[reflect.Type]reflect.Value, ord
 		switch marker {
 		case "", "inject", "optional", "-":
 		default:
-			return fmt.Errorf("invalid nestgo injection tag %q on %s.%s", marker, v.Elem().Type(), sf.Name)
+			return rejectInjection("invalid_tag", v.Elem().Type(), sf.Name, field.Type(), "invalid nestgo injection tag %q on %s.%s", marker, v.Elem().Type(), sf.Name)
 		}
 		if marker == "" || marker == "-" {
 			continue
 		}
 		if sf.Anonymous || !field.CanSet() {
 			if marker != "" {
-				return fmt.Errorf("cannot inject inaccessible field %s.%s", v.Elem().Type(), sf.Name)
+				return rejectInjection("inaccessible_field", v.Elem().Type(), sf.Name, field.Type(), "cannot inject inaccessible field %s.%s", v.Elem().Type(), sf.Name)
 			}
 			continue
 		}
 		if field.Kind() != reflect.Ptr && field.Kind() != reflect.Interface {
 			if marker != "" {
-				return fmt.Errorf("cannot inject non-pointer field %s.%s", v.Elem().Type(), sf.Name)
+				return rejectInjection("invalid_field_type", v.Elem().Type(), sf.Name, field.Type(), "cannot inject non-pointer field %s.%s", v.Elem().Type(), sf.Name)
 			}
 			continue
 		}
@@ -79,7 +98,7 @@ func injectFields(v reflect.Value, providers map[reflect.Type]reflect.Value, ord
 					continue
 				}
 				if found {
-					return fmt.Errorf("ambiguous dependency %s.%s", v.Elem().Type(), sf.Name)
+					return rejectInjection("ambiguous_dependency", v.Elem().Type(), sf.Name, field.Type(), "ambiguous dependency %s.%s", v.Elem().Type(), sf.Name)
 				}
 				dep, found = candidate, true
 			}
@@ -88,13 +107,13 @@ func injectFields(v reflect.Value, providers map[reflect.Type]reflect.Value, ord
 			if marker == "optional" {
 				continue
 			}
-			return fmt.Errorf("missing required dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
+			return rejectInjection("missing_dependency", v.Elem().Type(), sf.Name, field.Type(), "missing required dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
 		}
 		if nilDependency(dep) {
-			return fmt.Errorf("nil dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
+			return rejectInjection("nil_dependency", v.Elem().Type(), sf.Name, field.Type(), "nil dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
 		}
 		if !dep.Type().AssignableTo(field.Type()) {
-			return fmt.Errorf("incompatible dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
+			return rejectInjection("incompatible_dependency", v.Elem().Type(), sf.Name, field.Type(), "incompatible dependency %s.%s (%s)", v.Elem().Type(), sf.Name, field.Type())
 		}
 		assignments = append(assignments, injectionAssignment{field: field, value: dep})
 	}
