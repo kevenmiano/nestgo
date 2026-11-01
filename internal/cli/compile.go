@@ -12,12 +12,12 @@ import (
 
 func newCompileCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "compile <directory|file.mgo>",
-		Short: "Compile .mgo decorators into ordinary Go sources and metadata",
-		Long: "Compile all .mgo files in a package directory. Passing a single .mgo file compiles its containing directory.",
-		Args:  cobra.ExactArgs(1),
+		Use:     "compile <directory|file.mgo>",
+		Short:   "Compile .mgo decorators into ordinary Go sources and metadata",
+		Long:    "Compile all .mgo files in a package directory. Passing a single .mgo file compiles its containing directory.",
+		Args:    cobra.ExactArgs(1),
 		Example: "  nestgo compile ./examples/shop\n  nestgo compile ./myapp/controllers.mgo",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE:    func(cmd *cobra.Command, args []string) error {
 			path := args[0]
 			info, err := os.Stat(path)
 			if err != nil {
