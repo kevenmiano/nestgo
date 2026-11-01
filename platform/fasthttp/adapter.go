@@ -50,43 +50,45 @@ func (a *Adapter) Serve(listener net.Listener) error {
 	}
 	a.started = true
 	routes := append([]httpadapter.Route(nil), a.routes...)
-    // Index once at startup by HTTP method and path segment count.
-    byMethod := make(map[string][]httpadapter.Route)
-    byPath := make(map[int][]httpadapter.Route)
-    for _, route := range routes {
-        segments := segmentCount(route.Path)
-        key := route.Method + " " + strconv.Itoa(segments)
-        byMethod[key] = append(byMethod[key], route)
-        byPath[segments] = append(byPath[segments], route)
-    }
-    server := &fast.Server{Handler: func(c *fast.RequestCtx) {
-        path := string(c.Path())
-        method := string(c.Method())
-        segments := segmentCount(path)
-        for _, route := range byMethod[method+" "+strconv.Itoa(segments)] {
-            params, ok := match(route.Path, path)
-            if !ok { continue }
-            ctx := &requestContext{r:c, params:params, status:200}
-            if err := route.Handler(ctx); err != nil && !ctx.wrote {
-                c.Error(err.Error(), 500)
-            }
-            return
-        }
-        // Only resolve other methods if the current method has no matching path.
-        for _, route := range byPath[segments] {
-            if _, ok := match(route.Path, path); ok {
-                c.Error("Method Not Allowed", 405)
-                return
-            }
-        }
-        c.Error("Not Found", 404)
-    }}
+	// Index once at startup by HTTP method and path segment count.
+	byMethod := make(map[string][]httpadapter.Route)
+	byPath := make(map[int][]httpadapter.Route)
+	for _, route := range routes {
+		segments := segmentCount(route.Path)
+		key := route.Method + " " + strconv.Itoa(segments)
+		byMethod[key] = append(byMethod[key], route)
+		byPath[segments] = append(byPath[segments], route)
+	}
+	server := &fast.Server{Handler: func(c *fast.RequestCtx) {
+		path := string(c.Path())
+		method := string(c.Method())
+		segments := segmentCount(path)
+		for _, route := range byMethod[method+" "+strconv.Itoa(segments)] {
+			params, ok := match(route.Path, path)
+			if !ok {
+				continue
+			}
+			ctx := &requestContext{r: c, params: params, status: 200}
+			if err := route.Handler(ctx); err != nil && !ctx.wrote {
+				c.Error(err.Error(), 500)
+			}
+			return
+		}
+		// Only resolve other methods if the current method has no matching path.
+		for _, route := range byPath[segments] {
+			if _, ok := match(route.Path, path); ok {
+				c.Error("Method Not Allowed", 405)
+				return
+			}
+		}
+		c.Error("Not Found", 404)
+	}}
 	a.server = server
 	a.mu.Unlock()
 	return server.Serve(listener)
 }
 func segmentCount(path string) int {
-    return strings.Count(strings.Trim(path, "/"), "/") + 1
+	return strings.Count(strings.Trim(path, "/"), "/") + 1
 }
 
 func match(pattern, path string) (map[string]string, bool) {

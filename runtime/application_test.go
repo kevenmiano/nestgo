@@ -35,6 +35,10 @@ func TestApplicationReportsBootstrapMetrics(t *testing.T) {
 			t.Fatalf("invalid bootstrap metrics: %+v", m)
 		}
 	}})
-	if err != nil { t.Fatal(err) }
-	if !called { t.Fatal("bootstrap callback not invoked") }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !called {
+		t.Fatal("bootstrap callback not invoked")
+	}
 }

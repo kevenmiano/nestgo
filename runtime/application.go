@@ -12,7 +12,7 @@ import (
 
 type ApplicationOptions struct {
 	// Adapter selects the HTTP platform. Nil defaults to native fasthttp.
-	Adapter httpadapter.Adapter
+	Adapter     httpadapter.Adapter
 	OnBootstrap func(BootstrapMetrics)
 }
 
