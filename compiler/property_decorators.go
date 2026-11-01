@@ -140,13 +140,19 @@ func validateDTOField(path string, field DTOField) error {
 			}
 			switch annotation.Name {
 			case "Exclude":
-				if exclude { return Diagnostic{path, annotation.Line, "duplicate @Exclude"} }
+				if exclude {
+					return Diagnostic{path, annotation.Line, "duplicate @Exclude"}
+				}
 				exclude = true
 			case "ExcludeInput":
-				if excludeInput { return Diagnostic{path, annotation.Line, "duplicate @ExcludeInput"} }
+				if excludeInput {
+					return Diagnostic{path, annotation.Line, "duplicate @ExcludeInput"}
+				}
 				excludeInput = true
 			case "ExcludeOutput":
-				if excludeOutput { return Diagnostic{path, annotation.Line, "duplicate @ExcludeOutput"} }
+				if excludeOutput {
+					return Diagnostic{path, annotation.Line, "duplicate @ExcludeOutput"}
+				}
 				excludeOutput = true
 			}
 		case "Transform", "TransformInput", "TransformOutput":
@@ -214,9 +220,13 @@ func (field DTOField) excluded(direction string) bool {
 		case "Exclude":
 			return true
 		case "ExcludeInput":
-			if direction == "input" { return true }
+			if direction == "input" {
+				return true
+			}
 		case "ExcludeOutput":
-			if direction == "output" { return true }
+			if direction == "output" {
+				return true
+			}
 		}
 	}
 	return false
