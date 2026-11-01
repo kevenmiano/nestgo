@@ -63,7 +63,7 @@ The application only requires the **root module**; imports for `runtime`, `compi
 
 The `@v0.1.0` snippets are **examples** until that release has been published. Verify [releases](https://github.com/kevenmiano/nestgo/releases) before using a version.
 
-## Three independent GitHub Actions release workflows
+For automated version selection and the release PR lifecycle, see [Semantic releases](SEMANTIC_RELEASES.md). Release Please creates the tag and changelog; GoReleaser builds CLI artifacts for that tag.\n\n## Three independent GitHub Actions release workflows
 
 A single GitHub **Release published** event for a valid root-module tag (for example `v0.1.0`) triggers three separate workflows. They do not call or depend on one another.
 

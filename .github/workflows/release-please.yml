@@ -1,0 +1,44 @@
+name: Prepare semantic release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: nestgo-semantic-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare version, changelog and release PR
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # GITHUB_TOKEN-created release events do not trigger normal release workflows.
+      # workflow_dispatch is explicitly supported, so invoke the three existing
+      # independent pipelines only after release-please has created the release.
+      - name: Trigger release pipelines
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || exit 1
+          for workflow in go-packages.yml framework-release.yml docs-release.yml; do
+            gh workflow run "$workflow" --ref main -f tag="$RELEASE_TAG"
+          done
+          echo "Release $RELEASE_TAG dispatched to package, CLI and documentation workflows." >> "$GITHUB_STEP_SUMMARY"
