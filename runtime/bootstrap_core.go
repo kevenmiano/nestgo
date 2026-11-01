@@ -22,7 +22,7 @@ func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type)
 	for _, pkg := range packages {
 		for _, p := range pkg.Providers {
 			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
-				return nil, fmt.Errorf("provider must be pointer to struct: %v", p.Type)
+				return nil, fmt.Errorf("invalid provider %v: must be pointer to struct", p.Type)
 			}
 			if _, exists := graph.providers[p.Type]; exists {
 				return nil, fmt.Errorf("duplicate provider: %v", p.Type)
