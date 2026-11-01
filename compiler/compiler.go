@@ -43,6 +43,7 @@ type File struct {
 	Path, Package, Source string
 	Declarations          []Declaration
 	DTOs                  []DTO
+	StructTypes           map[string]bool
 }
 
 var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Expose": true, "Exclude": true, "ExcludeInput": true, "ExcludeOutput": true, "Transform": true, "TransformInput": true, "TransformOutput": true, "Type": true}
@@ -61,13 +62,16 @@ func Parse(path string, src []byte) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := &File{Path: path, Package: file.Name.Name, Source: source, DTOs: dtos}
+	result := &File{Path: path, Package: file.Name.Name, Source: source, DTOs: dtos, StructTypes: make(map[string]bool)}
 	typeNames := map[string]bool{}
 	for _, node := range file.Decls {
 		if gen, ok := node.(*ast.GenDecl); ok {
 			for _, spec := range gen.Specs {
 				if t, ok := spec.(*ast.TypeSpec); ok {
 					typeNames[t.Name.Name] = true
+					if _, isStruct := t.Type.(*ast.StructType); isStruct {
+						result.StructTypes[t.Name.Name] = true
+					}
 				}
 			}
 		}
@@ -560,6 +564,10 @@ func CompileDir(dir string) error {
 		}
 		files = append(files, file)
 	}
+	structTypes, err := collectPackageTransformerStructs(dir, files)
+	if err != nil {
+		return err
+	}
 	registry, err := Generate(files)
 	if err != nil {
 		return err
@@ -586,7 +594,7 @@ func CompileDir(dir string) error {
 			return err
 		}
 		codecPath := strings.TrimSuffix(file.Path, ".mgo") + "_transformers_generated.go"
-		codec, err := generatedPropertySource(file)
+		codec, err := generatedPropertySource(file, structTypes)
 		if err != nil {
 			return err
 		}
