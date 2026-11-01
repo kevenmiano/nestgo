@@ -84,4 +84,4 @@ order**. Do not assume these orders are equivalent.
 :::
 
 See [exception filters](./exception-filters.md) and
-[the full example](https://github.com/kevenmiano/nestgo/tree/feat/http-request-pipeline/examples/pipeline).
+[the full example](https://github.com/kevenmiano/nestgo/tree/main/examples/pipeline).
