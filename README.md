@@ -126,6 +126,28 @@ log.Fatal(app.Listen(":8080"))
 
 Pass `runtime.WithAdapter(nethttp.New())` to switch to the Go standard-library HTTP engine. You can mix `WithRoutes(...)` with registered controllers; duplicate routes are rejected during bootstrap. Both adapters use the same bootstrap and lifecycle. See [HTTP adapters](docs/HTTP_ADAPTERS.md).
 
+## Request pipeline example
+
+NestGo supports NestJS-inspired middleware, guards, pipes and exception
+filters, with both decorated `.mgo` controllers and compiler-free routes:
+
+```bash
+go run ./cmd/modforge compile ./examples/pipeline
+export DEMO_API_KEY=local-demo-key
+go run ./examples/pipeline/cmd/server
+```
+
+```bash
+curl -i -H 'X-API-Key: local-demo-key' http://localhost:8080/users/ada
+```
+
+Read the [runnable example](examples/pipeline/README.md) or the
+separate guides on [middleware](website/docs/fundamentals/middleware.md),
+[guards](website/docs/fundamentals/guards.md),
+[pipes](website/docs/fundamentals/pipes.md) and
+[exception filters](website/docs/fundamentals/exception-filters.md).
+These are NestJS-inspired contracts; not all NestJS features are present.
+
 ## Features
 
 - **Modular architecture:** declare controllers, providers, module imports and exports.
@@ -134,6 +156,7 @@ Pass `runtime.WithAdapter(nethttp.New())` to switch to the Go standard-library H
 - **Optional decorator compiler:** generate standard Go files and metadata from `.mgo` sources.
 - **HTTP adapters:** use native fasthttp or net/http through a platform interface.
 - **Hybrid invocation:** statically invoke eligible handlers while retaining reflection for other cases.
+- **Request pipeline:** matched-route middleware, guards, pipes and filters for compiled controllers and direct HTTP handlers.
 - **Diagnostics:** inspect module graphs and collect startup measurements.
 
 Features are evolving. Constructor injection, request-scoped providers, guards, interceptors and full cross-package compilation support are not yet stable.
