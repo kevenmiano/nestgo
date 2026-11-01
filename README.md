@@ -116,7 +116,7 @@ type UsersModule struct{}
 Use the generated metadata with the application runtime. For example, after importing your generated package for registration:
 
 ```go
-app, err := runtime.New(runtime.WithRegistry("shop")) // native fasthttp by default
+app, err := runtime.New() // native fasthttp by default
 if err != nil {
     log.Fatal(err)
 }
