@@ -225,7 +225,9 @@ func New(options ...Option) (*Application, error) {
 		instances = append([]any{settings, connections}, cfg.instances...)
 	}
 	registrationStarted := time.Now()
-	if err := validatePipeline(cfg.pipeline); err != nil {return fail(err)}
+	if err := validatePipeline(cfg.pipeline); err != nil {
+		return fail(err)
+	}
 	if err := registerRoutesWithPipeline(adapter, packages, registry, cfg.pipeline, instances, cfg.routes...); err != nil {
 		return fail(err)
 	}

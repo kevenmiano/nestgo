@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	metadata.Register("pipeline", metadata.Package{
+	metadata.RegisterCompiled("pipeline", metadata.Package{
 		Controllers: []metadata.Controller{
 			{Type: reflect.TypeOf((*UsersController)(nil)), Prefix: "/users", Guards: []reflect.Type{reflect.TypeOf((*ApiKeyGuard)(nil))}, Pipes: []reflect.Type{reflect.TypeOf((*TrimPipe)(nil))}, Routes: []metadata.Route{{Method: "GET", Path: "/{id}", Handler: "FindOne", Status: 0, Headers: []metadata.Header{}, RedirectURL: "", RedirectStatus: 0, Parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "id"}}, Pipes: []reflect.Type{reflect.TypeOf((*RequiredPipe)(nil))}, StaticHTTP: func(receiver any, ctx httpadapter.Context) (any, int, error) {
 				arg0, code, err := httpadapter.BindParam(ctx, "id", 0)
