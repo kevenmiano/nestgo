@@ -33,7 +33,7 @@ func TestNginxProxySecurityBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name string
+		name       string
 		newAdapter func() httpadapter.Adapter
 	}{
 		{"nethttp", func() httpadapter.Adapter {
@@ -154,10 +154,10 @@ http {
 				time.Sleep(40 * time.Millisecond)
 			}
 
-			for _, test := range []struct{
-				name string
+			for _, test := range []struct {
+				name  string
 				bytes int
-				want int
+				want  int
 			}{
 				{"bounded-body", 64, http.StatusOK},
 				{"upstream-body-limit", 65, http.StatusRequestEntityTooLarge},
@@ -178,14 +178,17 @@ http {
 
 			// Raw requests exercise Nginx parsing, not net/http's normalized client.
 			for _, test := range []struct {
-				name string
-				request string
-				want int
+				name       string
+				request    string
+				want       int
+				probeDelta int64
 			}{
-				{"extra-request-line-space", "GET  /probe HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n", 400},
-				{"duplicate-content-length", "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nContent-Length: 5\r\nConnection: close\r\n\r\n", 400},
-				{"transfer-encoding-content-length", "POST /echo HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\nConnection: close\r\n\r\n0\r\n\r\n", 400},
-				{"oversized-header", "GET /probe HTTP/1.1\r\nHost: localhost\r\nX-Big: " + strings.Repeat("z", 8192) + "\r\nConnection: close\r\n\r\n", 400},
+				// Nginx accepts the extra whitespace and forwards a canonicalized
+				// /probe request. Verify exactly one dispatch, not a 400.
+				{"extra-request-line-space", "GET  /probe HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n", 200, 1},
+				{"duplicate-content-length", "POST /echo HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nContent-Length: 5\r\nConnection: close\r\n\r\n", 400, 0},
+				{"transfer-encoding-content-length", "POST /echo HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\nConnection: close\r\n\r\n0\r\n\r\n", 400, 0},
+				{"oversized-header", "GET /probe HTTP/1.1\r\nHost: localhost\r\nX-Big: " + strings.Repeat("z", 8192) + "\r\nConnection: close\r\n\r\n", 400, 0},
 			} {
 				t.Run(test.name, func(t *testing.T) {
 					beforeProbe, beforeEcho := probeHits.Load(), echoHits.Load()
@@ -196,8 +199,11 @@ http {
 					if status != test.want {
 						t.Errorf("HTTP status %d, want %d", status, test.want)
 					}
-					if probeHits.Load() != beforeProbe || echoHits.Load() != beforeEcho {
-						t.Fatal("malformed request unexpectedly reached application handler")
+					if got := probeHits.Load() - beforeProbe; got != test.probeDelta {
+						t.Fatalf("unexpected downstream probe dispatches: %d, want %d", got, test.probeDelta)
+					}
+					if got := echoHits.Load() - beforeEcho; got != 0 {
+						t.Fatalf("malformed request reached body endpoint %d times", got)
 					}
 				})
 			}
