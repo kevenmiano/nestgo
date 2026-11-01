@@ -17,11 +17,11 @@ type ConnectionOption func(*ConnectionOptions) error
 // Options is an immutable-by-convention bootstrap plan after New returns.
 type Options struct {
 	Connections []ConnectionOptions
-	factories []connectionFactory
+	factories   []connectionFactory
 }
 
 type connectionFactory struct {
-	name string
+	name  string
 	build func(context.Context) (ConnectionOptions, error)
 }
 
