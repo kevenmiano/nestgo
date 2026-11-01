@@ -44,17 +44,47 @@ func TestSourceFingerprintDetectsSameSizeEditsAndIgnoresGeneratedFiles(t *testin
 func TestWatchDirRecompilesOnChangesAndRecoversFromInvalidSource(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "users.mgo")
-	good := "package sample\n@Injectable()\ntype Repository struct{}\n"
-	if err := os.WriteFile(source, []byte(good), 0644); err != nil {
-		t.Fatal(err)
+	// Replace sources atomically: editors commonly save via rename and a
+	// truncate-and-write sequence may expose transient, incomplete Go syntax.
+	// The watcher is tested against complete, stable source revisions here.
+	writeSource := func(contents string) {
+		t.Helper()
+		staged := source + ".tmp"
+		if err := os.WriteFile(staged, []byte(contents), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(staged, source); err != nil {
+			t.Fatal(err)
+		}
 	}
+	good := "package sample\n@Injectable()\ntype Repository struct{}\n"
+	writeSource(good)
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	reports := make(chan error, 16)
-	done := make(chan error, 1)
+	done := make(chan struct{})
+	var watchErr error
 	go func() {
-		done <- WatchDir(ctx, dir, 15*time.Millisecond, func(err error) { reports <- err })
+		defer close(done)
+		watchErr = WatchDir(ctx, dir, 15*time.Millisecond, func(err error) {
+			select {
+			case reports <- err:
+			case <-ctx.Done():
+			}
+		})
 	}()
+	// t.Fatal also runs Cleanup; never remove the temp directory while
+	// WatchDir may still be reading/writing generated files.
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-done:
+			if watchErr != nil {
+				t.Errorf("watch exited: %v", watchErr)
+			}
+		case <-time.After(3 * time.Second):
+			t.Error("watch did not exit during test cleanup")
+		}
+	})
 	receive := func() error {
 		t.Helper()
 		select {
@@ -78,9 +108,7 @@ func TestWatchDirRecompilesOnChangesAndRecoversFromInvalidSource(t *testing.T) {
 		t.Fatalf("generated output triggered watch: %v", err)
 	case <-time.After(70 * time.Millisecond):
 	}
-	if err := os.WriteFile(source, []byte(good+"\n@Injectable()\ntype Service struct{}\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeSource(good + "\n@Injectable()\ntype Service struct{}\n")
 	if err := receive(); err != nil {
 		t.Fatal(err)
 	}
@@ -88,23 +116,19 @@ func TestWatchDirRecompilesOnChangesAndRecoversFromInvalidSource(t *testing.T) {
 		t.Fatalf("source did not regenerate: %v %s", err, raw)
 	}
 	invalid := "package sample\n@Injectable()\ntype Invalid struct {\n"
-	if err := os.WriteFile(source, []byte(invalid), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeSource(invalid)
 	if err := receive(); err == nil {
 		t.Fatal("expected diagnostic for invalid source")
 	}
-	if err := os.WriteFile(source, []byte(good), 0644); err != nil {
-		t.Fatal(err)
-	}
+	writeSource(good)
 	if err := receive(); err != nil {
 		t.Fatal(err)
 	}
 	cancel()
 	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
+	case <-done:
+		if watchErr != nil {
+			t.Fatal(watchErr)
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("watch did not exit on cancellation")
