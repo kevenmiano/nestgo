@@ -46,7 +46,7 @@ type File struct {
 	StructTypes           map[string]bool
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Expose": true, "Exclude": true, "ExcludeInput": true, "ExcludeOutput": true, "Transform": true, "TransformInput": true, "TransformOutput": true, "Type": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "Expose": true, "Exclude": true, "ExcludeInput": true, "ExcludeOutput": true, "Transform": true, "TransformInput": true, "TransformOutput": true, "Type": true, "IsEmail": true, "IsCPF": true, "IsCNPJ": true, "IsCEP": true, "IsCNH": true, "IsPIS": true, "IsPlate": true, "IsPhone": true, "IsURL": true, "IsUUID": true, "IsNotEmpty": true, "IsOptional": true, "Matches": true, "Regex": true, "MinLength": true, "MaxLength": true, "Length": true, "Min": true, "Max": true, "Validate": true}
 
 func Parse(path string, src []byte) (*File, error) {
 	source, annotations, paramMarkers, propertyMarkers, err := lexDecorators(path, src)
