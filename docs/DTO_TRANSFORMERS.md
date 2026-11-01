@@ -61,8 +61,9 @@ binder and response encoder honor these automatically, including nested DTOs.
 direction string options. `@Exclude()` hides a field in both directions,
 and `@Transform(MyFunc)` applies the same function in both directions.
 
-Each custom callback has the signature `func(T) (T, error)`,
-where `T` is the Go field type. Multiple `@Transform`
+Custom function callbacks have signature `func(T) (T, error)`, where `T`
+is the Go field type. Struct transformers must satisfy
+`transform.Transformer[T]`. Multiple `@Transform`
 decorators execute in declaration order. Local functions and qualified
 imported functions are supported (for example
 `@TransformInput(url.PathUnescape)`).
@@ -90,6 +91,68 @@ Then use `@Transform(Normalize)`. There is no mandatory runtime
 registration. The `transform` package also exports
 `PlainToInstance[T]`, `InstanceToPlain[T]`,
 `Marshal[T]` and `Unmarshal[T]` for non-HTTP code.
+
+## Safe custom transformer contracts (functions or structs)
+
+Custom code must satisfy the **Go field type exactly**. It is **not**
+necessary to define a struct just for a simple function. For reusable,
+state-free struct transformers NestGo exposes a generic interface:
+
+~~~go
+type Transformer[T any] interface {
+    Transform(value T) (T, error)
+}
+~~~
+
+An example with both supported forms:
+
+~~~go
+// Simple function (no interface implementation needed).
+func NormalizeEmail(value string) (string, error) {
+    return strings.ToLower(strings.TrimSpace(value)), nil
+}
+
+// Struct with a value receiver satisfying transform.Transformer[string].
+type Trim struct{}
+func (Trim) Transform(value string) (string, error) {
+    return strings.TrimSpace(value), nil
+}
+
+// Struct with a pointer receiver.
+type Mask struct{}
+func (*Mask) Transform(value string) (string, error) {
+    return "****", nil
+}
+
+type AccountDTO struct {
+    @TransformInput(NormalizeEmail)
+    Email string
+
+    @TransformInput(Trim{})
+    FullName string
+
+    @TransformOutput(&Mask{})
+    Secret string
+}
+~~~
+
+The compiler emits calls through
+`transform.ApplyFunc[T](value, Fn)` for functions or
+`transform.Apply[T](value, Struct{})` for structs. This forces the Go
+compiler to verify the argument and return types, including the
+`Transform(T) (T, error)` interface. Incorrect signatures, missing
+methods, or pointer-receiver mismatches fail during **Go build**, not
+during HTTP request dispatch. Struct literals are deliberately limited
+to `Type{}` or `&Type{}`; constructors and dynamic expressions
+are not evaluated by the decorator compiler.
+
+A nil function, nil interface, or nil step in
+`transform.Compose` returns `transform.ErrNilTransformer` instead
+of causing a nil-function panic. This guarantee does not prevent
+arbitrary panics explicitly written inside user-provided transformers.
+Transformers should be stateless or concurrency-safe; instance
+injection/configured struct constructors are outside the current
+decorator contract.
 
 ## Using existing transformation libraries
 
