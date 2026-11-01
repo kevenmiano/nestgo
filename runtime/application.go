@@ -19,11 +19,11 @@ import (
 type Option func(*applicationConfig)
 
 type applicationConfig struct {
-	adapter    httpadapter.Adapter
-	packages   []metadata.Package
-	registry   []string
-	logger     *logging.Service
-	debug      bool
+	adapter     httpadapter.Adapter
+	packages    []metadata.Package
+	registry    []string
+	logger      *logging.Service
+	debug       bool
 	onBootstrap func(BootstrapMetrics)
 }
 
@@ -82,12 +82,16 @@ func New(options ...Option) (*Application, error) {
 	if len(cfg.registry) > 0 {
 		var err error
 		packages, err = registryImportClosure(cfg.registry)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	started := time.Now()
 	adapter := cfg.adapter
-	if adapter == nil { adapter = fastadapter.New() }
+	if adapter == nil {
+		adapter = fastadapter.New()
+	}
 	registry := &lifecycleRegistry{}
 	ctx := context.Background()
 	logger := cfg.logger
@@ -106,7 +110,9 @@ func New(options ...Option) (*Application, error) {
 		}
 	}
 	fail := func(err error) (*Application, error) {
-		if logger != nil { logger.Error(ctx, "NestFactory", "Bootstrap failed", slog.String("error", err.Error())) }
+		if logger != nil {
+			logger.Error(ctx, "NestFactory", "Bootstrap failed", slog.String("error", err.Error()))
+		}
 		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
 	}
 	registrationStarted := time.Now()
@@ -122,7 +128,9 @@ func New(options ...Option) (*Application, error) {
 	if err := registry.initialize(ctx); err != nil {
 		return fail(err)
 	}
-	if logger != nil { logger.Startup(ctx, "NestApplication", "Application initialized", started) }
+	if logger != nil {
+		logger.Startup(ctx, "NestApplication", "Application initialized", started)
+	}
 	if cfg.onBootstrap != nil {
 		cfg.onBootstrap(BootstrapMetrics{RouteRegistration: registrationDuration, LifecycleInitialization: time.Since(lifecycleStarted), Total: time.Since(started)})
 	}
@@ -138,7 +146,9 @@ func (a *Application) Serve(listener net.Listener) error { return a.adapter.Serv
 // Listen binds and serves on the provided address.
 func (a *Application) Listen(addr string) error {
 	listener, err := net.Listen("tcp", addr)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer listener.Close()
 	return a.Serve(listener)
 }
@@ -148,7 +158,8 @@ func (a *Application) Shutdown(ctx context.Context) error {
 	if a == nil || a.adapter == nil {
 		return errors.New("application is not initialized")
 	}
-	if a.lifecycle == nil { return a.adapter.Shutdown(ctx) }
+	if a.lifecycle == nil {
+		return a.adapter.Shutdown(ctx)
+	}
 	return a.lifecycle.shutdown(ctx, a.adapter.Shutdown)
 }
-
