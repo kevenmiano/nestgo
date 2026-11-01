@@ -25,7 +25,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Verify benchmark tests
-        run: go test ./runtime -run 'TestAdapterStaticInvocationAndDynamicFallback|TestHTTPAdapterConformance' -count=1
+        run: go test ./runtime -run 'TestAdapterStaticInvocationAndDynamicFallback|TestHTTPAdapterConformance|TestCodeFirstHTTPServer|TestCodeFirstRouteValidation' -count=1
       - name: Measure HTTP invocation and engine workloads
         shell: bash
         run: |
@@ -33,7 +33,7 @@ jobs:
           mkdir -p benchmark-results
           go version | tee benchmark-results/environment.txt
           uname -a | tee -a benchmark-results/environment.txt
-          GOMAXPROCS=2 go test ./runtime -run '^$' -bench 'BenchmarkHTTPInvocation|BenchmarkHTTPEngines|BenchmarkAdapterBootstrap|BenchmarkAdapterConcurrency' -benchtime=200ms -benchmem -count=3 -timeout=12m | tee benchmark-results/http.txt
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench 'BenchmarkHTTPInvocation|BenchmarkHTTPEngines|BenchmarkAdapterBootstrap|BenchmarkAdapterConcurrency|BenchmarkCodeFirstInvocation|BenchmarkCodeFirstHTTPEngines' -benchtime=200ms -benchmem -count=3 -timeout=12m | tee benchmark-results/http.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
