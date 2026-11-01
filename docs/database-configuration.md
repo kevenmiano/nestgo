@@ -95,3 +95,24 @@ _ = handler
 ```
 
 On an initialization error, opened pools are closed. On success, the caller must invoke `Close()` during shutdown. This API does not start an HTTP listener or parse dynamic constructors inside `@Module({imports:[...]})`; the executable Go bootstrap remains explicit. Neither the repository metadata nor `@Query` offer SQL editor autocomplete yet.
+
+## Canonical runtime application API
+
+Use the idiomatic `runtime.NewApp(ctx, options...)` for new applications. It follows the same `New`/`With...` pattern as the database and config packages, while avoiding the historical overlap between `NewWithOptions`, `NewApplication`, and `Bootstrap`.
+
+```go
+app, err := runtime.NewApp(ctx,
+    runtime.WithConfig(config.WithEnvFile(".env")),
+    runtime.WithDatabase(database.WithConnection("users",
+        database.WithDriver("postgres"),
+        database.WithDSN(usersDSN),
+    )),
+    runtime.WithPackages(generatedMetadata),
+)
+if err != nil { return err }
+defer app.Close()
+handler := app.HTTPHandler()
+_ = handler
+```
+
+Additional functional options: `WithProvider(instance)`, `WithLogger(logger)`, and `WithDebug()`. The returned `App` owns its database pools. `Close()` releases pools; it does not close an externally managed HTTP server. `New`, `NewWithOptions`, `NewApplication`, and `Bootstrap` remain available for compatibility, but new code should prefer `NewApp`.
