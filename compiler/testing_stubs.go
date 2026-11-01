@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // wiringTestSource generates assertions against the exact registry emitted by
@@ -132,6 +133,20 @@ func wiringTestSource(files []*File) ([]byte, error) {
 	return format.Source([]byte(out.String()))
 }
 
+// testStubName preserves conventional names for exported types and makes
+// lowercase decorated types discoverable by the go test runner.
+func testStubName(typeName, method string) string {
+	prefix := "Test"
+	if len(typeName) > 0 && unicode.IsLower([]rune(typeName)[0]) {
+		prefix = "TestNestGo_"
+	}
+	name := prefix + typeName
+	if method != "" {
+		name += "_" + method
+	}
+	return name
+}
+
 type editableTestStub struct {
 	name       string
 	typeName   string
@@ -187,7 +202,7 @@ func editableStubs(files []*File) ([]editableTestStub, error) {
 			if declaration.Kind == "type" {
 				for _, annotation := range declaration.Annotations {
 					if annotation.Name == "Controller" || annotation.Name == "Injectable" {
-						name := "Test" + declaration.Name
+						name := testStubName(declaration.Name, "")
 						byName[name] = editableTestStub{name: name, typeName: declaration.Name, dependency: fields[declaration.Name]}
 					}
 				}
@@ -195,7 +210,7 @@ func editableStubs(files []*File) ([]editableTestStub, error) {
 			if declaration.Kind == "func" {
 				for _, annotation := range declaration.Annotations {
 					if isRoute(annotation.Name) {
-						name := "Test" + declaration.Receiver + "_" + declaration.Name
+						name := testStubName(declaration.Receiver, declaration.Name)
 						byName[name] = editableTestStub{name: name, typeName: declaration.Receiver, dependency: fields[declaration.Receiver]}
 					}
 				}
