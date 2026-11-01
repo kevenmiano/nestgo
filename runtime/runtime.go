@@ -65,30 +65,17 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				return fail(fmt.Errorf("missing handler %s.%s", c.Type, route.Handler))
 			}
 			typ := method.Type()
-			if typ.NumOut() < 1 || typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem())) {
-				return fail(fmt.Errorf("unsupported signature %s", route.Handler))
+			contract, contractErr := compileRouteContract(c.Prefix, route, typ)
+			if contractErr != nil {
+				return fail(formatRouteContractError(contractErr, true))
 			}
-			path := strings.TrimSuffix(c.Prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
-			if path == "" {
-				path = "/"
-			}
-			key := route.Method + " " + path
+			path := contract.Path
+			key := contract.Key
 			if seen[key] {
 				return fail(fmt.Errorf("duplicate route %s", key))
 			}
 			seen[key] = true
-			bindings := map[int]metadata.Parameter{}
-			for _, p := range route.Parameters {
-				if p.Index < 0 || p.Index >= typ.NumIn() {
-					return fail(fmt.Errorf("invalid parameter index %d", p.Index))
-				}
-				bindings[p.Index] = p
-			}
-			for i := 0; i < typ.NumIn(); i++ {
-				if _, ok := bindings[i]; !ok && typ.In(i).Kind() != reflect.String {
-					return fail(fmt.Errorf("missing decorator for argument %d of %s", i, route.Handler))
-				}
-			}
+			bindings := contract.Bindings
 			handler := method
 			spec := route
 			mux.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
