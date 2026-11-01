@@ -6,7 +6,7 @@ Tracking gate: [#70](https://github.com/kevenmiano/nestgo/issues/70) · [executi
 
 ## Supported Core v1.0 target
 
-- Exactly one factory: `runtime.New(runtime.With...)`, plus `Listen`, `Serve`, `Shutdown(ctx)` and `Close()`; no legacy factories.
+- Exactly one factory: `runtime.New(runtime.With...)`, plus `Listen`, `Serve`, `Shutdown(ctx)` and `Close()`; generated metadata is discovered from imported packages or provided via `WithPackages`; `WithRegistry` and legacy factories are not public APIs.
 - Native `fasthttp` and `net/http` adapters. Both are supported only after their same-SHA parity and reverse-proxy tests pass.
 - Compiler-free `WithRoutes` and optional deterministic `.mgo` metadata compilation for modules, controllers, routes and explicit singleton DI.
 - Typed `http.Response[T]`, `http.Result`, JSON request/response, status, headers and safe HTTP errors.
@@ -20,14 +20,14 @@ Excluded from the core support contract: ORM/SQL code generation, config provide
 | Area / evidence | Existing implementation or work | Remaining acceptance | Release gate |
 | --- | --- | --- | --- |
 | Compiler + DI | Module graph, cross-package tests, explicit field injection and structured errors in core | Golden positive/negative cases; missing/ambiguous/cyclic dependencies; deterministic regeneration on **candidate SHA** | P0 — #4 #10 #35 #36 |
-| Lifecycle | Hooks and partial rollback exist | Dependency-topological init/teardown, cancellation, idempotent concurrent shutdown; #119 regression suite | P0 — #119 |
+| Lifecycle | PR #157 merged dependency-ordered hooks and partial-bootstrap cleanup; #119 closed | Re-run hook ordering, cancellation, rollback, shutdown concurrency and adapter parity on the exact candidate SHA | P0 evidence — #119 #70 |
 | HTTP + typed responses | PR #107 merged; adapters and server limits on main | Real-listener parity on candidate SHA incl. 404/405, JSON, headers/cookies, status/error handling, timeouts and request limits | P0 — #70 |
-| Request pipeline | PR #122 is draft | Middleware/guards/validation pipes/filters, reject/transform cases, ordering, fail-closed defaults, code-first/generation, both adapters | P0 bounded — #13 #14 #15 |
+| Request pipeline | PR #122 merged middleware, guards, validation pipes and exception filters | Prove ordering, 4xx/5xx, fail-closed behavior, direct/codegen/static and reflective parity on the exact candidate SHA, both adapters | P0 bounded evidence — #13 #14 #15 |
 | Unexpected errors and panics | Safe 5xx regression coverage already exists | Unified panic/recovery and redaction behavior through reflective/static/direct routes and both adapters; request correlation/logging | P0 — #112 |
 | HTTP boundaries and proxy | #113 and #115 closed; PR #140 merged with local Nginx tests | Rerun with actual Nginx/proxy and malicious framing/slow header/resource ceilings on candidate SHA | P0 — #70 |
-| Shutdown | Process SIGTERM smoke from PR #145 merged | PR #151 in-flight request completes or fails only by explicit deadline, no half-writes; both adapters | P0 — #151 |
-| Operations | `logging/slog` and bootstrap diagnostics available | Health/live and health/ready, readiness flips before draining, config validation, safe request logs; external runnable example | P0 bounded — #16 |
-| Static/race/security | `go-quality.yml` and `runtime-race-gates.yml` include tests, race, govulncheck, vet, formatting and module verification | All checks pass on candidate SHA; fuzz of metadata/parsing; no known reproducible panic, race or vulnerable supported dependency | P0 — #25 #70 |
+| Shutdown | Process SIGTERM and in-flight tests merged in PR #145 and #151 | Repeat real TCP SIGTERM and deadline/continuity checks on exact candidate SHA, both adapters; verify no half-writes | P0 evidence — #70 |
+| Operations | `logging/slog`, bootstrap diagnostics and optional typed config loading exist | Supply framework/application liveness and readiness contract, draining readiness transition, fail-closed required config and safe correlation-aware logs in a deployable example | P0 bounded — #16 #112 |
+| Static/race/security | Quality/race/vulnerability workflows plus merged PR #160 compiler watch-stability regression (50 repeats and 10 race repeats on PR SHA) | Re-run *all* checks on a single main candidate SHA; retain fuzz, dependency provenance and artifact evidence | P0 — #25 #70 |
 | Scale and benchmarks | Router/bootstrap comparison, profiling, #150 measurements and #153 startup/summary CI | Repeat 1/10/100/1000 startup, p95/p99, throughput, allocations on exact candidate SHA; approve regression thresholds and decision | P0 — #37 #55 #70 |
 | External release | External-consumer source and tagged proxy workflows, GoReleaser and docs exist | External Go project installs **approved immutable tag** from `proxy.golang.org` with `sum.golang.org`, without `replace`; build/sample/CLI/docs releases pass | P0 — #70 |
 | Stability and security policy | `SECURITY.md`, upgrade notes, Go semantic release automation | API/version policy, exclusions, rollback, owner sign-off, exact SHA/tag links; do **not** merge release PR #73 until approved | P0 — #70 |
