@@ -672,9 +672,34 @@ func CompileDirWithDialects(dir string, dialects map[string]sqlgen.Dialect) erro
 }
 
 func compileDirWithDialectPlan(dir string, dialect sqlgen.Dialect, dialects map[string]sqlgen.Dialect) error {
+	return compileDirWithDialectPlanMode(dir, dialect, dialects, false)
+}
+
+func compileDirWithDialectPlanMode(dir string, dialect sqlgen.Dialect, dialects map[string]sqlgen.Dialect, checkOnly bool) error {
 	if dialect != sqlgen.PostgreSQL && dialect != sqlgen.Question {
 		return fmt.Errorf("compiler: unsupported SQL dialect %d", dialect)
 	}
+	// Both compilation and read-only checks go through the exact same output
+	// generation path. A check collects all stale compiler-owned artifacts.
+	var stale []string
+	emit := func(path string, expected []byte) error {
+		if !checkOnly {
+			return writeIfChanged(path, expected)
+		}
+		actual, err := os.ReadFile(path)
+		if os.IsNotExist(err) {
+			stale = append(stale, path+" (missing)")
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("inspect generated artifact %q: %w", path, err)
+		}
+		if !bytes.Equal(actual, expected) {
+			stale = append(stale, path+" (outdated)")
+		}
+		return nil
+	}
+
 	paths, err := filepath.Glob(filepath.Join(dir, "*.mgo"))
 	if err != nil {
 		return err
@@ -775,31 +800,38 @@ func compileDirWithDialectPlan(dir string, dialect sqlgen.Dialect, dialects map[
 		if err != nil {
 			return err
 		}
-		if err := writeIfChanged(target, formatted); err != nil {
+		if err := emit(target, formatted); err != nil {
 			return err
 		}
 	}
-	if err := writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry); err != nil {
+	if err := emit(filepath.Join(dir, "zz_modforge_metadata.go"), registry); err != nil {
 		return err
 	}
 	for target, source := range repositoryFiles {
-		if err := writeIfChanged(target, source); err != nil {
+		if err := emit(target, source); err != nil {
 			return err
 		}
 	}
-	if err := writeIfChanged(filepath.Join(dir, moduleContractFile), append(contract, '\n')); err != nil {
+	if err := emit(filepath.Join(dir, moduleContractFile), append(contract, '\n')); err != nil {
 		return err
 	}
 	wiring, err := wiringTestSource(files)
 	if err != nil {
 		return err
 	}
-	if err := writeIfChanged(filepath.Join(dir, "zz_nestgo_wiring_generated_test.go"), wiring); err != nil {
+	if err := emit(filepath.Join(dir, "zz_nestgo_wiring_generated_test.go"), wiring); err != nil {
 		return err
 	}
 	stubs, err := editableStubs(files)
 	if err != nil {
 		return err
+	}
+	if checkOnly {
+		if len(stale) == 0 {
+			return nil
+		}
+		sortStrings(stale)
+		return fmt.Errorf("%w: %s; regenerate with nestgo compile %s", ErrOutdated, strings.Join(stale, ", "), dir)
 	}
 	return appendMissingTestStubs(dir, files[0].Package, stubs)
 }

@@ -21,16 +21,9 @@ func newCompileCommand() *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		Example: "  nestgo compile ./examples/shop\n  nestgo compile --watch ./myapp\n  nestgo compile ./myapp --watch",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := args[0]
-			info, err := os.Stat(path)
+			path, err := resolveCompileTarget(args[0])
 			if err != nil {
-				return fmt.Errorf("inspect %q: %w", path, err)
-			}
-			if !info.IsDir() {
-				if !strings.HasSuffix(path, ".mgo") {
-					return fmt.Errorf("expected .mgo file: %q", path)
-				}
-				path = filepath.Dir(path)
+				return err
 			}
 			if !watch {
 				if cmd.Flags().Changed("poll-interval") {
@@ -58,4 +51,18 @@ func newCompileCommand() *cobra.Command {
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "recompile when top-level .mgo sources change")
 	cmd.Flags().DurationVar(&interval, "poll-interval", 250*time.Millisecond, "source polling interval in watch mode")
 	return cmd
+}
+
+func resolveCompileTarget(path string) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", fmt.Errorf("inspect %q: %w", path, err)
+	}
+	if !info.IsDir() {
+		if !strings.HasSuffix(path, ".mgo") {
+			return "", fmt.Errorf("expected .mgo file: %q", path)
+		}
+		return filepath.Dir(path), nil
+	}
+	return path, nil
 }
