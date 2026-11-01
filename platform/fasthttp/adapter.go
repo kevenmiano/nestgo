@@ -15,6 +15,9 @@ type Adapter struct {
 	mu      sync.Mutex
 	routes  []httpadapter.Route
 	keys    map[string]bool
+	// Dynamic patterns require overlap checking; literal paths only conflict
+	// with their exact method/path duplicate, already handled by keys.
+	hasDynamic bool
 	server  *fast.Server
 	limits  httpadapter.ServerLimits
 	started bool
@@ -52,17 +55,28 @@ func (a *Adapter) Register(route httpadapter.Route) error {
 	if a.keys[key] {
 		return errors.New("duplicate HTTP route: " + key)
 	}
-	for _, existing := range a.routes {
-		if existing.Method != route.Method {
-			continue
-		}
-		overlaps, aMore, bMore := routeOverlap(existing.Path, route.Path)
-		if overlaps && aMore == bMore {
-			return errors.New("ambiguous HTTP routes: " + existing.Path + " and " + route.Path)
+	// Two purely literal routes cannot overlap unless they are identical;
+	// that exact duplicate was already rejected by the constant-time key map.
+	// Keep exhaustive checking for new dynamic patterns and when previously
+	// registered dynamic routes could intersect a new literal route.
+	dynamic := strings.Contains(route.Path, "{")
+	if dynamic || a.hasDynamic {
+		for _, existing := range a.routes {
+			if existing.Method != route.Method {
+				continue
+			}
+			if !dynamic && !strings.Contains(existing.Path, "{") {
+				continue
+			}
+			overlaps, aMore, bMore := routeOverlap(existing.Path, route.Path)
+			if overlaps && aMore == bMore {
+				return errors.New("ambiguous HTTP routes: " + existing.Path + " and " + route.Path)
+			}
 		}
 	}
 	a.keys[key] = true
 	a.routes = append(a.routes, route)
+	a.hasDynamic = a.hasDynamic || dynamic
 	return nil
 }
 func (a *Adapter) Serve(listener net.Listener) error {
