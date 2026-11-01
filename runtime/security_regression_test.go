@@ -44,7 +44,7 @@ func (*securityController) TypedNil() (string, error) {
 
 func securityPackages() []metadata.Package {
 	return []metadata.Package{{Controllers: []metadata.Controller{{
-		Type: reflect.TypeOf((*securityController)(nil)),
+		Type:   reflect.TypeOf((*securityController)(nil)),
 		Prefix: "/security",
 		Routes: []metadata.Route{
 			{Method: http.MethodGet, Path: "/regular", Handler: "Regular"},
@@ -66,7 +66,7 @@ func TestSecurityRejectsConcreteErrorSignatures(t *testing.T) {
 	for _, method := range []string{"Named", "Struct", "Pointer"} {
 		t.Run(method, func(t *testing.T) {
 			packages := []metadata.Package{{Controllers: []metadata.Controller{{
-				Type: reflect.TypeOf((*securityController)(nil)),
+				Type:   reflect.TypeOf((*securityController)(nil)),
 				Prefix: "/security",
 				Routes: []metadata.Route{{Method: http.MethodGet, Path: "/invalid", Handler: method}},
 			}}}}
