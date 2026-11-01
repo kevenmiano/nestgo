@@ -33,7 +33,7 @@ func TestNamedStructTransformerAcrossGoSourceFiles(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	mod := "module dto\n\ngo 1.23\n\nrequire github.com/kevenmiano/nestgo v0.0.0\nreplace github.com/kevenmiano/nestgo => " + filepath.ToSlash(filepath.Dir(root)) + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil { t.Fatal(err) }
-	testSource := "package dto\nimport (\"encoding/json\"; \"testing\")\nfunc TestTrimName(t *testing.T) { var user User; if err := json.Unmarshal([]byte(`{"Name":"  Ada  "}`), &user); err != nil { t.Fatal(err) }; if user.Name != \"Ada\" { t.Fatalf(\"got %q\", user.Name) } }\n"
+	testSource := "package dto\nimport (\"encoding/json\"; \"testing\")\nfunc TestTrimName(t *testing.T) { var user User; if err := json.Unmarshal([]byte(`{\"Name\":\"  Ada  \"}`), &user); err != nil { t.Fatal(err) }; if user.Name != \"Ada\" { t.Fatalf(\"got %q\", user.Name) } }\n"
 	if err := os.WriteFile(filepath.Join(dir, "dto_test.go"), []byte(testSource), 0644); err != nil { t.Fatal(err) }
 	cmd := exec.Command("go", "test", "-mod=mod", ".")
 	cmd.Dir = dir
