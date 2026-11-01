@@ -101,7 +101,7 @@ func (*directCollisionController) Ready() string { return "ok" }
 
 func TestCodeFirstRoutesShareControllerRouteNamespace(t *testing.T) {
 	pkg := metadata.Package{Controllers: []metadata.Controller{{
-		Type: reflect.TypeOf((*directCollisionController)(nil)),
+		Type:   reflect.TypeOf((*directCollisionController)(nil)),
 		Routes: []metadata.Route{{Method: "GET", Path: "/ready", Handler: "Ready"}},
 	}}}
 	app, err := New(
@@ -112,4 +112,3 @@ func TestCodeFirstRoutesShareControllerRouteNamespace(t *testing.T) {
 		t.Fatalf("expected shared route duplicate check: app=%v err=%v", app, err)
 	}
 }
-
