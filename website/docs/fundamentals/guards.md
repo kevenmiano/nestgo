@@ -38,6 +38,10 @@ An API-key equality check is not a complete authentication system.
 Use appropriate credential verification and secret management in production.
 :::
 
+The compiler emits `var _ httpadapter.Guard = (*ApiKeyGuard)(nil)`
+automatically for decorated guard classes. Incorrect method signatures fail
+at Go compile time, before the server starts.
+
 ## Apply guards
 
 Decorate an entire controller or a particular method:
