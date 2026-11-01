@@ -18,7 +18,9 @@ func TestGeneratedFactoryProviderInjected(t *testing.T) {
 	pkg := metadata.Package{Providers: []metadata.Provider{
 		{Type: reflect.TypeOf((*factoryResult)(nil)), Factory: func(resolve func(reflect.Type) (any, bool)) (any, error) {
 			value, ok := resolve(reflect.TypeOf((*factorySource)(nil)))
-			if !ok { return nil, fmt.Errorf("source missing") }
+			if !ok {
+				return nil, fmt.Errorf("source missing")
+			}
 			return &factoryResult{Value: value.(*factorySource).Value}, nil
 		}},
 		{Type: reflect.TypeOf((*factoryConsumer)(nil))},
@@ -39,7 +41,6 @@ func TestGeneratedFactoryFailsClosed(t *testing.T) {
 		t.Fatalf("factory error should stop bootstrap: %v", err)
 	}
 }
-
 
 func TestSharedBootstrapRunsFactoryAcrossRuntimePaths(t *testing.T) {
 	typ := reflect.TypeOf((*factoryResult)(nil))
