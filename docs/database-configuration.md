@@ -77,25 +77,6 @@ For a single local `@Module`, compiled repository providers are assigned automat
 
 **Limits:** database pools still need explicit initialization and must be provided to `runtime.Options.Instances`; decorators do not currently instantiate `DatabaseModule.NewModule(...)` themselves. Only the supported repository `SELECT` subset is emitted. The `@Query` editor autocomplete and full schema/migrations remain separate outstanding issues (#89–#93).
 
-## Unified runtime bootstrap
-
-The runtime also offers `runtime.Bootstrap(ctx, runtime.BootstrapOptions{...}, packages...)` as an opt-in lifecycle owner. It loads validated configuration, creates named database pools, and registers `*config.Service` plus `*database.Connections` in DI before starting the HTTP handler. Repository factories defined by compiled metadata can resolve the named registry during startup.
-
-```go
-app, err := runtime.Bootstrap(ctx, runtime.BootstrapOptions{
-    ConfigOptions: []config.Option{config.WithEnvFile(".env")},
-    DatabaseOptions: []database.Option{
-        database.WithConnection("users", database.WithDriver("postgres"), database.WithDSN(usersDSN)),
-    },
-}, generatedMetadata)
-if err != nil { return err }
-defer app.Close()
-handler := app.Handler
-_ = handler
-```
-
-On an initialization error, opened pools are closed. On success, the caller must invoke `Close()` during shutdown. This API does not start an HTTP listener or parse dynamic constructors inside `@Module({imports:[...]})`; the executable Go bootstrap remains explicit. Neither the repository metadata nor `@Query` offer SQL editor autocomplete yet.
-
 ## Canonical runtime application API
 
 Use the idiomatic `runtime.NewApp(ctx, options...)` for new applications. It follows the same `New`/`With...` pattern as the database and config packages, while avoiding the historical overlap between `NewWithOptions`, `NewApplication`, and `Bootstrap`.
@@ -115,4 +96,4 @@ handler := app.HTTPHandler()
 _ = handler
 ```
 
-Additional functional options: `WithProvider(instance)`, `WithLogger(logger)`, and `WithDebug()`. The returned `App` owns its database pools. `Close()` releases pools; it does not close an externally managed HTTP server. `New`, `NewWithOptions`, `NewApplication`, and `Bootstrap` remain available for compatibility, but new code should prefer `NewApp`.
+Additional functional options: `WithProvider(instance)`, `WithLogger(logger)`, and `WithDebug()`. The returned `App` owns its database pools. `Close()` releases pools; it does not close an externally managed HTTP server. `NewApp` is the public lifecycle entrypoint; legacy bootstrap structs and the public `Bootstrap` function were removed. Remaining legacy HTTP adapter entrypoints are being migrated separately.
