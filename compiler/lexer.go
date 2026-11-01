@@ -135,8 +135,15 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 					out[k] = ' '
 				}
 			}
-			if name == "Body" || name == "Param" || name == "Headers" || (name == "Query" && strings.TrimSpace(string(src[lineBeginning(src, start):start])) != "") {
-				if argument != "" {
+			if name == "Body" || name == "Param" || name == "Query" || name == "Headers" || name == "Res" || name == "Response" {
+				if name == "Res" || name == "Response" {
+					if argument != "" && argument != "{passthrough:true}" {
+						return "", nil, nil, Diagnostic{path, startLine, "@Res expects no argument or {passthrough:true}"}
+					}
+					if argument != "" {
+						argument = "passthrough"
+					}
+				} else if argument != "" {
 					v, e := strconv.Unquote(argument)
 					if e != nil {
 						return "", nil, nil, Diagnostic{path, startLine, "parameter decorator expects quoted string"}
@@ -175,12 +182,4 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 		panic(fmt.Sprintf("offset drift %d != %d", len(out), len(src)))
 	}
 	return string(out), annotations, params, nil
-}
-
-// lineBeginning returns the byte offset at the start of the decorator's line.
-func lineBeginning(src []byte, offset int) int {
-	for offset > 0 && src[offset-1] != '\n' {
-		offset--
-	}
-	return offset
 }
