@@ -1,48 +1,56 @@
-# Runtime and application lifecycle
+# Runtime and lifecycle
 
-NestGo supports two runtime entry points with different HTTP execution paths. For the authoritative illustrated walkthrough, see the [Docusaurus application lifecycle guide](../website/docs/fundamentals/lifecycle.md).
+NestGo has **one application factory** and one lifecycle owner for all HTTP engines.
 
-## Supported entry points
+## Get started
 
-| Entry point | Return type | HTTP engine | Shutdown owner |
-| --- | --- | --- | --- |
-| `runtime.ApplicationFromRegistry(options, names...)` | `*runtime.Application` | fasthttp by default; adapter selectable | `app.Shutdown(ctx)` |
-| `runtime.NewApplication(options, packages...)` | `*runtime.Application` | fasthttp by default; adapter selectable | `app.Shutdown(ctx)` |
-| `runtime.FromRegistry(names...)` | `http.Handler` | standard net/http | caller |
-| `runtime.New(packages...)` | `http.Handler` | standard net/http | caller |
+```go
+// Import the generated package to register its metadata.
+app, err := runtime.New(runtime.WithRegistry("shop"))
+if err != nil { log.Fatal(err) }
+defer app.Shutdown(context.Background())
+log.Fatal(app.Listen(":8080"))
+```
 
-All registry-based paths require generated metadata to be registered via Go package initialization. `ApplicationFromRegistry` / `FromRegistry` resolve transitive package imports before bootstrapping.
+`runtime.New(options ...runtime.Option)` returns `*runtime.Application`. Options:
 
-## Application bootstrap
+| Option | Function |
+| --- | --- |
+| `WithRegistry(names...)` | Resolve registered packages and transitive module imports |
+| `WithPackages(packages...)` | Provide metadata directly |
+| `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
+| `WithLogger(logger)` | Enable structured bootstrap logging |
+| `WithDebug(true)` | Enable detailed per-provider diagnostics |
+| `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
+
+Do not combine `WithRegistry` and `WithPackages`. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
+
+## Lifecycle
 
 ```mermaid
 flowchart TD
-  R["Generated metadata"] --> P["Package closure (registry entry points)"]
-  P --> V["Module graph and visibility"]
-  V --> I["Provider allocation and field injection"]
-  I --> C["Controller allocation and field injection"]
-  C --> H["Handler validation and route registration"]
-  H --> S["Application ready to Serve"]
+  New["runtime.New"] --> Packages{"Metadata source"}
+  Packages -->|"WithRegistry"| Closure["Registered package import closure"]
+  Packages -->|"WithPackages"| Direct["Explicit metadata"]
+  Closure --> Graph["Validate module scopes and imports"]
+  Direct --> Graph
+  Graph --> Providers["Instantiate and inject providers"]
+  Providers --> Controllers["Instantiate and inject controllers"]
+  Controllers --> Routes["Validate and register HTTP routes"]
+  Routes --> Hooks["OnModuleInit / OnApplicationBootstrap"]
+  Hooks --> Application["Application ready"]
 ```
 
-Implementation detail: provider pointers are allocated before module validation in the adapter-based path; the diagram above summarizes logical responsibilities, not exact instruction order. The legacy `net/http` path has separate initialization and dispatch code. Provider fields support exported pointer/interface injection; `nestgo:"optional"` allows an unresolved field. Explicit modules enforce imports/exports visibility, while legacy modules without explicit scopes retain global DI. Constructor injection is not supported. Adapter-based Application instances invoke optional provider/controller initialization and shutdown lifecycle hooks. Legacy http.Handler constructors do not.
+Providers are initialized in stable type-name order and controllers follow metadata order. Field injection supports exported pointer and interface fields. The `nestgo:"optional"` tag permits missing optional dependencies; module scopes control imports and exports.
 
-## Startup timing
+Generated invokers can bypass reflective calls, while other handlers use reflection as needed. Both native `platform/fasthttp` and `platform/nethttp` use the same route contract and lifecycle.
 
-`ApplicationOptions.OnBootstrap` optionally receives `BootstrapMetrics` containing route registration, initialization hook and total bootstrap durations. See `BenchmarkApplicationBootstrapProviders` for 1/10/100-provider allocation and latency benchmarks. This callback currently applies to adapter-based applications only.
+`app.Shutdown(ctx)` runs `BeforeApplicationShutdown`, adapter shutdown, `OnModuleDestroy`, then `OnApplicationShutdown` in reverse instance order. It is idempotent and joins errors. Failed bootstrap attempts best-effort cleanup, but registered adapter routes are not transactionally rolled back. The caller owns OS signal handling and deadlines.
 
-## HTTP dispatch
+## Observability and constraints
 
-Adapter applications register `httpadapter.Route` closures during boot. The default `fasthttp` adapter performs route matching; the optional `net/http` adapter uses `http.ServeMux`. The legacy `runtime.New` APIs construct their own `http.ServeMux`. All handler routes decode `Body`, `Param`, and `Query` metadata, invoke controller methods and serialize JSON results, with implementation-specific details and parity gaps.
+Use `WithBootstrapMetrics` for route registration, lifecycle initialization and total durations. The `BenchmarkApplicationBootstrapProviders` benchmark and CI baseline comparison cover 1/10/100 providers.
 
-Generated static invokers for eligible zero-argument routes are used by both dispatch paths when metadata provides `StaticInvoke`; other handlers use `reflect.Value.Call`.
+Constructor injection, request scopes, automatic OS signals, universal filters/guards/interceptors and arbitrary resource disposal are not implemented. Successful application construction does not mean the HTTP port is bound.
 
-## Shutdown
-
-`Application.Shutdown(ctx)` delegates to the selected adapter, which shuts down the underlying HTTP server if started. There are no automatic signal handlers. Adapter-based applications invoke optional provider/controller cleanup hooks; legacy handler constructors do not. Full NestJS lifecycle and automatic resource-disposal semantics remain incomplete. Integrations needing resource cleanup must coordinate it outside the framework.
-
-## Runtime constraints
-
-There is no complete built-in authentication/authorization, request-scoped injection, global validation/interceptor/filter pipeline, or automatic dependency resource disposal in these runtime paths. Errors during bootstrap are returned. Adapter applications attempt best-effort lifecycle and transport cleanup on failure, but registered adapter routes cannot currently be rolled back. Both HTTP paths now use the same bootstrap graph for provider allocation, module visibility, deterministic field injection and controller construction. Their HTTP route validation, dispatch, logging and lifecycle ownership still differ. Test and harden both HTTP paths before production exposure.
-
-See also [HTTP adapters](HTTP_ADAPTERS.md), [architecture](ARCHITECTURE.md) and [lifecycle documentation](../website/docs/fundamentals/lifecycle.md).
+See [HTTP adapters](HTTP_ADAPTERS.md) and [lifecycle guide](../website/docs/fundamentals/lifecycle.md).

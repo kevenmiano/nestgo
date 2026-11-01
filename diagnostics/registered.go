@@ -29,7 +29,7 @@ func RunRegistered(output string, samples, iterations, coldSamples int, strict, 
 		packages = append(packages, registered[name])
 	}
 	if coldChild {
-		_, err := nestgoruntime.New(packages...)
+		_, err := nestgoruntime.New(nestgoruntime.WithPackages(packages...))
 		return err
 	}
 	if coldSamples < 0 || coldSamples > 50 {

@@ -52,17 +52,8 @@ func TestRegistryImportClosureTraversesThreePackages(t *testing.T) {
 
 func TestRegistryTransitiveImportDoesNotLeakProviderVisibility(t *testing.T) {
 	registerTransitiveFixture()
-	for name, bootstrap := range map[string]func() error{
-		"legacy": func() error { _, err := FromRegistry("nestgo-transitive-root-test"); return err },
-		"adapter": func() error {
-			_, err := ApplicationFromRegistry(ApplicationOptions{}, "nestgo-transitive-root-test")
-			return err
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			if err := bootstrap(); err == nil || !strings.Contains(err.Error(), "missing required dependency") {
-				t.Fatalf("indirect import must not grant provider visibility: %v", err)
-			}
-		})
+	_, err := New(WithRegistry("nestgo-transitive-root-test"))
+	if err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+		t.Fatalf("indirect import must not grant provider visibility: %v", err)
 	}
 }

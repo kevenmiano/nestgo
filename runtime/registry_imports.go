@@ -9,7 +9,7 @@ import (
 )
 
 // registryImportClosure resolves imported module metadata across registered Go
-// packages. Callers only need to name their root package in FromRegistry.
+// packages. Callers supply root package names through WithRegistry.
 func registryImportClosure(names []string) ([]metadata.Package, error) {
 	registered := metadata.All()
 	packageNames := make([]string, 0, len(registered))

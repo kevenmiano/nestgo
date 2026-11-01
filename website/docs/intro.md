@@ -42,9 +42,9 @@ func (c *UsersController) FindAll() []string {
 Decorators are accepted in `.mgo` files by the NestGo compiler, **not** by the standard Go compiler.
 :::
 
-## Current runtime APIs
+## Application runtime
 
-The legacy `runtime.New` and `runtime.FromRegistry` return `http.Handler`. The pluggable `runtime.NewApplication` selects a native fasthttp adapter by default or an explicitly supplied `httpadapter.Adapter`, including the net/http adapter. Declarative modules support imports, providers, controllers and exports with runtime graph checks.
+The single factory `runtime.New(runtime.WithRegistry("shop"))` creates `*runtime.Application` with a native fasthttp adapter by default. Use `runtime.WithAdapter(nethttp.New())` to switch engines. Both engines share DI, route contracts, initialization hooks and explicit `app.Shutdown(ctx)`. Declarative modules support imports, providers, controllers and exports with runtime graph checks.
 
 The compiler can emit direct invocation wrappers for eligible zero-argument handlers, retaining reflective invocation for other signatures. These are experimental features, not evidence of production-scale performance or complete adapter parity.
 

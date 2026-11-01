@@ -31,11 +31,11 @@ Developer                         Build time                          Runtime
                                                    |
                                             metadata.Register
                                                    |
-                                            runtime.FromRegistry
+                                            runtime.New(runtime.WithRegistry("shop"))
                                                    |
                                     provider/controller construction
                                                    |
-                                            net/http ServeMux
+                                            httpadapter.Adapter (fasthttp default)
                                                    |
                                            HTTP request handler
 ```
@@ -69,18 +69,15 @@ Generated `init()` functions call `metadata.Register(packageName, packageMetadat
 
 ## Runtime subsystem
 
-The `runtime` package exposes two constructors:
+The `runtime` package exposes **one** constructor: `New(options ...Option) (*Application, error)`. Use `WithRegistry(names...)` or `WithPackages(packages...)` to select metadata, and `WithAdapter` to select the HTTP engine.
 
-- `New(packages ...metadata.Package)`: build a handler from explicit metadata.
-- `FromRegistry(names ...string)`: resolve package names in the registry and call `New`.
-
-During handler construction, the runtime:
+During application construction, the runtime:
 
 1. Instantiates provider structs.
 2. Injects registered providers into exported pointer or interface fields.
 3. Instantiates controller structs and injects their dependencies.
-4. Resolves route handler methods with reflection.
-5. Registers method-specific patterns on Go 1.23 `http.ServeMux`.
+4. Validates route contracts and chooses generated invokers or reflection fallback.
+5. Registers handlers with the selected HTTP adapter and runs initialization hooks.
 
 At request time, it binds JSON bodies, string path parameters and string query parameters; calls the reflected handler; and writes a JSON response. POST defaults to HTTP 201, other methods to 200, unless `@HttpCode` overrides the status.
 
@@ -88,7 +85,7 @@ See [Runtime reference](RUNTIME.md) for signatures, errors, and injection constr
 
 ## Example end-to-end flow
 
-`examples/shop/users.mgo` defines a `UsersController`, `UsersService` and `UsersModule`. Compilation produces `users_generated.go` and `zz_modforge_metadata.go`. Importing the package registers its metadata. Calling `runtime.FromRegistry("shop")` creates routes for:
+`examples/shop/users.mgo` defines a `UsersController`, `UsersService` and `UsersModule`. Compilation produces `users_generated.go` and `zz_modforge_metadata.go`. Importing the package registers its metadata. Calling `runtime.New(runtime.WithRegistry("shop"))` creates routes for:
 
 | Method | Pattern | Handler |
 | --- | --- | --- |
@@ -102,7 +99,7 @@ These routes are exercised by `examples/shop/runtime_test.go`.
 
 - Decorator parsing is not a full new-language grammar.
 - Generated metadata uses reflection and has no stable compatibility guarantee.
-- Provider injection does not implement constructors, scopes or lifecycle hooks.
+- Provider injection does not implement constructor injection or request scopes; lifecycle hooks exist on applications.
 - `@Headers` is recognized by the compiler but not handled by the runtime.
 - The runtime does not provide guards, validation pipes, interceptors or authentication.
 - Global metadata registration requires unique package names.
