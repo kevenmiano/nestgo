@@ -38,3 +38,4 @@ func injectFields(v reflect.Value, providers map[reflect.Type]reflect.Value, ord
     }
     return nil
 }
+
