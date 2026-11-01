@@ -3,10 +3,10 @@ package runtime
 import (
 	"encoding/json"
 	"errors"
-	"github.com/kevenmiano/nestgo/validation"
 	"fmt"
 	"github.com/kevenmiano/nestgo/httpadapter"
 	"github.com/kevenmiano/nestgo/metadata"
+	"github.com/kevenmiano/nestgo/validation"
 	"reflect"
 	"strings"
 )
@@ -193,11 +193,13 @@ func respondValidationError(ctx httpadapter.Context, err error) error {
 	ctx.Status(400)
 	ctx.SetHeader("Content-Type", "application/json")
 	payload := struct {
-		StatusCode int `json:"statusCode"`
-		Error string `json:"error"`
-		Fields validation.Errors `json:"fields"`
+		StatusCode int               `json:"statusCode"`
+		Error      string            `json:"error"`
+		Fields     validation.Errors `json:"fields"`
 	}{400, "Bad Request", fields}
 	data, marshalErr := json.Marshal(payload)
-	if marshalErr != nil { return respondError(ctx, 500, "Internal server error") }
+	if marshalErr != nil {
+		return respondError(ctx, 500, "Internal server error")
+	}
 	return ctx.Write(append(data, '\n'))
 }

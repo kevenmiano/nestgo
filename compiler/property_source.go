@@ -63,7 +63,9 @@ func generatedPropertySource(file *File, structTypes map[string]bool) ([]byte, e
 					fn, _ := transformerSpec(ann.Argument)
 					if alias := transformerQualifier(fn); alias != "" {
 						uri, ok := imports[alias]
-						if !ok { return nil, Diagnostic{file.Path, ann.Line, "unknown validator package " + alias} }
+						if !ok {
+							return nil, Diagnostic{file.Path, ann.Line, "unknown validator package " + alias}
+						}
 						required[alias] = uri
 					}
 				}

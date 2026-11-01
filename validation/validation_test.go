@@ -10,7 +10,7 @@ func TestBuiltIns(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		want bool
-		got bool
+		got  bool
 	}{
 		{"email", true, IsEmail("ada@example.com")},
 		{"display-name address rejected", false, IsEmail("Ada <ada@example.com>")},
@@ -32,8 +32,14 @@ func TestBuiltIns(t *testing.T) {
 	}
 }
 func TestCustomAndErrors(t *testing.T) {
-	if !errors.Is(ApplyFunc("", Func[string](nil)), ErrNilValidator) { t.Fatal("nil callback") }
-	if !errors.Is(Apply[string]("", nil), ErrNilValidator) { t.Fatal("nil validator") }
+	if !errors.Is(ApplyFunc("", Func[string](nil)), ErrNilValidator) {
+		t.Fatal("nil callback")
+	}
+	if !errors.Is(Apply[string]("", nil), ErrNilValidator) {
+		t.Fatal("nil validator")
+	}
 	e := Errors{{Field: "email", Rule: "IsEmail", Message: "invalid email"}}
-	if e.Error() == "" { t.Fatal("missing error") }
+	if e.Error() == "" {
+		t.Fatal("missing error")
+	}
 }

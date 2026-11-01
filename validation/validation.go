@@ -30,6 +30,7 @@ func (e Errors) Error() string {
 
 type Func[T any] func(T) error
 type Validator[T any] interface{ Validate(T) error }
+
 var ErrNilValidator = errors.New("nestgo: nil validator")
 
 func ApplyFunc[T any](value T, fn Func[T]) error {
@@ -60,20 +61,22 @@ func IsEmail(value string) bool {
 	addr, err := mail.ParseAddress(value)
 	return err == nil && addr.Address == value && strings.Count(value, "@") == 1
 }
-func IsCPF(value string) bool { return brdoc.IsCPF(value) }
-func IsCNPJ(value string) bool { return brdoc.IsCNPJ(value) }
-func IsCEP(value string) bool { valid, _ := brdoc.IsCEP(value); return valid }
-func IsCNH(value string) bool { return brdoc.IsCNH(value) }
-func IsPIS(value string) bool { return brdoc.IsPIS(value) }
-func IsPlate(value string) bool { return brdoc.IsPlate(value) }
-func IsPhone(value string) bool { valid, _ := brdoc.IsPhone(value); return valid }
-func IsNotEmpty(value string) bool { return strings.TrimSpace(value) != "" }
-func MinLength(value string, min int) bool { return utf8.RuneCountInString(value) >= min }
-func MaxLength(value string, max int) bool { return utf8.RuneCountInString(value) <= max }
+func IsCPF(value string) bool                          { return brdoc.IsCPF(value) }
+func IsCNPJ(value string) bool                         { return brdoc.IsCNPJ(value) }
+func IsCEP(value string) bool                          { valid, _ := brdoc.IsCEP(value); return valid }
+func IsCNH(value string) bool                          { return brdoc.IsCNH(value) }
+func IsPIS(value string) bool                          { return brdoc.IsPIS(value) }
+func IsPlate(value string) bool                        { return brdoc.IsPlate(value) }
+func IsPhone(value string) bool                        { valid, _ := brdoc.IsPhone(value); return valid }
+func IsNotEmpty(value string) bool                     { return strings.TrimSpace(value) != "" }
+func MinLength(value string, min int) bool             { return utf8.RuneCountInString(value) >= min }
+func MaxLength(value string, max int) bool             { return utf8.RuneCountInString(value) <= max }
 func MatchRegexp(value string, re *regexp.Regexp) bool { return re != nil && re.MatchString(value) }
 func IsURL(value string) bool {
 	u, err := url.ParseRequestURI(value)
 	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != ""
 }
+
 var uuidPattern = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+
 func IsUUID(value string) bool { return uuidPattern.MatchString(value) }
