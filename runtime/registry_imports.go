@@ -90,28 +90,37 @@ func compiledRootClosure(compiled, registered map[string]metadata.Package) ([]me
 	}
 	sort.Strings(names)
 
-	owners := make(map[reflect.Type]string)
-	imported := make(map[reflect.Type]bool)
-	var moduleTypes []reflect.Type
-	for _, name := range names {
-		for _, module := range compiled[name].Modules {
-			if module.Type == nil {
-				return nil, fmt.Errorf("compiled module in %q has nil type", name)
+	// Index module ownership once. The previous implementation constructed
+	// separate ownership and reachability maps during multiple graph walks.
+	owners := make(map[reflect.Type]string, len(registered))
+	for name, pkg := range registered {
+		for _, mod := range pkg.Modules {
+			if mod.Type == nil {
+				continue
 			}
-			if other, exists := owners[module.Type]; exists {
-				return nil, fmt.Errorf("duplicate compiled module %s in %s and %s", module.Type, other, name)
+			if other, exists := owners[mod.Type]; exists && other != name {
+				return nil, fmt.Errorf("duplicate module %s in %s and %s", mod.Type, other, name)
 			}
-			owners[module.Type] = name
-			moduleTypes = append(moduleTypes, module.Type)
-			for _, dependency := range module.Imports {
-				if dependency == nil {
-					return nil, fmt.Errorf("compiled module %s imports nil module", module.Type)
-				}
-				imported[dependency] = true
-			}
+			owners[mod.Type] = name
 		}
 	}
 
+	imported := make(map[reflect.Type]bool)
+	var moduleTypes []reflect.Type
+	for _, name := range names {
+		for _, mod := range compiled[name].Modules {
+			if mod.Type == nil {
+				return nil, fmt.Errorf("compiled module in %q has nil type", name)
+			}
+			moduleTypes = append(moduleTypes, mod.Type)
+			for _, dep := range mod.Imports {
+				if dep == nil {
+					return nil, fmt.Errorf("compiled module %s imports nil module", mod.Type)
+				}
+				imported[dep] = true
+			}
+		}
+	}
 	if len(moduleTypes) == 0 {
 		if len(names) != 1 {
 			return nil, fmt.Errorf("ambiguous compiled packages without @Module: %v", names)
@@ -119,55 +128,51 @@ func compiledRootClosure(compiled, registered map[string]metadata.Package) ([]me
 		return []metadata.Package{compiled[names[0]]}, nil
 	}
 
-	var roots []reflect.Type
+	rootCount := 0
+	var root reflect.Type
 	for _, typ := range moduleTypes {
 		if !imported[typ] {
-			roots = append(roots, typ)
+			rootCount++
+			root = typ
 		}
 	}
-	sort.Slice(roots, func(i, j int) bool {
-		return roots[i].String() < roots[j].String()
-	})
-	if len(roots) != 1 {
-		return nil, fmt.Errorf("expected exactly one application root @Module, found %d (%v)", len(roots), roots)
+	if rootCount != 1 {
+		return nil, fmt.Errorf("expected exactly one application root @Module, found %d", rootCount)
 	}
 
-	// Reuse the existing explicit import-closure validation, but without
-	// requiring a registry name in application startup code.
-	root := roots[0]
-	packages, err := registryImportClosureFrom([]string{owners[root]}, registered)
-	if err != nil {
-		return nil, err
+	visited := make(map[string]bool, len(compiled))
+	queue := []string{owners[root]}
+	packages := make([]metadata.Package, 0, len(compiled))
+	for i := 0; i < len(queue); i++ {
+		name := queue[i]
+		if visited[name] {
+			continue
+		}
+		pkg, exists := registered[name]
+		if !exists {
+			return nil, fmt.Errorf("metadata package not found: %s", name)
+		}
+		visited[name] = true
+		packages = append(packages, pkg)
+
+		imports := make([]reflect.Type, 0)
+		for _, mod := range pkg.Modules {
+			imports = append(imports, mod.Imports...)
+		}
+		sort.Slice(imports, func(i, j int) bool { return imports[i].String() < imports[j].String() })
+		for _, dependency := range imports {
+			if dependency == nil {
+				return nil, fmt.Errorf("metadata package %s imports nil module", name)
+			}
+			if owner := owners[dependency]; owner != "" && !visited[owner] {
+				queue = append(queue, owner)
+			}
+			// Unknown imports remain errors in moduleVisibility.
+		}
 	}
 
-	// A binary with two disconnected compiled applications must fail closed
-	// rather than accidentally combining providers from unrelated services.
-	allOwners := make(map[reflect.Type]string)
-	for name, pkg := range registered {
-		for _, module := range pkg.Modules {
-			if module.Type != nil {
-				allOwners[module.Type] = name
-			}
-		}
-	}
-	reachable := make(map[string]bool, len(packages))
-	var visit func(string)
-	visit = func(name string) {
-		if reachable[name] {
-			return
-		}
-		reachable[name] = true
-		for _, module := range registered[name].Modules {
-			for _, dependency := range module.Imports {
-				if owner := allOwners[dependency]; owner != "" {
-					visit(owner)
-				}
-			}
-		}
-	}
-	visit(owners[root])
 	for _, name := range names {
-		if !reachable[name] {
+		if !visited[name] {
 			return nil, fmt.Errorf("compiled package %q is not reachable from application root %s", name, root)
 		}
 	}
