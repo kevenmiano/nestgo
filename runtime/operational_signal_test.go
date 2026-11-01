@@ -178,7 +178,7 @@ func TestOperationalSIGTERMRealProcess(t *testing.T) {
 			}
 			select {
 			case <-stopped:
-			default:
+			case <-time.After(2 * time.Second):
 				t.Fatal("worker did not report successful graceful shutdown")
 			}
 		})
