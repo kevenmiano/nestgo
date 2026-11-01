@@ -19,15 +19,15 @@ import (
 type Option func(*applicationConfig)
 
 type applicationConfig struct {
-	adapter     httpadapter.Adapter
-	packages    []metadata.Package
-	routes      []Route
-	registry    []string
-	logger      *logging.Service
-	debug       bool
-	onBootstrap func(BootstrapMetrics)
+	adapter      httpadapter.Adapter
+	packages     []metadata.Package
+	routes       []Route
+	registry     []string
+	logger       *logging.Service
+	debug        bool
+	onBootstrap  func(BootstrapMetrics)
 	bootstrapCtx context.Context
-	contextSet bool
+	contextSet   bool
 }
 
 // WithPackages supplies already-generated metadata to the application.
