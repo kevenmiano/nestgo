@@ -16,7 +16,7 @@ if err != nil { log.Fatal(err) }
 log.Fatal(app.Listen(":8080"))
 ```
 
-The default engine is native fasthttp. To select the Go standard library, add `runtime.WithAdapter(nethttp.New())`. To pass metadata directly, use `runtime.WithPackages(packages...)`. Do not combine both metadata sources. Import generated Go packages so their `init()` registrations are linked.
+The default engine is native fasthttp. To select the Go standard library, add `runtime.WithAdapter(nethttp.New())`. To pass metadata directly, use `runtime.WithPackages(packages...)`. Compiled package metadata is discovered automatically; `WithPackages` overrides that discovery for explicit embedding and tests. Import the generated Go packages so their `init()` registrations are linked.
 
 The `*runtime.Application` provides `Listen`, `Serve`, `HTTPAdapter` and `Shutdown`. A bare HTTP handler is not a second framework lifecycle.
 
