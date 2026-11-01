@@ -1,0 +1,54 @@
+name: P0 runtime race and dependency safety
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/**'
+      - 'platform/**'
+      - 'metadata/**'
+      - 'logging/**'
+      - '.github/workflows/runtime-race-gates.yml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  race-and-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Race tests across all packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p verification
+          go version | tee verification/environment.txt
+          GOMAXPROCS=2 go test -race ./... -count=1 -timeout=20m 2>&1 | tee verification/race-all.txt
+      - name: Repeat runtime and adapters to detect flakes
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOMAXPROCS=2 go test -race ./runtime ./platform/... -count=3 -timeout=10m 2>&1 | tee verification/race-runtime-repeated.txt
+      - name: DI and route contract coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./runtime -coverprofile=verification/runtime-cover.out -covermode=atomic -count=1 2>&1 | tee verification/coverage.txt
+          go tool cover -func=verification/runtime-cover.out | tee verification/coverage-functions.txt
+      - name: Static checks
+        run: go vet ./...
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p0-race-evidence-${{ github.sha }}
+          path: verification/
+          retention-days: 30
