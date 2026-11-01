@@ -110,7 +110,7 @@ type Application struct {
 
 // New is the single application factory. All HTTP platforms share DI and hooks.
 //
-// Example: app, err := runtime.New(runtime.WithRegistry("shop"))
+// Example: app, err := runtime.New(runtime.WithDatabase(...))
 func New(options ...Option) (*Application, error) {
 	var cfg applicationConfig
 	for i, option := range options {
@@ -129,6 +129,14 @@ func New(options ...Option) (*Application, error) {
 	if len(cfg.registry) > 0 {
 		var err error
 		packages, err = registryImportClosure(cfg.registry)
+		if err != nil {
+			return nil, err
+		}
+	} else if len(cfg.packages) == 0 {
+		// Compiled modules self-register at import time. Their unique root and
+		// transitive imports are discovered once during bootstrap.
+		var err error
+		packages, err = discoverCompiledPackages()
 		if err != nil {
 			return nil, err
 		}
