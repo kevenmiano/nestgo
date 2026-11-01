@@ -27,7 +27,7 @@ func TestStaticInvocationAndDynamicFallback(t *testing.T) {
 			{Method: "GET", Path: "/echo/{id}", Handler: "Echo", Parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "id"}}},
 		},
 	}}}
-	h, err := newHandler(Options{}, pkg)
+	h, err := newHandler(handlerOptions{}, pkg)
 	if err != nil {
 		t.Fatal(err)
 	}
