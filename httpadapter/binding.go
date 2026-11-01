@@ -3,6 +3,7 @@ package httpadapter
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/kevenmiano/nestgo/validation"
 )
 
 // DecodeBody reads a JSON request into a concrete Go type without reflection
@@ -15,6 +16,9 @@ func DecodeBody[T any](ctx Context) (T, int, error) {
 	}
 	if err := json.Unmarshal(body, &value); err != nil {
 		return value, 400, fmt.Errorf("invalid JSON: %w", err)
+	}
+	if err := validation.Check(value); err != nil {
+		return value, 400, err
 	}
 	return value, 0, nil
 }
