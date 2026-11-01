@@ -18,11 +18,17 @@ type Route struct {
 	StaticHTTP            func(any, httpadapter.Context) (any, int, error)
 	Method, Path, Handler string
 	Status                int
+	Guards                []reflect.Type
+	Pipes                 []reflect.Type
+	Filters               []reflect.Type
 	Parameters            []Parameter
 }
 type Controller struct {
 	Type   reflect.Type
 	Prefix string
+	Guards []reflect.Type
+	Pipes []reflect.Type
+	Filters []reflect.Type
 	Routes []Route
 }
 type Provider struct {
