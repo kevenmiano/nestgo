@@ -33,17 +33,39 @@ GraphQL, persistence connectors, or arbitrary legacy factories. Runtime
 | Handler signature safety and race | #108, #109, #116, #117 | Implemented and tested |
 | Generated example is deterministic | `go-quality.yml` generated shop check | CI gate; repeat on release SHA |
 | Both adapters use real listeners | `runtime/http_adapter_integration_test.go` | CI gate; expand operational matrix |
-| SIGTERM, health, error redaction | #145 | Pending PR verification |
-| External consumer using current SHA | #147, source-mode external-consumer workflow | Pending PR verification |
+| SIGTERM, health, error redaction | #145; [successful CI](https://github.com/kevenmiano/nestgo/actions/runs/41339632513) | Verified smoke; in-flight follow-up #151 pending |
+| External consumer using current SHA | #147; [source-mode CI](https://github.com/kevenmiano/nestgo/actions/runs/41339678113) | Verified source checkout only |
 | Tagged consumer through public proxy and checksum DB | #147, release-mode workflow | **Not yet verified for release tag** |
 | Race, vet, static checks, module integrity | `go-quality.yml`, `runtime-race-gates.yml` | CI gates; repeat on release SHA |
-| Route/bootstrap throughput regressions | Router and bootstrap comparative workflows | Partial; p95/p99 and 1/1000 matrix pending |
-| SIGTERM under in-flight load and timeout | Operational load test and trace | Pending |
+| Route/bootstrap throughput regressions | #150; [p95/p99 scale CI](https://github.com/kevenmiano/nestgo/actions/runs/41340172375) | Baseline measured at 1/10/100/1000; regression thresholds pending |
+| SIGTERM under in-flight load and timeout | #151 (in-flight request test) | Pending latest CI and overload/timeout evidence |
 | GoReleaser, tags, docs publication | Release workflow evidence | Pending exact tag sign-off |
 | Security handling and disclosure | `SECURITY.md`, error-redaction tests | Guidance available; audit pending |
 
 Do not turn the above **pending** cells into accepted claims without their
 specific successful workflow runs and artifacts.
+
+## Measured HTTP baseline (2026-11-01)
+
+[Workflow and artifact](https://github.com/kevenmiano/nestgo/actions/runs/41340172375),
+Go runner with `GOMAXPROCS=2`; median of three repetitions per
+configuration, loopback HTTP/1.1 and one handler with explicit 200 response.
+
+| Routes / providers | Engine | Requests/s | p95 (ms) | p99 (ms) |
+| --- | --- | ---: | ---: | ---: |
+| 1 / 1 | fasthttp | 33,377 | 0.104 | 0.132 |
+| 1 / 1 | net/http | 30,347 | 0.109 | 0.154 |
+| 10 / 10 | fasthttp | 31,901 | 0.114 | 0.164 |
+| 10 / 10 | net/http | 30,396 | 0.109 | 0.155 |
+| 100 / 100 | fasthttp | 33,658 | 0.103 | 0.146 |
+| 100 / 100 | net/http | 29,078 | 0.113 | 0.208 |
+| 1000 / 1000 | fasthttp | 28,125 | 0.123 | 0.224 |
+| 1000 / 1000 | net/http | 28,424 | 0.128 | 0.251 |
+
+These are baseline samples, **not** production SLAs. They do not include
+database calls, multi-node communication, external network latency or
+long-duration sustained workloads. Establish explicit regression thresholds
+and retest on the exact candidate release SHA.
 
 ## Release checklist
 
