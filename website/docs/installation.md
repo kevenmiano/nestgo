@@ -5,7 +5,7 @@ sidebar_position: 2
 
 # Install NestGo
 
-NestGo uses a single Go module with an installable CLI and three importable library packages.
+NestGo uses one Go module with an optional installable CLI and importable library packages. Check the minimum supported Go version in the [root `go.mod`](https://github.com/kevenmiano/nestgo/blob/main/go.mod); the module currently declares Go 1.27.
 
 ## 1. Install the CLI
 
@@ -14,11 +14,11 @@ go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
 nestgo compile ./myapp
 ```
 
+The CLI is needed only for decorated `.mgo` code or diagnostics; ordinary Go routes run without it. See the [CLI command reference](./cli.md) for commands, arguments, flags, reports and troubleshooting.
+
 For reproducible builds, replace `@latest` with a published release tag such as `@v0.1.0`. Check [available releases](https://github.com/kevenmiano/nestgo/releases) before pinning a version.
 
-:::tip Existing modforge users
-The original `modforge` executable remains available through `go install github.com/kevenmiano/nestgo/cmd/modforge@latest`.
-:::
+The legacy `modforge` entrypoint still exists for older development workflows, but new projects should use `nestgo`.
 
 ## 2. Use the runtime in your application
 
