@@ -4,7 +4,6 @@ package sqlx
 import (
  "context"
  "database/sql"
- "errors"
  "github.com/kevenmiano/nestgo/database"
 )
 
@@ -44,4 +43,3 @@ func (a *Adapter) Store() (*database.Store,error) {
  return database.New(a)
 }
 var _ database.Executor = (*Adapter)(nil)
-var _ = errors.Is
