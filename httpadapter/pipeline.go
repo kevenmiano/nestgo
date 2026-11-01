@@ -71,7 +71,7 @@ func StatusOf(err error) int {
 
 func WriteError(ctx Context, err error) error {
 	status := StatusOf(err)
-	message := "Internal Server Error"
+	message := "Internal server error"
 	if status < 500 {
 		message = err.Error()
 		if message == "" {
