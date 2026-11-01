@@ -36,6 +36,8 @@ jobs:
         run: go test ./...
       - name: Observe source fingerprint benchmark
         run: go test ./compiler -run '^$' -bench '^BenchmarkSourceFingerprint$' -benchtime=100x -benchmem -count=1
+      - name: Observe incremental compiler benchmarks
+        run: go test ./compiler -run '^$' -bench '^BenchmarkCompileDirColdVsIncremental$' -benchtime=10x -benchmem -count=1
       - name: Static analysis
         run: go vet ./...
       - name: Verify gofmt on changed Go files

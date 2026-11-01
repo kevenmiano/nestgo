@@ -156,3 +156,38 @@ func BenchmarkSourceFingerprint(b *testing.B) {
 		}
 	}
 }
+
+func TestSourceFingerprintTracksHandwrittenGoDependencies(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "dto.mgo"), []byte("package sample\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	before, err := sourceFingerprint(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	goSource := filepath.Join(dir, "helpers.go")
+	if err := os.WriteFile(goSource, []byte("package sample\ntype Helper struct{}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := sourceFingerprint(dir)
+	if err != nil || changed == before {
+		t.Fatalf("new handwritten Go file was ignored: %v", err)
+	}
+	for _, ignored := range []string{"helpers_generated.go", "zz_modforge_metadata.go", "zz_nestgo_stubs_test.go"} {
+		if err := os.WriteFile(filepath.Join(dir, ignored), []byte("generated"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ignored, err := sourceFingerprint(dir)
+	if err != nil || ignored != changed {
+		t.Fatalf("generated/test output retriggered fingerprint: %v", err)
+	}
+	if err := os.WriteFile(goSource, []byte("package sample\ntype Helper struct{ Name string }\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := sourceFingerprint(dir)
+	if err != nil || updated == changed {
+		t.Fatalf("edited handwritten Go source was not detected: %v", err)
+	}
+}

@@ -47,7 +47,7 @@ nestgo compile --watch ./myapp
 nestgo compile ./myapp -w --poll-interval=500ms
 ```
 
-The watcher initially compiles the directory and repeats only when input fingerprints change. It ignores generated outputs, preserves existing editable tests, and prints errors while continuing to watch. It is not a runtime server and does not run `go test`. Source re-parsing still covers the whole package on each detected change.
+The watcher compiles immediately, then detects edits in `.mgo` files and handwritten Go dependencies. Unchanged decorated units reuse their parsed and locally rendered Go sources within the watch process; package-wide registries, DTO/SQL contracts and wiring remain validated on each change. It ignores generated outputs, preserves editable tests, and prints errors while continuing to watch. It is not a runtime server and does not run `go test`. Restarting the watcher resets its cache.
 
 A successful compilation emits ordinary Go files, registration metadata, a generated wiring test and editable testing TODOs. The compiler accepts one existing directory or `.mgo` file. Decorators are not syntax understood by `go build`; compile them first and then use native Go commands:
 

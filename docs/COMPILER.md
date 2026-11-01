@@ -90,7 +90,203 @@ func TestUsersController_FindAll(t *testing.T) {
 
 ### Watch mode
 
-Run `nestgo compile --watch ./myapp` (or `nestgo compile ./myapp -w`) to compile immediately and recompile whenever a top-level `.mgo` file is added, renamed, removed or edited. The watcher checks source contents every 250 ms by default (configurable with `--poll-interval=500ms`), including same-size edits; it intentionally ignores generated outputs to avoid self-triggering loops. Source diagnostics are printed but the watcher keeps running. Ctrl+C stops it. Watch mode does **not** automatically run `go test`.
+Run `nestgo compile --watch ./myapp` (or `nestgo compile ./myapp -w`) to compile immediately and recompile when top-level `.mgo` **or handwritten `.go` source files** change. The watcher checks source content every 250 ms by default (configurable with `--poll-interval=500ms`), including same-size edits. It ignores generated files and test stubs to avoid self-triggering loops. Source diagnostics are printed but the watcher keeps running. Ctrl+C stops it. Watch mode does **not** automatically run `go test`.
+
+### Incremental build contract
+
+The watch process owns an **in-memory, per-directory cache** keyed by each `.mgo` source path and SHA-256 content digest. After a successful initial build, unchanged units reuse their parsed decorator model and formatted local Go source; changed/added units are parsed and rendered again. When a previously compiled source disappears, its compiler-owned local Go, DTO transformer and repository output files are deleted. Failed builds do not replace the last successfully compiled cache snapshot.
+
+The compiler still regenerates and checks **package-wide metadata, SQL repository/connection contracts, DTO property codecs, dependency validations and wiring tests**. These may depend on another unit or on handwritten Go helpers, so cached local output must never bypass them. It uses the same full compilation logic and `writeIfChanged` semantics for unchanged artifacts. Every watch-triggered build checks a fresh directory snapshot rather than relying on file modification times.
+
+A standalone `nestgo compile` or read-only `nestgo check` remains stateless, and a restarted watcher starts with a cold cache. The cache is not persisted to disk or shared across concurrent processes; no new runtime reflection or production-path overhead is introduced. Developer-owned test stubs are never deleted automatically, including after removing their source declaration; review obsolete stubs manually.
+
+**Validation:** `go test ./compiler` verifies selective re-parsing, output parity against a full compile, same-size source edits, added/removed files, recovery after invalid source, and invalidation on handwritten Go changes. Use `go test ./compiler -run '^
+
+### DTO scaffolding
+
+Use `@Dto()` to opt in to DTO-specific test stubs:
+
+```go
+@Dto()
+type CreateUserDTO struct {
+    Name string // json:"name" validate:"required" (use a Go struct tag in your code)
+}
+```
+
+The compiler creates `TestCreateUserDTO_Serialization` and `TestCreateUserDTO_Deserialization` TODOs. It creates `TestCreateUserDTO_Validation` only when at least one DTO field has a nonempty `validate` struct tag. Plain undecorated Go structs do not receive DTO stubs.
+
+A `validate` tag is a contract hint: it does not enable validation in the runtime. Generated tests explicitly use `t.Skip`, so add real fixtures, validators and assertions before treating them as behavioral coverage. DTO property-transformer code is being built separately in PR #132; specialized transformation scaffolding is not yet integrated.
+
+**Boundary:** The generated assertion checks *compiled registry consistency*, not full runtime dependency construction or correct application behavior. The editable unit stubs do not automatically create mocks, start servers, or execute HTTP requests. Add dependency fakes and assertions as needed. Test generation adds no cost to a production binary because all generated tests live in `*_test.go` files.
+
+## Read-only compiler check
+
+```bash
+nestgo compile ./myapp
+nestgo check ./myapp
+```
+
+`nestgo check` runs the same source parsing, metadata generation, SQL repository generation and wiring-test generation as a normal compile, but compares compiler-owned artifacts **in memory** against existing files. It never writes to disk. Missing or changed output files result in `compiler.ErrOutdated` (nonzero CLI exit), with deterministic sorted file paths and a suggestion to recompile.
+
+Developer-owned `zz_nestgo_stubs_test.go` is intentionally excluded from equality checks: the compiler must not overwrite handwritten assertions or insist on a specific test body. A successful check verifies compiler-owned outputs, **not** behavioral correctness, and does not run `go test`. SQL dialect defaults match `CompileDir`; dedicated CLI dialect flags are not yet available.
+
+## Structured compiler diagnostics (JSON schema v1)
+
+`nestgo compile` and `nestgo check` accept `--format=json` for single-shot commands.
+The default `--format=text` remains unchanged. JSON produces **exactly one JSON
+object on stdout**, even when validation fails; the process still exits with a
+nonzero code on failure and does not print a duplicate error message to stderr.
+Cobra argument/unknown flag parsing failures occur before command execution
+and still use standard textual usage errors.
+
+```bash
+nestgo compile --format=json ./myapp
+nestgo check --format=json ./myapp
+```
+
+Example: a missing compiler-owned artifact.
+
+```json
+{
+  "schema_version": 1,
+  "command": "check",
+  "ok": false,
+  "diagnostics": [
+    {
+      "code": "NG2001",
+      "severity": "error",
+      "message": "generated artifact missing",
+      "file": "myapp/zz_modforge_metadata.go"
+    }
+  ]
+}
+```
+
+The `diagnostics` field is **always an array**, including on success. Paths
+use the directory/file spelling passed to the CLI (not necessarily absolute).
+Go source diagnostics contain `file`, 1-based `line` and, for parser errors,
+1-based `column` when available. Absent coordinates are omitted rather than guessed.
+Generated artifacts in `check` are ordered by file path.
+
+| Code | Meaning |
+| --- | --- |
+| `NG1001` | NestGo decorator/semantic compiler diagnostic |
+| `NG1002` | Go parser syntax diagnostic |
+| `NG2001` | Compiler-owned artifact missing |
+| `NG2002` | Compiler-owned artifact outdated |
+| `NG2003` | Compiler-owned artifact obsolete |
+| `NG9000` | Other error (I/O, arguments or currently unclassified error) |
+
+`compiler.OutdatedError` also exposes typed `Artifacts` with `Path` and
+`Reason` fields and preserves `errors.Is(err, compiler.ErrOutdated)`.
+This is a v1 CLI **output contract**, not a declaration that every compiler
+error has granular semantic classifications. `--format=json` is deliberately
+rejected alongside `--watch`: watch remains a textual stream, not JSON/NDJSON.
+
+## Known limitations
+
+- No recursive directory compilation.
+- No full source mapping or language server integration.
+- No decorator support on arbitrary expressions or non-struct types.
+- No cross-file controller receiver lookup for decorated methods.
+- No complete semantic validation of every handler signature.
+- No stable generated metadata schema.
+
+See [Runtime](RUNTIME.md) for supported request and response behavior.
+ -bench '^BenchmarkCompileDirColdVsIncremental
+
+### DTO scaffolding
+
+Use `@Dto()` to opt in to DTO-specific test stubs:
+
+```go
+@Dto()
+type CreateUserDTO struct {
+    Name string // json:"name" validate:"required" (use a Go struct tag in your code)
+}
+```
+
+The compiler creates `TestCreateUserDTO_Serialization` and `TestCreateUserDTO_Deserialization` TODOs. It creates `TestCreateUserDTO_Validation` only when at least one DTO field has a nonempty `validate` struct tag. Plain undecorated Go structs do not receive DTO stubs.
+
+A `validate` tag is a contract hint: it does not enable validation in the runtime. Generated tests explicitly use `t.Skip`, so add real fixtures, validators and assertions before treating them as behavioral coverage. DTO property-transformer code is being built separately in PR #132; specialized transformation scaffolding is not yet integrated.
+
+**Boundary:** The generated assertion checks *compiled registry consistency*, not full runtime dependency construction or correct application behavior. The editable unit stubs do not automatically create mocks, start servers, or execute HTTP requests. Add dependency fakes and assertions as needed. Test generation adds no cost to a production binary because all generated tests live in `*_test.go` files.
+
+## Read-only compiler check
+
+```bash
+nestgo compile ./myapp
+nestgo check ./myapp
+```
+
+`nestgo check` runs the same source parsing, metadata generation, SQL repository generation and wiring-test generation as a normal compile, but compares compiler-owned artifacts **in memory** against existing files. It never writes to disk. Missing or changed output files result in `compiler.ErrOutdated` (nonzero CLI exit), with deterministic sorted file paths and a suggestion to recompile.
+
+Developer-owned `zz_nestgo_stubs_test.go` is intentionally excluded from equality checks: the compiler must not overwrite handwritten assertions or insist on a specific test body. A successful check verifies compiler-owned outputs, **not** behavioral correctness, and does not run `go test`. SQL dialect defaults match `CompileDir`; dedicated CLI dialect flags are not yet available.
+
+## Structured compiler diagnostics (JSON schema v1)
+
+`nestgo compile` and `nestgo check` accept `--format=json` for single-shot commands.
+The default `--format=text` remains unchanged. JSON produces **exactly one JSON
+object on stdout**, even when validation fails; the process still exits with a
+nonzero code on failure and does not print a duplicate error message to stderr.
+Cobra argument/unknown flag parsing failures occur before command execution
+and still use standard textual usage errors.
+
+```bash
+nestgo compile --format=json ./myapp
+nestgo check --format=json ./myapp
+```
+
+Example: a missing compiler-owned artifact.
+
+```json
+{
+  "schema_version": 1,
+  "command": "check",
+  "ok": false,
+  "diagnostics": [
+    {
+      "code": "NG2001",
+      "severity": "error",
+      "message": "generated artifact missing",
+      "file": "myapp/zz_modforge_metadata.go"
+    }
+  ]
+}
+```
+
+The `diagnostics` field is **always an array**, including on success. Paths
+use the directory/file spelling passed to the CLI (not necessarily absolute).
+Go source diagnostics contain `file`, 1-based `line` and, for parser errors,
+1-based `column` when available. Absent coordinates are omitted rather than guessed.
+Generated artifacts in `check` are ordered by file path.
+
+| Code | Meaning |
+| --- | --- |
+| `NG1001` | NestGo decorator/semantic compiler diagnostic |
+| `NG1002` | Go parser syntax diagnostic |
+| `NG2001` | Compiler-owned artifact missing |
+| `NG2002` | Compiler-owned artifact outdated |
+| `NG2003` | Compiler-owned artifact obsolete |
+| `NG9000` | Other error (I/O, arguments or currently unclassified error) |
+
+`compiler.OutdatedError` also exposes typed `Artifacts` with `Path` and
+`Reason` fields and preserves `errors.Is(err, compiler.ErrOutdated)`.
+This is a v1 CLI **output contract**, not a declaration that every compiler
+error has granular semantic classifications. `--format=json` is deliberately
+rejected alongside `--watch`: watch remains a textual stream, not JSON/NDJSON.
+
+## Known limitations
+
+- No recursive directory compilation.
+- No full source mapping or language server integration.
+- No decorator support on arbitrary expressions or non-struct types.
+- No cross-file controller receiver lookup for decorated methods.
+- No complete semantic validation of every handler signature.
+- No stable generated metadata schema.
+
+See [Runtime](RUNTIME.md) for supported request and response behavior.
+ -benchmem` to compare repeated single-source edits for 10/50-file packages. Results vary by machine; treat them as observed measurements, not guaranteed speedups.
 
 ### DTO scaffolding
 
