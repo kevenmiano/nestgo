@@ -34,7 +34,7 @@ func (r *UsersRepository) FindByID(ctx context.Context, id int64) (*User, error)
 	}
 	providers, err := os.ReadFile(filepath.Join(dir, "zz_modforge_repositories.go"))
 	if err != nil { t.Fatal(err) }
-	if !strings.Contains(string(providers), "NewGeneratedRepositories") || !strings.Contains(string(providers), "NewUsersRepositoryGeneratedFromConnections") { t.Fatalf("missing repository bootstrap registry: %s", providers) }
+	if !strings.Contains(string(providers), "NewGeneratedRepositories") || !strings.Contains(string(providers), "NewUsersRepositoryGeneratedFromConnections") || !strings.Contains(string(providers), "Instances() []any") { t.Fatalf("missing repository bootstrap registry: %s", providers) }
 	if err := CompileDir(dir); err != nil {
 		t.Fatalf("recompile not idempotent: %v", err)
 	}
