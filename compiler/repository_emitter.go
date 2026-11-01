@@ -15,6 +15,7 @@ type RepositoryDefinition struct {
 	Package string
 	Name    string
 	Entity  string
+	Connection string
 	Fields  []RepositoryField
 	Methods []RepositoryMethod
 	Dialect sqlgen.Dialect
@@ -47,6 +48,12 @@ func GenerateRepository(def RepositoryDefinition) ([]byte, error) {
 	out.WriteString("import (\n\"context\"\n\"github.com/kevenmiano/nestgo/database\"\n)\n")
 	fmt.Fprintf(&out, "type %sGenerated struct { db database.Executor }\n", def.Name)
 	fmt.Fprintf(&out, "func New%sGenerated(db database.Executor) *%sGenerated { return &%sGenerated{db:db} }\n", def.Name, def.Name, def.Name)
+	if def.Connection != "" {
+		if !schemaIdentifier(def.Connection) {
+			return nil, fmt.Errorf("repository: invalid connection name %q", def.Connection)
+		}
+		fmt.Fprintf(&out, "func New%sGeneratedFromConnections(registry *database.Connections) (*%sGenerated, error) { db, err := registry.Get(%q); if err != nil { return nil, err }; return New%sGenerated(db), nil }\n", def.Name, def.Name, def.Connection, def.Name)
+	}
 	seen := make(map[string]bool)
 	for _, method := range def.Methods {
 		if !schemaIdentifier(method.Name) || seen[method.Name] {
