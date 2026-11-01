@@ -10,23 +10,23 @@ import (
 	"github.com/kevenmiano/nestgo/metadata"
 )
 
-// BootstrapOptions configures the owned resources for a single runtime.
-type BootstrapOptions struct {
+// bootstrapOptions configures the owned resources for a single runtime.
+type bootstrapOptions struct {
 	ConfigOptions   []config.Option
 	DatabaseOptions []database.Option
 	Runtime         Options
 }
 
-// Bootstrapped owns initialized services and must be closed after use.
-type Bootstrapped struct {
+// bootstrapped owns initialized services and must be closed after use.
+type bootstrapped struct {
 	Handler     http.Handler
 	Config      *config.Service
 	Connections *database.Connections
 }
 
-// Bootstrap loads configuration, opens named pools, registers both as injectable
+// bootstrap loads configuration, opens named pools, registers both as injectable
 // providers, then constructs the handler. A failure closes opened resources.
-func Bootstrap(ctx context.Context, options BootstrapOptions, packages ...metadata.Package) (*Bootstrapped, error) {
+func bootstrap(ctx context.Context, options bootstrapOptions, packages ...metadata.Package) (*bootstrapped, error) {
 	if ctx == nil {
 		return nil, errors.New("runtime: nil bootstrap context")
 	}
@@ -52,11 +52,11 @@ func Bootstrap(ctx context.Context, options BootstrapOptions, packages ...metada
 		_ = connections.Close()
 		return nil, err
 	}
-	return &Bootstrapped{Handler: handler, Config: settings, Connections: connections}, nil
+	return &bootstrapped{Handler: handler, Config: settings, Connections: connections}, nil
 }
 
 // Close releases owned connections; it does not shut down the HTTP listener.
-func (b *Bootstrapped) Close() error {
+func (b *bootstrapped) Close() error {
 	if b == nil || b.Connections == nil {
 		return nil
 	}
