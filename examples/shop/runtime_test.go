@@ -14,7 +14,7 @@ import (
 )
 
 func TestGeneratedRoutes(t *testing.T) {
-	app, err := runtime.New(runtime.WithRegistry("shop"), runtime.WithAdapter(nethttp.New()))
+	app, err := runtime.New(runtime.WithAdapter(nethttp.New()))
 	if err != nil {
 		t.Fatal(err)
 	}

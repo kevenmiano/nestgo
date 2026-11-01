@@ -17,9 +17,13 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 }
 
 func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, direct ...httpadapter.Route) error {
-	return registerRoutesWithPipeline(adapter, packages, lifecycle, requestPipelineConfig{}, direct...)
+	return registerRoutesWithPipeline(adapter, packages, lifecycle, requestPipelineConfig{}, nil, direct...)
 }
-func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, pipeline requestPipelineConfig, direct ...httpadapter.Route) error {
+// registerRoutesWithLifecycleAndInstances supplies external SQL and configuration providers.
+func registerRoutesWithLifecycleAndInstances(adapter httpadapter.Adapter,packages []metadata.Package,lifecycle *lifecycleRegistry,instances []any,direct ...httpadapter.Route) error {
+ return registerRoutesWithPipeline(adapter,packages,lifecycle,requestPipelineConfig{},instances,direct...)
+}
+func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, pipeline requestPipelineConfig, instances []any, direct ...httpadapter.Route) error {
 	if err := validatePipeline(pipeline); err != nil {
 		return err
 	}
@@ -27,7 +31,7 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 	if lifecycle != nil {
 		onProvider = lifecycle.onProvider
 	}
-	graph, err := prepareBootstrap(packages, onProvider, nil)
+	graph, err := prepareBootstrapWithInstances(packages, instances, onProvider, nil)
 	if err != nil {
 		return err
 	}

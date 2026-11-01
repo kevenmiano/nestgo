@@ -28,7 +28,7 @@ Excluded from the core support contract: ORM/SQL code generation, config provide
 | Shutdown | Process SIGTERM smoke from PR #145 merged | PR #151 in-flight request completes or fails only by explicit deadline, no half-writes; both adapters | P0 — #151 |
 | Operations | `logging/slog` and bootstrap diagnostics available | Health/live and health/ready, readiness flips before draining, config validation, safe request logs; external runnable example | P0 bounded — #16 |
 | Static/race/security | `go-quality.yml` and `runtime-race-gates.yml` include tests, race, govulncheck, vet, formatting and module verification | All checks pass on candidate SHA; fuzz of metadata/parsing; no known reproducible panic, race or vulnerable supported dependency | P0 — #25 #70 |
-| Scale and benchmarks | Router/bootstrap comparison, profiling, release-scale fixtures | Record reproducible 1/10/100/1000 provider/route samples, p95/p99, allocs, runner/toolchain, thresholds and regression decision | P0 — #37 #55 #70 |
+| Scale and benchmarks | Router/bootstrap comparison, profiling, #150 measurements and #153 startup/summary CI | Repeat 1/10/100/1000 startup, p95/p99, throughput, allocations on exact candidate SHA; approve regression thresholds and decision | P0 — #37 #55 #70 |
 | External release | External-consumer source and tagged proxy workflows, GoReleaser and docs exist | External Go project installs **approved immutable tag** from `proxy.golang.org` with `sum.golang.org`, without `replace`; build/sample/CLI/docs releases pass | P0 — #70 |
 | Stability and security policy | `SECURITY.md`, upgrade notes, Go semantic release automation | API/version policy, exclusions, rollback, owner sign-off, exact SHA/tag links; do **not** merge release PR #73 until approved | P0 — #70 |
 
@@ -54,3 +54,31 @@ Production users opt into only the tested HTTP core contract. Dynamic/request DI
 Rollback by deploying a previously **verified immutable tag** with its corresponding configuration and binaries. Never retag a version; verify external DB migration compatibility separately.
 
 References: [semantic releases](SEMANTIC_RELEASES.md), [distribution](DISTRIBUTION.md), [security](../SECURITY.md).
+
+## Reproducing release-scale measurements
+
+The `.github/workflows/release-scale.yml` job runs `BenchmarkReleaseScale`
+for 1, 10, 100 and 1,000 routes and singleton providers on the **same** runner,
+for both `fasthttp` and `net/http`, using three repetitions:
+
+```sh
+GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkReleaseScale$' \
+  -benchtime=250ms -count=3 -benchmem -timeout=20m
+```
+
+The downloadable `release-scale-<sha>` artifact contains `environment.txt`
+(Go version, OS, architecture, CPU and commit SHA), raw `bench.txt`,
+machine-readable `summary.json` and a median `summary.md`. CI fails on
+missing or inconsistent samples. The `startup-ms` metric includes NestGo
+metadata/DI initialization and route registration, but excludes TCP listener
+initialization and request warmup. HTTP p95/p99 and throughput include the Go
+client, local TCP stack and adapter, so they are **not** isolated handler or
+routing costs. The 250 ms sample duration is useful for tracking regressions,
+not a high-confidence production load test.
+
+**Release sign-off is still blocked:** collect measurements for the exact
+candidate release SHA, compare them to an approved baseline on comparable
+hardware, define explicit allowed deviations for p95/p99, startup, throughput
+and allocations, then test under production-like concurrency and real
+ingress. Do not turn a successful benchmark run into an automatic performance
+SLA.

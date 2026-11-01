@@ -15,8 +15,8 @@ func TestNewRejectsInvalidFunctionalOptions(t *testing.T) {
 		want    string
 	}{
 		{"nil option", []Option{nil}, "nil application option"},
-		{"mixed metadata sources", []Option{WithPackages(metadata.Package{}), WithRegistry("shop")}, "cannot be combined"},
-		{"unregistered package", []Option{WithRegistry("missing-single-application-fixture")}, "metadata package not found"},
+		{"invalid nil logger", []Option{WithLogger(nil)}, "nil logger"},
+		{"invalid nil provider", []Option{WithProvider(nil)}, "nil external provider"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

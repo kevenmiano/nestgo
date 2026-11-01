@@ -113,7 +113,7 @@ be concurrency-safe**. For global components, use functional options:
 
 ```go
 app, err := runtime.New(
-    runtime.WithRegistry("users"),
+    
     runtime.WithMiddleware(func(ctx httpadapter.Context, next httpadapter.Next) error {
         ctx.SetHeader("X-Framework", "NestGo")
         return next()
@@ -143,8 +143,8 @@ HTTP 400. For validation failures, return
 
 Unhandled errors produce HTTP 500 with a redacted message. Explicit
 `HTTPException` values are returned with their declared 4xx code and safe
-message. The default response is currently plain text; the separate HTTP
-response contracts change will define common response formatting.
+message. The default response is JSON (`statusCode` and `message`) through the typed
+[HTTP response contract](HTTP_RESPONSES.md); filters may override formatting.
 
 **Important differences from NestJS:** Pipes run on each argument in
 handler-declaration order, not NestJS's reverse-parameter order. Custom

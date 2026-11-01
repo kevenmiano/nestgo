@@ -11,8 +11,11 @@ NestGo uses a single Go module with an installable CLI and three importable libr
 
 ```bash
 go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
+nestgo --help
 nestgo compile ./myapp
 ```
+
+Read the [CLI guide](./cli/overview.md) for all commands, flags, completion and generated reference pages.
 
 For reproducible builds, replace `@latest` with a published release tag such as `@v0.1.0`. Check [available releases](https://github.com/kevenmiano/nestgo/releases) before pinning a version.
 

@@ -28,7 +28,6 @@ func TestRequestPipelineExample(t *testing.T) {
 	} {
 		t.Run(engine.name, func(t *testing.T) {
 			app, err := runtime.New(
-				runtime.WithRegistry("pipeline"),
 				runtime.WithAdapter(engine.newAdapter()),
 				runtime.WithMiddleware(func(ctx httpadapter.Context, next httpadapter.Next) error {
 					ctx.SetHeader("X-Example", "pipeline")

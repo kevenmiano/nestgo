@@ -3,7 +3,7 @@ title: Controllers
 ---
 # Controllers
 
-Controllers group HTTP handlers. NestGo's decorators are compiled from `.mgo`, not supported by the Go compiler directly. NestGo supports `@Controller`,
+Controllers group HTTP handlers. NestGo supports `@Controller`,
 `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete`,
 `@HttpCode`, `@Header` and `@Redirect`.
 

@@ -15,7 +15,6 @@ func main() {
 		log.Fatal("configure DEMO_API_KEY before starting the example server")
 	}
 	app, err := runtime.New(
-		runtime.WithRegistry("pipeline"),
 		runtime.WithMiddleware(func(ctx httpadapter.Context, next httpadapter.Next) error {
 			ctx.SetHeader("X-Example", "pipeline")
 			return next()

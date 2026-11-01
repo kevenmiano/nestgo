@@ -57,6 +57,7 @@ jobs:
           if [[ -n "$unformatted" ]]; then
             echo "Go files need gofmt:"
             echo "$unformatted"
+            gofmt -d "${files[@]}"
             exit 1
           fi
       - name: Verify generated example output

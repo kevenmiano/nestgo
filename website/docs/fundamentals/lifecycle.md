@@ -10,13 +10,13 @@ NestGo has **one application** abstraction and an engine-independent lifecycle. 
 ## Create an application
 
 ```go
-app, err := runtime.New(runtime.WithRegistry("shop"))
+app, err := runtime.New()
 if err != nil { log.Fatal(err) }
 
 log.Fatal(app.Listen(":8080"))
 ```
 
-The default engine is native fasthttp. To select the Go standard library, add `runtime.WithAdapter(nethttp.New())`. To pass metadata directly, use `runtime.WithPackages(packages...)`. Do not combine both metadata sources. Import generated Go packages so their `init()` registrations are linked.
+The default engine is native fasthttp. To select the Go standard library, add `runtime.WithAdapter(nethttp.New())`. To pass metadata directly, use `runtime.WithPackages(packages...)`. Compiled package metadata is discovered automatically; `WithPackages` overrides that discovery for explicit embedding and tests. Import the generated Go packages so their `init()` registrations are linked.
 
 The `*runtime.Application` provides `Listen`, `Serve`, `HTTPAdapter` and `Shutdown`. A bare HTTP handler is not a second framework lifecycle.
 
@@ -25,7 +25,7 @@ The `*runtime.Application` provides `Listen`, `Serve`, `HTTPAdapter` and `Shutdo
 ```mermaid
 flowchart TD
   Entry["runtime.New(options...)"] --> Source{"Metadata"}
-  Source -->|"WithRegistry"| Registry["Resolve registered package imports"]
+  Source -->|"auto-discovery"| Registry["Resolve registered package imports"]
   Source -->|"WithPackages"| Direct["Use explicit metadata"]
   Registry --> Graph["Validate modules and visibility"]
   Direct --> Graph
