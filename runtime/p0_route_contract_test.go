@@ -19,15 +19,15 @@ func (*p0SignatureController) OnlyError() error { return errors.New("failure") }
 func (*p0SignatureController) ConcreteError() (string, unsafeConcreteError) {
 	return "", unsafeConcreteError{}
 }
-func (*p0SignatureController) Parameter(n int) string { return "ok" }
+func (*p0SignatureController) Parameter(n int) string         { return "ok" }
 func (*p0SignatureController) Valid(s string) (string, error) { return s, nil }
 
 func TestP0RejectUnsafeHandlerContractBeforeServing(t *testing.T) {
 	tests := []struct {
-		name string
-		handler string
+		name       string
+		handler    string
 		parameters []metadata.Parameter
-		want string
+		want       string
 	}{
 		{name: "error-only return", handler: "OnlyError", want: "invalid signature"},
 		{name: "concrete error return", handler: "ConcreteError", want: "invalid signature"},
@@ -39,7 +39,7 @@ func TestP0RejectUnsafeHandlerContractBeforeServing(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			adapter := &capturedAdapter{}
 			err := registerRoutes(adapter, []metadata.Package{{Controllers: []metadata.Controller{{
-				Type: reflect.TypeOf((*p0SignatureController)(nil)),
+				Type:   reflect.TypeOf((*p0SignatureController)(nil)),
 				Prefix: "/test",
 				Routes: []metadata.Route{{Method: "GET", Path: "/invalid", Handler: tc.handler, Parameters: tc.parameters}},
 			}}}})
@@ -56,7 +56,7 @@ func TestP0RejectUnsafeHandlerContractBeforeServing(t *testing.T) {
 func TestP0ValidErrorResultUsesStandardResponse(t *testing.T) {
 	a := &capturedAdapter{}
 	err := registerRoutes(a, []metadata.Package{{Controllers: []metadata.Controller{{
-		Type: reflect.TypeOf((*p0SignatureController)(nil)),
+		Type:   reflect.TypeOf((*p0SignatureController)(nil)),
 		Prefix: "/test",
 		Routes: []metadata.Route{{Method: "GET", Path: "/{id}", Handler: "Valid", Parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "id"}}}},
 	}}}})
