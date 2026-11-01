@@ -3,12 +3,18 @@ title: Compiler
 ---
 # Compiler
 
-The `modforge` CLI translates NestGo `.mgo` files into ordinary Go code.
+The NestGo compiler translates decorator-annotated `.mgo` files into ordinary Go code and typed route/module metadata.
 
 ```bash
-go run ./cmd/modforge compile ./examples/shop
+go run ./cmd/nestgo compile ./examples/shop
 ```
 
-Output includes `*_generated.go` files and `zz_modforge_metadata.go`. Re-running generation should produce deterministic output; generated files can be checked by normal Go tests.
+The legacy `cmd/modforge` entry point remains available. Compilation produces `*_generated.go` files and `zz_modforge_metadata.go`; generation is deterministic and checked by CI against the committed `shop` example.
 
-Read the [compiler reference](https://github.com/kevenmiano/nestgo/blob/main/docs/COMPILER.md) for supported syntax, diagnostics and restrictions.
+## Validation and invocation
+
+The compiler validates declared module references, local dependency graphs, interface matching in supported cases and malformed annotations. It generates optional `StaticInvoke` wrappers for conservative, zero-argument, single-result routes. Other method signatures use the reflective runtime path. The direct path is an optimization, not a removal of dynamic execution.
+
+Explicit module imports support qualified Go type references. External type resolution and end-to-end cross-package validation remain areas under development. Do not assume all possible external Go provider types are supported by compiler analysis.
+
+For supported syntax and diagnostics, consult the [compiler reference](https://github.com/kevenmiano/nestgo/blob/main/docs/COMPILER.md).
