@@ -10,7 +10,7 @@ NestGo has **one application** abstraction and an engine-independent lifecycle. 
 ## Create an application
 
 ```go
-app, err := runtime.New(runtime.WithRegistry("shop"))
+app, err := runtime.New()
 if err != nil { log.Fatal(err) }
 
 log.Fatal(app.Listen(":8080"))
@@ -25,7 +25,7 @@ The `*runtime.Application` provides `Listen`, `Serve`, `HTTPAdapter` and `Shutdo
 ```mermaid
 flowchart TD
   Entry["runtime.New(options...)"] --> Source{"Metadata"}
-  Source -->|"WithRegistry"| Registry["Resolve registered package imports"]
+  Source -->|"auto-discovery"| Registry["Resolve registered package imports"]
   Source -->|"WithPackages"| Direct["Use explicit metadata"]
   Registry --> Graph["Validate modules and visibility"]
   Direct --> Graph
