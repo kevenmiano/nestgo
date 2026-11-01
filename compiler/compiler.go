@@ -875,7 +875,7 @@ func compileDirWithCache(dir string, dialect sqlgen.Dialect, dialects map[string
 	if err := emit(filepath.Join(dir, moduleContractFile), append(contract, '\n')); err != nil {
 		return err
 	}
-	wiring, err := wiringTestSource(files)
+	wiring, err := wiringTestSource(files, repositoryDefinitions...)
 	if err != nil {
 		return err
 	}
