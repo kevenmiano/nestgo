@@ -8,7 +8,9 @@ import (
 )
 
 type sharedBootstrapDependency struct{}
-type sharedBootstrapConsumer struct{ Dependency *sharedBootstrapDependency `nestgo:"inject"` }
+type sharedBootstrapConsumer struct {
+	Dependency *sharedBootstrapDependency `nestgo:"inject"`
+}
 type sharedBootstrapController struct{ Dependency *sharedBootstrapDependency }
 
 func TestSharedBootstrapGraphInjectsProvidersAndControllers(t *testing.T) {
