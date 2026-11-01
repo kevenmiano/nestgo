@@ -1,10 +1,10 @@
 module github.com/kevenmiano/nestgo
 
-go 1.23.0
+go 1.27.0
 
-toolchain go1.23.12
+toolchain go1.27.3
 
-require github.com/valyala/fasthttp v1.65.0
+require github.com/valyala/fasthttp v1.75.0
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
