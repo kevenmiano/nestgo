@@ -31,7 +31,7 @@ func WithLimits(limits httpadapter.ServerLimits) Option {
 }
 
 func New(options ...Option) *Adapter {
-	a := &Adapter{keys: map[string]bool{}, limits: httpadapter.DefaultServerLimits()}
+	a := &Adapter{limits: httpadapter.DefaultServerLimits()}
 	for _, option := range options {
 		if option != nil {
 			option(a)
@@ -60,6 +60,11 @@ func (a *Adapter) Register(route httpadapter.Route) error {
 		if overlaps && aMore == bMore {
 			return errors.New("ambiguous HTTP routes: " + existing.Path + " and " + route.Path)
 		}
+	}
+	// Route-free applications need no lookup table; initialize it only
+	// once the first route has passed validation and overlap checks.
+	if a.keys == nil {
+		a.keys = make(map[string]bool)
 	}
 	a.keys[key] = true
 	a.routes = append(a.routes, route)
