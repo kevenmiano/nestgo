@@ -37,3 +37,33 @@ func (r *UsersRepository) FindByID(ctx context.Context, id int64) (*User, error)
 		}
 	}
 }
+
+
+func TestRepositoryFromMGOWriteMethod(t *testing.T) {
+	file, err := Parse("users.mgo", []byte(`package users
+import "context"
+@Entity({table: "users"})
+type User struct { ID int64; Name string }
+@Repository(User, "users")
+type UsersRepository struct{}
+@Query("UPDATE users SET name=:name WHERE id=:id")
+func (r *UsersRepository) Update(ctx context.Context, name string, id int64) (int64, error) { return 0, nil }
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	def, err := RepositoryFromMGO(file, sqlgen.PostgreSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(def.Methods) != 1 || !def.Methods[0].Exec {
+		t.Fatalf("expected DML repository method: %#v", def.Methods)
+	}
+	generated, err := GenerateRepository(def)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(generated), "ExecContext(ctx, query, name, id)") {
+		t.Fatalf("missing generated write call: %s", generated)
+	}
+}
