@@ -1,0 +1,53 @@
+name: Runtime profiling after router optimization
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/**'
+      - 'platform/**'
+      - '.github/workflows/runtime-profile-baseline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pprof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Record environment
+        shell: bash
+        run: |
+          mkdir -p profiles
+          { go version; go env GOOS GOARCH GOMAXPROCS; uname -a; } | tee profiles/environment.txt
+      - name: Benchmark without profiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench 'BenchmarkHTTPInvocation|BenchmarkHTTPEngines|BenchmarkAdapterBootstrap' -benchtime=300ms -count=3 -benchmem -timeout=12m | tee profiles/baseline.txt
+      - name: Profile CPU independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPEngines/fasthttp/(static|path|query|body)$' -benchtime=2s -count=1 -cpuprofile=profiles/http.cpu.pprof -timeout=12m | tee profiles/cpu-bench.txt
+          go tool pprof -top -nodecount=35 profiles/http.cpu.pprof > profiles/http.cpu-top.txt
+      - name: Profile allocations independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPEngines/fasthttp/(static|path|query|body)$' -benchtime=2s -count=1 -memprofile=profiles/http.heap.pprof -memprofilerate=512 -timeout=12m | tee profiles/memory-bench.txt
+          go tool pprof -alloc_space -top -nodecount=35 profiles/http.heap.pprof > profiles/http.alloc-top.txt
+      - name: Upload profiles and benchmark output
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-profiles-post-router-${{ github.sha }}
+          path: profiles/
+          retention-days: 30
