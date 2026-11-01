@@ -132,6 +132,16 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 						value, status, err := rt.StaticHTTP(controllerInstance, bindingContext)
 						if err != nil {
 							if status >= 400 && status <= 599 && httpadapter.StatusOf(err) == 500 {
+								if status >= 500 {
+									return httpadapter.NewHTTPException(status, "Internal server error")
+								}
+								v := reflect.ValueOf(err)
+								switch v.Kind() {
+								case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Chan, reflect.Func, reflect.Interface:
+									if v.IsNil() {
+										return httpadapter.NewHTTPException(status, "Bad Request")
+									}
+								}
 								return httpadapter.NewHTTPException(status, err.Error())
 							}
 							return err
