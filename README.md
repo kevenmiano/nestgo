@@ -155,7 +155,8 @@ These are NestJS-inspired contracts; not all NestJS features are present.
 - **Optional decorator compiler:** generate standard Go files and metadata from `.mgo` sources.
 - **HTTP adapters:** use native fasthttp or net/http through a platform interface.
 - **Hybrid invocation:** statically invoke eligible handlers while retaining reflection for other cases.
-- **Request pipeline:** global and controller/method guards, pipes, exception filters, and matched-route middleware through transport-neutral interfaces.\n- **Diagnostics:** inspect module graphs and collect startup measurements.
+- **Request pipeline:** global and controller/method guards, pipes, exception filters, and matched-route middleware through transport-neutral interfaces.
+- **Diagnostics:** inspect module graphs and collect startup measurements.
 
 Features are evolving. Constructor injection, request-scoped providers, interceptors, and full cross-package compilation support are not yet stable.
 
