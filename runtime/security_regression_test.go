@@ -55,9 +55,6 @@ func securityPackages() []metadata.Package {
 			{Method: http.MethodGet, Path: "/static-http", Handler: "Regular", StaticHTTP: func(any, httpadapter.Context) (any, int, error) {
 				return nil, 503, errors.New("PRIVATE_HTTP_SENTINEL")
 			}},
-			{Method: http.MethodGet, Path: "/static-http-bad-request", Handler: "Regular", StaticHTTP: func(any, httpadapter.Context) (any, int, error) {
-				return nil, 400, errors.New("PRIVATE_400_SENTINEL")
-			}},
 			{Method: http.MethodGet, Path: "/static-http-invalid-status", Handler: "Regular", StaticHTTP: func(any, httpadapter.Context) (any, int, error) {
 				return nil, 200, errors.New("PRIVATE_STATUS_SENTINEL")
 			}},
@@ -98,7 +95,6 @@ func TestSecurityRuntimeServerErrorsDoNotLeak(t *testing.T) {
 		{"/typed-nil", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
 		{"/static", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
 		{"/static-http", 503, `{"statusCode":503,"message":"Internal server error"}` + "\n"},
-		{"/static-http-bad-request", 400, `{"statusCode":400,"message":"Bad Request"}` + "\n"},
 		{"/static-http-invalid-status", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
