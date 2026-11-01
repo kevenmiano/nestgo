@@ -102,7 +102,16 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			methodType := typ
 			err := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
 				var result any
-				if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
+				if rt.StaticHTTP != nil {
+					value, status, err := rt.StaticHTTP(instance.Interface(), ctx)
+					if err != nil {
+						if status == 0 {
+							status = 500
+						}
+						return respondError(ctx, status, err.Error())
+					}
+					result = value
+				} else if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
 					value, err := rt.StaticInvoke(instance.Interface())
 					if err != nil {
 						return respondError(ctx, 500, err.Error())
