@@ -47,7 +47,19 @@ func TestRealDatabases(t *testing.T) {
 			if err := db.PingContext(ctx); err != nil {
 				t.Fatalf("real database unavailable: %v", err)
 			}
-			store, err := nestdb.Native(db)
+			registry := nestdb.NewConnections()
+			if err := registry.Register(tc.name, db); err != nil {
+				t.Fatal(err)
+			}
+			if err := registry.Register(tc.name, db); err == nil {
+				t.Fatal("duplicate connection accepted")
+			}
+			resolved, err := registry.Get(tc.name)
+			if err != nil || resolved != db {
+				t.Fatalf("named connection lookup failed: %v", err)
+			}
+			defer registry.Close()
+			store, err := nestdb.Native(resolved)
 			if err != nil {
 				t.Fatal(err)
 			}
