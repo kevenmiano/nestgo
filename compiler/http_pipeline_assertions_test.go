@@ -68,12 +68,14 @@ func TestPipelineInterfacesRejectedByGoCompiler(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "test.mgo"), []byte(source), 0644); err != nil {
 				t.Fatal(err)
 			}
-			if err := CompileDir(dir); err != nil {
-				t.Fatalf("generate: %v", err)
-			}
+			// The .mgo compiler type-checks imports: its fixture must have
+			// the local module replacement before invoking CompileDir.
 			mod := "module testpipeline\n\ngo 1.27.0\n\nrequire github.com/kevenmiano/nestgo v0.0.0\nreplace github.com/kevenmiano/nestgo => " + root + "\n"
 			if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil {
 				t.Fatal(err)
+			}
+			if err := CompileDir(dir); err != nil {
+				t.Fatalf("generate: %v", err)
 			}
 			cmd := exec.Command("go", "test", "-mod=mod", ".")
 			cmd.Dir = dir
