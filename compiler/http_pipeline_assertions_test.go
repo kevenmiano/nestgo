@@ -26,9 +26,13 @@ type C struct{}
 func (*C) Get() string { return "ok" }
 `)
 	file, err := Parse("sample.mgo", source)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	output, err := Generate([]*File{file})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, line := range []string{
 		"var _ httpadapter.Guard = (*Auth)(nil)",
 		"var _ httpadapter.Pipe = (*Trim)(nil)",
@@ -42,9 +46,11 @@ func (*C) Get() string { return "ok" }
 
 func TestPipelineInterfacesRejectedByGoCompiler(t *testing.T) {
 	cwd, err := os.Getwd()
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	root := filepath.ToSlash(filepath.Dir(cwd))
-	cases := []struct{
+	cases := []struct {
 		name, decorator, method, want string
 	}{
 		{"guard", "UseGuards", "func (*Bad) CanActivate(httpadapter.ExecutionContext) bool { return true }", "httpadapter.Guard"},
@@ -56,20 +62,26 @@ func TestPipelineInterfacesRejectedByGoCompiler(t *testing.T) {
 			dir := t.TempDir()
 			source := "package testpipeline\nimport \"github.com/kevenmiano/nestgo/httpadapter\"\n" +
 				"@Injectable()\ntype Bad struct{}\n" + tc.method + "\n" +
-				"@"+tc.decorator+"(Bad)\n@Controller(\"/\")\ntype TestController struct{}\n" +
+				"@" + tc.decorator + "(Bad)\n@Controller(\"/\")\ntype TestController struct{}\n" +
 				"@Get(\"/\")\nfunc (*TestController) Get() string { return \"ok\" }\n" +
 				"@Module({controllers: [TestController], providers: [Bad]})\ntype RootModule struct{}\n"
-			if err := os.WriteFile(filepath.Join(dir,"test.mgo"),[]byte(source),0644); err != nil { t.Fatal(err) }
+			if err := os.WriteFile(filepath.Join(dir, "test.mgo"), []byte(source), 0644); err != nil {
+				t.Fatal(err)
+			}
 			if err := CompileDir(dir); err != nil { t.Fatalf("generate: %v",err) }
 			mod := "module testpipeline\n\ngo 1.27.0\n\nrequire github.com/kevenmiano/nestgo v0.0.0\nreplace github.com/kevenmiano/nestgo => " + root + "\n"
-			if err := os.WriteFile(filepath.Join(dir,"go.mod"),[]byte(mod),0644); err != nil { t.Fatal(err) }
-			cmd := exec.Command("go","test","-mod=mod",".")
-			cmd.Dir=dir
-			cmd.Env=append(os.Environ(),"GOWORK=off")
-			output,err:=cmd.CombinedOutput()
-			if err==nil {t.Fatalf("incompatible %s provider compiled successfully:\n%s",tc.name,output)}
-			if !strings.Contains(string(output),tc.want) || !strings.Contains(string(output),"does not implement") {
-				t.Fatalf("want a static interface failure for %s; got:\n%s",tc.name,output)
+			if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.Command("go", "test", "-mod=mod", ".")
+			cmd.Dir = dir
+			cmd.Env = append(os.Environ(), "GOWORK=off")
+			output, err := cmd.CombinedOutput()
+			if err == nil {
+				t.Fatalf("incompatible %s provider compiled successfully:\n%s", tc.name, output)
+			}
+			if !strings.Contains(string(output), tc.want) || !strings.Contains(string(output), "does not implement") {
+				t.Fatalf("want a static interface failure for %s; got:\n%s", tc.name, output)
 			}
 		})
 	}
