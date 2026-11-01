@@ -430,12 +430,18 @@ func Generate(files []*File) ([]byte, error) {
 					status = n
 				case "Header":
 					name, value, err := parseHeaderDecorator(a.Argument)
-					if err != nil { return nil, Diagnostic{f.Path,a.Line,"@Header: "+err.Error()} }
-					headers = append(headers, fmt.Sprintf("{Name:%q,Value:%q}",name,value))
+					if err != nil {
+						return nil, Diagnostic{f.Path, a.Line, "@Header: " + err.Error()}
+					}
+					headers = append(headers, fmt.Sprintf("{Name:%q,Value:%q}", name, value))
 				case "Redirect":
-					if redirectURL != "" { return nil, Diagnostic{f.Path,a.Line,"duplicate @Redirect"} }
+					if redirectURL != "" {
+						return nil, Diagnostic{f.Path, a.Line, "duplicate @Redirect"}
+					}
 					url, code, err := parseRedirectDecorator(a.Argument)
-					if err != nil { return nil, Diagnostic{f.Path,a.Line,"@Redirect: "+err.Error()} }
+					if err != nil {
+						return nil, Diagnostic{f.Path, a.Line, "@Redirect: " + err.Error()}
+					}
 					redirectURL, redirectStatus = url, code
 				}
 			}

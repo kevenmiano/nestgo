@@ -70,7 +70,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				if rt.StaticHTTP != nil {
 					value, status, err := rt.StaticHTTP(instance.Interface(), ctx)
 					if err != nil {
-						if status != 0 { return respondError(ctx, status, err.Error()) }
+						if status != 0 {
+							return respondError(ctx, status, err.Error())
+						}
 						return httpresponse.WriteError(ctx, err)
 					}
 					result, resultStatus = value, status
@@ -79,7 +81,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 					}
 				} else if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
 					value, err := rt.StaticInvoke(instance.Interface())
-					if err != nil { return httpresponse.WriteError(ctx, err) }
+					if err != nil {
+						return httpresponse.WriteError(ctx, err)
+					}
 					result = value
 					if handlerError, ok := value.(error); ok && handlerError != nil {
 						return httpresponse.WriteError(ctx, handlerError)
@@ -110,7 +114,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 								}
 								v.Elem().SetString(ctx.Query(p.Name))
 							case "Headers":
-								if t.Kind() != reflect.String { return respondError(ctx, 500, "header parameter must be string") }
+								if t.Kind() != reflect.String {
+									return respondError(ctx, 500, "header parameter must be string")
+								}
 								v.Elem().SetString(ctx.Header(p.Name))
 							case "Res", "Response":
 								v.Elem().Set(reflect.ValueOf(writer))
@@ -133,11 +139,17 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 					}
 					errType := reflect.TypeOf((*error)(nil)).Elem()
 					if len(results) == 1 && results[0].Type().Implements(errType) {
-						if !results[0].IsNil() { return httpresponse.WriteError(ctx, results[0].Interface().(error)) }
-					} else if len(results) > 0 { result = results[0].Interface() }
+						if !results[0].IsNil() {
+							return httpresponse.WriteError(ctx, results[0].Interface().(error))
+						}
+					} else if len(results) > 0 {
+						result = results[0].Interface()
+					}
 				}
 				replyRoute := rt
-				if resultStatus != 0 { replyRoute.Status = resultStatus }
+				if resultStatus != 0 {
+					replyRoute.Status = resultStatus
+				}
 				return finishHTTPResponse(ctx, replyRoute, result, writer, explicit, passthrough)
 			}})
 			if registrationErr != nil {

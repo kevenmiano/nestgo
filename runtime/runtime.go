@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kevenmiano/nestgo/logging"
 	"github.com/kevenmiano/nestgo/httpresponse"
-	"github.com/kevenmiano/nestgo/platform/nethttp"
+	"github.com/kevenmiano/nestgo/logging"
 	"github.com/kevenmiano/nestgo/metadata"
+	"github.com/kevenmiano/nestgo/platform/nethttp"
 	"log/slog"
 	"net/http"
 	"reflect"
@@ -87,7 +87,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 			handler := method
 			spec := route
 			mux.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
-				responseCtx := nethttp.NewContext(w,r)
+				responseCtx := nethttp.NewContext(w, r)
 				writer := httpresponse.NewWriter(responseCtx)
 				routeResponseHeaders(responseCtx, spec)
 				replyRoute := spec
@@ -115,7 +115,10 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 							}
 							v.Elem().SetString(r.URL.Query().Get(p.Name))
 						case "Headers":
-							if t.Kind() != reflect.String { http.Error(w, "header parameter must be string", 500); return }
+							if t.Kind() != reflect.String {
+								http.Error(w, "header parameter must be string", 500)
+								return
+							}
 							v.Elem().SetString(r.Header.Get(p.Name))
 						case "Res", "Response":
 							v.Elem().Set(reflect.ValueOf(writer))
@@ -137,30 +140,47 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				if spec.StaticHTTP != nil {
 					value, status, err := spec.StaticHTTP(instance.Interface(), responseCtx)
 					if err != nil {
-						if status != 0 { _ = respondError(responseCtx,status,err.Error()) } else { _ = httpresponse.WriteError(responseCtx,err) }
+						if status != 0 {
+							_ = respondError(responseCtx, status, err.Error())
+						} else {
+							_ = httpresponse.WriteError(responseCtx, err)
+						}
 						return
 					}
 					result = value
 					if handlerError, ok := value.(error); ok && handlerError != nil {
-						_ = httpresponse.WriteError(responseCtx, handlerError); return
+						_ = httpresponse.WriteError(responseCtx, handlerError)
+						return
 					}
-					if status != 0 { replyRoute.Status = status }
+					if status != 0 {
+						replyRoute.Status = status
+					}
 				} else if spec.StaticInvoke != nil && typ.NumIn() == 0 {
 					value, err := spec.StaticInvoke(instance.Interface())
-					if err != nil { _ = httpresponse.WriteError(responseCtx, err); return }
+					if err != nil {
+						_ = httpresponse.WriteError(responseCtx, err)
+						return
+					}
 					result = value
 					if handlerError, ok := value.(error); ok && handlerError != nil {
-						_ = httpresponse.WriteError(responseCtx, handlerError); return
+						_ = httpresponse.WriteError(responseCtx, handlerError)
+						return
 					}
 				} else {
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
-						_ = httpresponse.WriteError(responseCtx, results[1].Interface().(error)); return
+						_ = httpresponse.WriteError(responseCtx, results[1].Interface().(error))
+						return
 					}
 					errType := reflect.TypeOf((*error)(nil)).Elem()
 					if len(results) == 1 && results[0].Type().Implements(errType) {
-						if !results[0].IsNil() { _ = httpresponse.WriteError(responseCtx,results[0].Interface().(error)); return }
-					} else if len(results) > 0 { result = results[0].Interface() }
+						if !results[0].IsNil() {
+							_ = httpresponse.WriteError(responseCtx, results[0].Interface().(error))
+							return
+						}
+					} else if len(results) > 0 {
+						result = results[0].Interface()
+					}
 				}
 				if err := finishHTTPResponse(responseCtx, replyRoute, result, writer, explicit, passthrough); err != nil {
 					_ = httpresponse.WriteError(responseCtx, err)
