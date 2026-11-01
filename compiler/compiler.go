@@ -896,7 +896,9 @@ func compileDirWithCache(dir string, dialect sqlgen.Dialect, dialects map[string
 		return err
 	}
 	if cache != nil {
-		cache.commit(next)
+		if err := cache.commit(next); err != nil {
+			return err
+		}
 	}
 	return nil
 }

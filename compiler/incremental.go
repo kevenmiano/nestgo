@@ -2,6 +2,8 @@ package compiler
 
 import (
 	"crypto/sha256"
+	"os"
+	"strings"
 )
 
 // cachedUnit owns one immutable parsed source and its local generated Go code.
@@ -58,4 +60,44 @@ func (c *incrementalCache) render(file *File, next map[string]cachedUnit) ([]byt
 // Commit only after the entire compile succeeds. Errors in any source or in
 // package-wide validation cannot poison the last known-good snapshot. Files
 // deleted from the directory disappear from the committed cache automatically.
-func (c *incrementalCache) commit(next map[string]cachedUnit) { c.units = next }
+func (c *incrementalCache) commit(next map[string]cachedUnit) error {
+	// A removed source leaves behind Go files that are otherwise still picked
+	// up by go build. Remove only paths that this watcher previously compiled.
+	for path, previous := range c.units {
+		current, exists := next[path]
+		if !exists {
+			base := strings.TrimSuffix(path, ".mgo")
+			for _, suffix := range []string{"_generated.go", "_transformers_generated.go", "_repository_generated.go"} {
+				if err := removeGeneratedArtifact(base + suffix); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if isRepositoryUnit(previous.file) && !isRepositoryUnit(current.file) {
+			if err := removeGeneratedArtifact(strings.TrimSuffix(path, ".mgo") + "_repository_generated.go"); err != nil {
+				return err
+			}
+		}
+	}
+	c.units = next
+	return nil
+}
+
+func isRepositoryUnit(file *File) bool {
+	for _, declaration := range file.Declarations {
+		for _, annotation := range declaration.Annotations {
+			if annotation.Name == "Repository" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func removeGeneratedArtifact(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
