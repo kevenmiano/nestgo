@@ -104,7 +104,7 @@ Construction returns an error when dependency/route validation or registration f
 | DI | `registerRoutes` in `runtime/http_routes.go` | `NewWithOptions` in `runtime/runtime.go` |
 | HTTP serving | `Application.Listen/Serve` | Caller runs `http.Server` |
 | Shutdown | `Application.Shutdown(ctx)` delegates to adapter | Caller owns server shutdown |
-| Static zero-arg invoker | Adapter path currently calls `reflect.Value.Call` | Legacy path uses `StaticInvoke` when eligible |
+| Static zero-arg invoker | Uses generated `StaticInvoke` when eligible | Uses generated `StaticInvoke` when eligible |
 | Lifecycle logs | No equivalent structured bootstrap events in `NewApplication` | `NewWithOptions` emits bootstrap/DI/route events |
 
 These implementations are **not guaranteed to have identical routing, performance, errors or instrumentation**. Check both paths before assuming feature parity.
