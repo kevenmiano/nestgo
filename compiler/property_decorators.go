@@ -185,28 +185,89 @@ func validateDTOField(path string, field DTOField) error {
 	return nil
 }
 
-// transformerSpec accepts only a named Go function or package-qualified
-// function. Direction is explicit in the decorator name; string flags are
-// deliberately unsupported.
+// transformerSpec accepts typed functions, or zero-value struct instances
+// such as Trim{} and &Normalize{}. Arbitrary runtime calls and expressions
+// are rejected; generated Go invokes the typed Transformer[T] interface.
 func transformerSpec(argument string) (string, error) {
 	name := strings.TrimSpace(argument)
 	expr, err := parserExpr(name)
 	if err != nil {
-		return "", fmt.Errorf("@Transform expects one function identifier; use @TransformInput or @TransformOutput to select a direction")
+		return "", fmt.Errorf("@Transform expects a function or struct instance, such as Normalize or Trim{}")
 	}
 	switch expression := expr.(type) {
 	case *ast.Ident:
 		if expression.Name == "_" {
-			return "", fmt.Errorf("@Transform expects a function identifier")
+			return "", fmt.Errorf("@Transform expects a function or struct instance")
 		}
 	case *ast.SelectorExpr:
 		if _, ok := expression.X.(*ast.Ident); !ok {
-			return "", fmt.Errorf("@Transform expects a function identifier")
+			return "", fmt.Errorf("@Transform expects a function or struct instance")
+		}
+	case *ast.CompositeLit:
+		if !validTransformerStructLiteral(expression) {
+			return "", fmt.Errorf("@Transform struct must use a zero-value literal like Trim{}")
+		}
+	case *ast.UnaryExpr:
+		literal, ok := expression.X.(*ast.CompositeLit)
+		if expression.Op != token.AND || !ok || !validTransformerStructLiteral(literal) {
+			return "", fmt.Errorf("@Transform struct must use a zero-value literal like &Trim{}")
 		}
 	default:
-		return "", fmt.Errorf("@Transform expects a function identifier")
+		return "", fmt.Errorf("@Transform expects a function or struct instance")
 	}
 	return name, nil
+}
+
+func validTransformerStructLiteral(literal *ast.CompositeLit) bool {
+	if len(literal.Elts) != 0 {
+		return false
+	}
+	switch typ := literal.Type.(type) {
+	case *ast.Ident:
+		return typ.Name != "_"
+	case *ast.SelectorExpr:
+		_, ok := typ.X.(*ast.Ident)
+		return ok
+	default:
+		return false
+	}
+}
+
+func transformerStructLiteral(name string) bool {
+	expr, err := parserExpr(name)
+	if err != nil {
+		return false
+	}
+	switch expr.(type) {
+	case *ast.CompositeLit, *ast.UnaryExpr:
+		return true
+	}
+	return false
+}
+
+// transformerQualifier discovers the package alias for qualified functions
+// and struct values, including &other.Normalize{}.
+func transformerQualifier(name string) string {
+	expr, err := parserExpr(name)
+	if err != nil {
+		return ""
+	}
+	switch value := expr.(type) {
+	case *ast.SelectorExpr:
+		id, ok := value.X.(*ast.Ident)
+		if ok { return id.Name }
+	case *ast.CompositeLit:
+		if valueType, ok := value.Type.(*ast.SelectorExpr); ok {
+			if id, ok := valueType.X.(*ast.Ident); ok { return id.Name }
+		}
+	case *ast.UnaryExpr:
+		if literal, ok := value.X.(*ast.CompositeLit); ok {
+			if valueType, ok := literal.Type.(*ast.SelectorExpr); ok {
+				if id, ok := valueType.X.(*ast.Ident); ok { return id.Name }
+			}
+		}
+	}
+	return ""
 }
 
 // Kept separate from Parse so the lexer can retain the offsets of property markers.
