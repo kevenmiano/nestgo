@@ -18,7 +18,7 @@ type AppModule struct{}
 
 A provider is available within its declaring module. A consuming module can inject it when it imports a module that exports that provider. External module references can use qualified Go types in `imports` when their package aliases are declared in the `.mgo` source.
 
-At bootstrap, the runtime validates missing imports, duplicate ownership, invalid exports, import cycles and unavailable required dependencies. `runtime.New()` discovers the registered metadata packages of imported modules transitively. Those Go packages must still be linked into the binary so their `init` registration runs.
+At bootstrap, the runtime validates missing imports, duplicate ownership, invalid exports, import cycles and unavailable required dependencies. A field is injected only with `nestgo:"inject"` (required) or `nestgo:"optional"`; untagged fields are ordinary user state. Use `nestgo:"-"` to exclude a field explicitly. `runtime.New()` discovers the registered metadata packages of imported modules transitively. Those Go packages must still be linked into the binary so their `init` registration runs.
 
 :::caution Experimental limitations
 Field injection is supported; constructor injection, request-scoped providers, complete cross-package compiler type validation and advanced lifecycle hooks are not stable features. An import does not automatically export all providers.
