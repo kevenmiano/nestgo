@@ -185,93 +185,35 @@ func validateDTOField(path string, field DTOField) error {
 	return nil
 }
 
-// transformerSpec accepts typed functions, or zero-value struct instances
-// such as Trim{} and &Normalize{}. Arbitrary runtime calls and expressions
-// are rejected; generated Go invokes the typed Transformer[T] interface.
+// transformerSpec accepts only a bare Go function name or named struct type.
+// The compiler resolves local struct symbols and generates a typed, non-nil
+// instance. No struct literals, constructors, or runtime type assertions are
+// needed in user-written decorators.
 func transformerSpec(argument string) (string, error) {
 	name := strings.TrimSpace(argument)
 	expr, err := parserExpr(name)
 	if err != nil {
-		return "", fmt.Errorf("@Transform expects a function or struct instance, such as Normalize or Trim{}")
+		return "", fmt.Errorf("@Transform expects a function or struct type name, e.g. NormalizeEmail")
 	}
 	switch expression := expr.(type) {
 	case *ast.Ident:
 		if expression.Name == "_" || expression.Name == "nil" || expression.Name == "true" || expression.Name == "false" {
-			return "", fmt.Errorf("@Transform expects a function or struct instance")
+			return "", fmt.Errorf("@Transform expects a function or struct type name")
 		}
 	case *ast.SelectorExpr:
 		if _, ok := expression.X.(*ast.Ident); !ok {
-			return "", fmt.Errorf("@Transform expects a function or struct instance")
-		}
-	case *ast.CompositeLit:
-		if !validTransformerStructLiteral(expression) {
-			return "", fmt.Errorf("@Transform struct must use a zero-value literal like Trim{}")
-		}
-	case *ast.UnaryExpr:
-		literal, ok := expression.X.(*ast.CompositeLit)
-		if expression.Op != token.AND || !ok || !validTransformerStructLiteral(literal) {
-			return "", fmt.Errorf("@Transform struct must use a zero-value literal like &Trim{}")
+			return "", fmt.Errorf("@Transform expects a function or struct type name")
 		}
 	default:
-		return "", fmt.Errorf("@Transform expects a function or struct instance")
+		return "", fmt.Errorf("@Transform expects a function or struct type name; do not pass an instance")
 	}
 	return name, nil
 }
 
-func validTransformerStructLiteral(literal *ast.CompositeLit) bool {
-	if len(literal.Elts) != 0 {
-		return false
-	}
-	switch typ := literal.Type.(type) {
-	case *ast.Ident:
-		return typ.Name != "_"
-	case *ast.SelectorExpr:
-		_, ok := typ.X.(*ast.Ident)
-		return ok
-	default:
-		return false
-	}
-}
-
-func transformerStructLiteral(name string) bool {
-	expr, err := parserExpr(name)
-	if err != nil {
-		return false
-	}
-	switch expr.(type) {
-	case *ast.CompositeLit, *ast.UnaryExpr:
-		return true
-	}
-	return false
-}
-
-// transformerQualifier discovers the package alias for qualified functions
-// and struct values, including &other.Normalize{}.
+// transformerQualifier returns the optional imported package alias.
 func transformerQualifier(name string) string {
-	expr, err := parserExpr(name)
-	if err != nil {
-		return ""
-	}
-	switch value := expr.(type) {
-	case *ast.SelectorExpr:
-		id, ok := value.X.(*ast.Ident)
-		if ok {
-			return id.Name
-		}
-	case *ast.CompositeLit:
-		if valueType, ok := value.Type.(*ast.SelectorExpr); ok {
-			if id, ok := valueType.X.(*ast.Ident); ok {
-				return id.Name
-			}
-		}
-	case *ast.UnaryExpr:
-		if literal, ok := value.X.(*ast.CompositeLit); ok {
-			if valueType, ok := literal.Type.(*ast.SelectorExpr); ok {
-				if id, ok := valueType.X.(*ast.Ident); ok {
-					return id.Name
-				}
-			}
-		}
+	if alias, _, ok := strings.Cut(name, "."); ok {
+		return alias
 	}
 	return ""
 }
@@ -322,19 +264,19 @@ func (field DTOField) jsonName() string {
 // propertyMethods emits direct field accesses and typed custom callback calls.
 // Generated DTO methods are consumed automatically by encoding/json, including
 // HTTP request binding and response serialization, regardless of HTTP adapter.
-func propertyMethods(file *File) string {
+func propertyMethods(file *File, structTypes map[string]bool) string {
 	var out strings.Builder
 	for _, dto := range file.DTOs {
 		fmt.Fprintf(&out, "\nfunc (value %s) MarshalJSON() ([]byte, error) {\n", dto.Name)
-		writeDTOJSONMethod(&out, dto, "output")
+		writeDTOJSONMethod(&out, dto, "output", structTypes)
 		fmt.Fprintf(&out, "\nfunc (value *%s) UnmarshalJSON(data []byte) error {\n", dto.Name)
 		out.WriteString("if value == nil { return __nestgo_fmt.Errorf(\"cannot unmarshal into nil DTO\") }\n")
-		writeDTOJSONMethod(&out, dto, "input")
+		writeDTOJSONMethod(&out, dto, "input", structTypes)
 	}
 	return out.String()
 }
 
-func writeDTOJSONMethod(out *strings.Builder, dto DTO, direction string) {
+func writeDTOJSONMethod(out *strings.Builder, dto DTO, direction string, structTypes map[string]bool) {
 	encoding := direction == "output"
 	type indexedField struct {
 		index int
@@ -371,8 +313,8 @@ func writeDTOJSONMethod(out *strings.Builder, dto DTO, direction string) {
 				continue
 			}
 			name, _ := transformerSpec(a.Argument)
-			if transformerStructLiteral(name) {
-				fmt.Fprintf(out, "next%d_%d, err%d_%d := __nestgo_transform.Apply[%s](p%d, %s)\n", i, n, i, n, field.Type, i, name)
+			if structTypes[name] {
+				fmt.Fprintf(out, "next%d_%d, err%d_%d := __nestgo_transform.Apply[%s](p%d, new(%s))\n", i, n, i, n, field.Type, i, name)
 			} else {
 				fmt.Fprintf(out, "next%d_%d, err%d_%d := __nestgo_transform.ApplyFunc[%s](p%d, %s)\n", i, n, i, n, field.Type, i, name)
 			}
