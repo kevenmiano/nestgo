@@ -332,7 +332,7 @@ func generateMetadata(files []*File, allowPersistence bool, repositories ...Repo
 			for _, n := range exportNames {
 				exportsCode = append(exportsCode, fmt.Sprintf("reflect.TypeOf((*%s)(nil))", n))
 			}
-			if len(imports) == 0 && len(exports) == 0 && !strings.HasPrefix(strings.TrimSpace(moduleAnnotation.Argument), "{") {
+			if len(repositories) == 0 && len(imports) == 0 && len(exports) == 0 && !strings.HasPrefix(strings.TrimSpace(moduleAnnotation.Argument), "{") {
 				// Preserve exact legacy generated metadata for plain @Module.
 				modules = append(modules, fmt.Sprintf(`{Type: reflect.TypeOf((*%s)(nil)), Name: %q}`, d.Name, name))
 			} else {
