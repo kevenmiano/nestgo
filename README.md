@@ -89,6 +89,12 @@ go run ./cmd/nestgo compile ./examples/shop
 go test ./...
 ```
 
+### Compile on source changes
+
+Use `nestgo compile --watch ./myapp` for an immediate compile and automatic recompilation when top-level `.mgo` sources change. Generated output files do not trigger another compile; `Ctrl+C` exits cleanly. Watch mode does not run tests or start an HTTP server.
+
+A successful compile generates a compiler-owned wiring assertion test and editable `t.Skip` scaffolds for decorated controllers/providers. Add `@Dto()` to generate DTO serialization/deserialization TODOs; validation TODOs require explicit `validate` field tags. Developer-written tests are not overwritten. See the [compiler guide](docs/COMPILER.md).
+
 ## Optional: decorators and modules
 
 NestGo's decorators are written in `.mgo` files and compiled into regular Go source:

@@ -156,7 +156,7 @@ func TestCompileWatchCancellationAndHelp(t *testing.T) {
 			t.Errorf("missing %s in Cobra help", part)
 		}
 	}
-	for _, flags := range [][]string{{"--watch"}, {"--watch=false", "--poll-interval=0"}, {"--watch", "--poll-interval=0"}, {"--poll-interval=1s"}} {
+	for _, flags := range [][]string{{"--watch=false", "--poll-interval=0"}, {"--watch", "--poll-interval=0"}, {"--poll-interval=1s"}} {
 		args := append([]string{"compile"}, flags...)
 		args = append(args, t.TempDir())
 		_, err := executeForTest(args...)

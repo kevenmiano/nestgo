@@ -40,14 +40,23 @@ nestgo compile ./myapp
 nestgo compile ./myapp/users.mgo
 ```
 
-A successful compilation emits ordinary Go files and registration metadata. The compiler accepts one existing directory or `.mgo` file. Decorators are not syntax understood by `go build`; compile them first and then use native Go commands:
+To watch edits during development:
+
+```bash
+nestgo compile --watch ./myapp
+nestgo compile ./myapp -w --poll-interval=500ms
+```
+
+The watcher initially compiles the directory and repeats only when input fingerprints change. It ignores generated outputs, preserves existing editable tests, and prints errors while continuing to watch. It is not a runtime server and does not run `go test`. Source re-parsing still covers the whole package on each detected change.
+
+A successful compilation emits ordinary Go files, registration metadata, a generated wiring test and editable testing TODOs. The compiler accepts one existing directory or `.mgo` file. Decorators are not syntax understood by `go build`; compile them first and then use native Go commands:
 
 ```bash
 go build ./...
 go test ./...
 ```
 
-There is currently **no** `nestgo new`, `start`, `watch`, `generate`, or `test` subcommand. Do not confuse this compiler with a long-running application server.
+There is currently **no separate** `nestgo new`, `start`, `watch`, `generate`, `check`, or `test` subcommand; `--watch` is a flag on `compile`. Do not confuse this compiler with a long-running application server.
 
 ## Diagnose dependencies and startup
 
@@ -99,7 +108,7 @@ Use `nestgo completion --help` for detailed persistent installation instructions
 ## Day-to-day workflow
 
 1. Add `.mgo` files only when opting into NestGo decorators.
-2. Run `nestgo compile ./path/to/package` after editing decorated source.
+2. Run `nestgo compile ./path/to/package`, or `nestgo compile --watch ./path/to/package` during development.
 3. Run `go test ./...` to test the generated Go application.
 4. Optionally run `nestgo diagnose -app ./path/to/package -strict` to inspect registrations and graphs.
 5. Use ordinary `go build` and deployment tooling. The NestGo CLI is not a production application runtime.
