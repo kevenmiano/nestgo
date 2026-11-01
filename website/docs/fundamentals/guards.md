@@ -82,4 +82,4 @@ expressions or instances in `@UseGuards`.
 :::
 
 Continue with [pipes](./pipes.md) and
-[the complete example](https://github.com/kevenmiano/nestgo/tree/feat/http-request-pipeline/examples/pipeline).
+[the complete example](https://github.com/kevenmiano/nestgo/tree/main/examples/pipeline).
