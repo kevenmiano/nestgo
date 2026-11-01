@@ -87,22 +87,7 @@ func TestCompileDirDoesNotWriteOnTypeError(t *testing.T) {
 }
 
 func TestGeneratedRepositoryImplementsInjectedInterface(t *testing.T) {
-	source := `package demo
-import "context"
-@Entity({table: "users"})
-type User struct{ ID int64 }
-@Repository(User, "users")
-type UsersRepository struct{}
-@Query("SELECT id FROM users WHERE id=:id")
-func (r *UsersRepository) FindByID(ctx context.Context, id int64) (*User, error) { return nil, nil }
-type UserReader interface {
-	FindByID(ctx context.Context, id int64) (*User, error)
-}
-@Injectable()
-type UsersService struct { Repo UserReader \`nestgo:"inject"\` }
-@Module({providers:[UsersService]})
-type UsersModule struct{}
-`
+	source := "package demo\nimport \"context\"\n@Entity({table: \"users\"})\ntype User struct{ ID int64 }\n@Repository(User, \"users\")\ntype UsersRepository struct{}\n@Query(\"SELECT id FROM users WHERE id=:id\")\nfunc (r *UsersRepository) FindByID(ctx context.Context, id int64) (*User, error) { return nil, nil }\ntype UserReader interface {\n\tFindByID(ctx context.Context, id int64) (*User, error)\n}\n@Injectable()\ntype UsersService struct { Repo UserReader `nestgo:\"inject\"` }\n@Module({providers:[UsersService]})\ntype UsersModule struct{}\n"
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "users.mgo"), []byte(source), 0600); err != nil {
 		t.Fatal(err)
@@ -111,7 +96,7 @@ type UsersModule struct{}
 		t.Fatalf("generated repository interface must resolve at compile time: %v", err)
 	}
 	// The compiler must reject an interface that the generated type does not implement.
-	invalid := strings.Replace(source, "FindByID(ctx context.Context, id int64) (*User, error)\\n}", "UnknownMethod(ctx context.Context, id int64) (*User, error)\\n}", 1)
+	invalid := strings.Replace(source, "FindByID(ctx context.Context, id int64) (*User, error)\n}", "UnknownMethod(ctx context.Context, id int64) (*User, error)\n}", 1)
 	invalidDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(invalidDir, "users.mgo"), []byte(invalid), 0600); err != nil {
 		t.Fatal(err)
