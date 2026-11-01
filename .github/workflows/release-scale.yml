@@ -1,0 +1,59 @@
+name: Release-scale latency and throughput baselines
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/release_scale_benchmark_test.go'
+      - '.github/workflows/release-scale.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/release_scale_benchmark_test.go'
+      - '.github/workflows/release-scale.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scale-benchmarks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Record immutable measurement context
+        shell: bash
+        run: |
+          mkdir -p scale-results
+          { echo "SHA=$GITHUB_SHA"; go version; go env GOOS GOARCH GOMAXPROCS; uname -a; lscpu; } > scale-results/environment.txt
+      - name: Collect p95, p99, req/s, allocations at 1/10/100/1000
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkReleaseScale$' -benchtime=250ms -count=3 -benchmem -timeout=20m | tee scale-results/bench.txt
+      - name: Summarize benchmark samples
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          path = pathlib.Path("scale-results/bench.txt")
+          entries = [line for line in path.read_text().splitlines() if line.startswith("BenchmarkReleaseScale/")]
+          with open("scale-results/summary.md", "w") as f:
+              f.write("# Release-scale evidence\n\n")
+              f.write("Same GitHub runner and compiler; measurements include loopback Go HTTP client. ")
+              f.write("Values are samples, not production SLAs.\n\n")
+              f.write("Measured: " + str(len(entries)) + " benchmark samples.\n\n")
+              for item in entries:
+                  f.write("- " + item + "\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-scale-${{ github.sha }}
+          path: scale-results/
+          retention-days: 30
