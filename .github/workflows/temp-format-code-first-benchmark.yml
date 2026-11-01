@@ -1,0 +1,24 @@
+name: Temporary format code-first benchmarks
+on:
+  push:
+    branches: [perf/benchmark-code-first-http]
+    paths: [runtime/code_first_benchmark_test.go]
+permissions:
+  contents: write
+jobs:
+  gofmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/benchmark-code-first-http
+      - name: Apply gofmt
+        run: |
+          gofmt -w runtime/code_first_benchmark_test.go
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add runtime/code_first_benchmark_test.go
+            git commit -m "style(runtime): gofmt code-first benchmarks"
+            git push origin HEAD:perf/benchmark-code-first-http
+          fi
