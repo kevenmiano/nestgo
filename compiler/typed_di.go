@@ -4,9 +4,14 @@ import (
 	"fmt"
 	"go/ast"
 	"go/importer"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"go/parser"
 	"go/token"
 	"go/types"
+	"io"
 	"reflect"
 	"strconv"
 )
@@ -25,7 +30,7 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 	}
 	// Source may contain incomplete application code. Check declarations for
 	// reliable interfaces and implementations without requiring function bodies.
-	cfg := types.Config{Importer: importer.Default(), IgnoreFuncBodies: true, DisableUnusedImportCheck: true}
+	cfg := types.Config{Importer: moduleAwareImporter(fset, filepath.Dir(files[0].Path)), IgnoreFuncBodies: true, DisableUnusedImportCheck: true}
 	info := &types.Info{Defs: make(map[*ast.Ident]types.Object), Types: make(map[ast.Expr]types.TypeAndValue)}
 	pkg, err := cfg.Check(files[0].Package, fset, parsed, info)
 	if err != nil {
@@ -131,4 +136,23 @@ func sortedProviderNames(providers map[string]bool) []string {
 	}
 	sortStrings(names)
 	return names
+}
+
+ 
+// moduleAwareImporter loads compiled export data in the source module context.
+// go/importer.Default cannot resolve Go module replace directives or local modules.
+func moduleAwareImporter(fset *token.FileSet, dir string) types.Importer {
+	return importer.ForCompiler(fset, "gc", func(path string) (io.ReadCloser, error) {
+		cmd := exec.Command("go", "list", "-export", "-f", "{{.Export}}", path)
+		cmd.Dir = dir
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return nil, fmt.Errorf("resolve import %q: %w: %s", path, err, strings.TrimSpace(string(output)))
+		}
+		exportFile := strings.TrimSpace(string(output))
+		if exportFile == "" {
+			return nil, fmt.Errorf("resolve import %q: no compiled export data", path)
+		}
+		return os.Open(exportFile)
+	})
 }
