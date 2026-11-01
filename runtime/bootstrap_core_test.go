@@ -27,7 +27,9 @@ func TestSharedBootstrapGraphInjectsProvidersAndControllers(t *testing.T) {
 		t.Fatal("provider dependency not injected")
 	}
 	controller, err := graph.newController(reflect.TypeOf((*sharedBootstrapController)(nil)))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	resolved := controller.Interface().(*sharedBootstrapController)
 	if resolved.Dependency != consumer.Dependency {
 		t.Fatal("controller and provider must share singleton instance")
@@ -43,9 +45,10 @@ func TestSharedBootstrapGraphRejectsUnresolvedDependency(t *testing.T) {
 
 func TestSharedBootstrapGraphRejectsInvalidController(t *testing.T) {
 	graph, err := prepareBootstrap(nil, nil, nil)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := graph.newController(reflect.TypeOf(123)); err == nil {
 		t.Fatal("expected invalid controller error")
 	}
 }
-
