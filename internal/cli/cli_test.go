@@ -2,10 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra/doc"
 )
@@ -140,6 +142,65 @@ func TestCompileFixture(t *testing.T) {
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil || len(data) == 0 {
 			t.Fatalf("missing/empty %s: %v", name, err)
+		}
+	}
+}
+
+func TestCompileWatchCancellationAndHelp(t *testing.T) {
+	help, err := executeForTest("compile", "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{"--watch", "--poll-interval"} {
+		if !strings.Contains(help, part) {
+			t.Errorf("missing %s in Cobra help", part)
+		}
+	}
+	for _, flags := range [][]string{{"--watch=false", "--poll-interval=0"}, {"--watch", "--poll-interval=0"}, {"--poll-interval=1s"}} {
+		args := append([]string{"compile"}, flags...)
+		args = append(args, t.TempDir())
+		_, err := executeForTest(args...)
+		if err == nil {
+			t.Errorf("expected invalid combination rejection: %v", args)
+		}
+	}
+}
+func TestCompileWatchCompilesAndExitsOnContextCancellation(t *testing.T) {
+	for _, watchFlag := range []string{"--watch", "-watch"} {
+		dir := t.TempDir()
+		source := filepath.Join(dir, "types.mgo")
+		if err := os.WriteFile(source, []byte("package example\n@Injectable()\ntype Provider struct{}\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		var stdout, stderr bytes.Buffer
+		cmd := New()
+		cmd.SetOut(&stdout)
+		cmd.SetErr(&stderr)
+		cmd.SetArgs(normalizeArgs([]string{"compile", dir, watchFlag, "--poll-interval=10ms"}))
+		ctx, cancel := context.WithCancel(context.Background())
+		done := make(chan error, 1)
+		go func() { done <- cmd.ExecuteContext(ctx) }()
+		deadline := time.After(4 * time.Second)
+		compiled := filepath.Join(dir, "zz_nestgo_wiring_generated_test.go")
+		for {
+			if _, err := os.Stat(compiled); err == nil {
+				break
+			}
+			select {
+			case <-deadline:
+				cancel()
+				t.Fatal("watch did not generate wiring")
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
+		cancel()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("watch did not honor cancellation")
 		}
 	}
 }
