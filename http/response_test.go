@@ -1,7 +1,7 @@
 package http
 
 import (
-"errors"
+	"errors"
 	"strings"
 	"testing"
 )
