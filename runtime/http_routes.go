@@ -124,7 +124,7 @@ func registerRoutesWithLifecycleAndInstances(adapter httpadapter.Adapter, packag
 					}
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
-						return respondError(ctx, 500, results[1].Interface().(error).Error())
+						return respondError(ctx, 500, "Internal server error")
 					}
 					result = results[0].Interface()
 				}
@@ -171,6 +171,9 @@ func registerRoutesWithLifecycleAndInstances(adapter httpadapter.Adapter, packag
 	return nil
 }
 func respondError(ctx httpadapter.Context, status int, message string) error {
+	if status >= 500 {
+		message = "Internal server error"
+	}
 	ctx.Status(status)
 	ctx.SetHeader("Content-Type", "text/plain; charset=utf-8")
 	return ctx.Write([]byte(message + "\n"))
