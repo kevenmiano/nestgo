@@ -29,7 +29,7 @@ Developer                         Build time                          Runtime
                                                    |
                                          generated init() function
                                                    |
-                                            metadata.Register
+                                            metadata.RegisterCompiled
                                                    |
                                             runtime.New()
                                                    |
