@@ -40,10 +40,11 @@ log.Fatal(app.Listen(":8080"))
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
+| `WithContext(ctx)` | Supply a cancellable bootstrap context |
 | `WithDebug(true)` | Enable detailed per-provider diagnostics |
 | `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
 
-`WithPackages` is reserved for explicit metadata fixtures and advanced embedding. Generated modules are loaded automatically when linked. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
+`WithPackages` is reserved for explicit metadata fixtures and advanced embedding. Generated modules are loaded automatically when linked. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown(ctx)`, `Close()` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
 
 ## Lifecycle
 
