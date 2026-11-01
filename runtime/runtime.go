@@ -267,5 +267,5 @@ func FromRegistry(names ...string) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return New(pkgs...)
+	return newHandler(Options{}, pkgs...)
 }
