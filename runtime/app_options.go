@@ -26,7 +26,7 @@ type appOptions struct {
 
 // App owns the initialized HTTP handler and its database connections.
 type App struct {
-	*Bootstrapped
+	*bootstrapped
 }
 
 // NewApp is the idiomatic application entrypoint. Construction initializes
@@ -41,7 +41,7 @@ func NewApp(ctx context.Context, options ...AppOption) (*App, error) {
 			return nil, err
 		}
 	}
-	boot, err := Bootstrap(ctx, BootstrapOptions{
+	boot, err := bootstrap(ctx, bootstrapOptions{
 		ConfigOptions:   opts.config,
 		DatabaseOptions: opts.database,
 		Runtime:         Options{Logger: opts.logger, Debug: opts.debug, Instances: opts.instances},
@@ -49,12 +49,12 @@ func NewApp(ctx context.Context, options ...AppOption) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &App{Bootstrapped: boot}, nil
+	return &App{bootstrapped: boot}, nil
 }
 
 // HTTPHandler exposes the ready-to-serve net/http handler.
 func (a *App) HTTPHandler() http.Handler {
-	if a == nil || a.Bootstrapped == nil {
+	if a == nil || a.bootstrapped == nil {
 		return nil
 	}
 	return a.Handler
