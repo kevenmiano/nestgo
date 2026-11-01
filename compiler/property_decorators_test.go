@@ -22,16 +22,23 @@ type User struct {
     Name string ` + "\u0060json:\"name,omitempty\"\u0060" + `
     @Exclude()
     Password string ` + "\u0060json:\"password\"\u0060" + `
-    @Transform(NormalizeEmail, "toClassOnly")
+    @TransformInput(NormalizeEmail)
     Email string ` + "\u0060json:\"email\"\u0060" + `
-    @Transform(url.PathUnescape, "toClassOnly")
+    @TransformInput(url.PathUnescape)
     Slug string ` + "\u0060json:\"slug\"\u0060" + `
+    @TransformOutput(Uppercase)
+    Label string ` + "\u0060json:\"label\"\u0060" + `
+    @ExcludeOutput()
+    Token string ` + "\u0060json:\"token\"\u0060" + `
+    @ExcludeInput()
+    ServerID string ` + "\u0060json:\"server_id\"\u0060" + `
     @Type(Address)
     Address Address ` + "\u0060json:\"address\"\u0060" + `
     Age int ` + "\u0060json:\"age,omitempty\"\u0060" + `
 }
 
 func NormalizeEmail(value string) (string,error) { return strings.ToLower(value),nil }
+func Uppercase(value string) (string,error) { return strings.ToUpper(value),nil }
 `
 
 func TestPropertyDecoratorsCompileAndRoundTrip(t *testing.T) {
@@ -46,7 +53,7 @@ func TestPropertyDecoratorsCompileAndRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"MarshalJSON()", "UnmarshalJSON(data []byte)", "NormalizeEmail(p", "url.PathUnescape(p", "display_name"} {
+	for _, expected := range []string{"MarshalJSON()", "UnmarshalJSON(data []byte)", "NormalizeEmail(p", "url.PathUnescape(p", "Uppercase(p", "display_name"} {
 		if !strings.Contains(string(codec), expected) {
 			t.Fatalf("missing %q from generated codec:\n%s", expected, codec)
 		}
@@ -78,8 +85,9 @@ import (
 func TestCodec(t *testing.T) {
     var u User
     if err := json.Unmarshal([]byte("{\"display_name\":\"Ada\",\"password\":\"secret\",\"email\":\"ADA@EXAMPLE.COM\",\"slug\":\"%2Fapi\",\"address\":{\"city\":\"London\"}}"), &u); err != nil {t.Fatal(err)}
-    if u.Name!="Ada"||u.Password!=""||u.Email!="ada@example.com"||u.Slug!="/api"||u.Address.City!="London" {t.Fatalf("decoded: %+v",u)}
+    if u.Name!="Ada"||u.Password!=""||u.Email!="ada@example.com"||u.Slug!="/api"||u.Token!="inbound"||u.ServerID!=""||u.Label!="hello"||u.Address.City!="London" {t.Fatalf("decoded: %+v",u)}
     u.Password="private"
+    u.ServerID="server-set"
     data,err:=json.Marshal(u)
     if err != nil {t.Fatal(err)}
     if strings.Contains(string(data),"private")||strings.Contains(string(data),"password") {t.Fatalf("password leaked: %s",data)}
@@ -105,7 +113,10 @@ func TestPropertyDecoratorDiagnostics(t *testing.T) {
 		{"bad-transform", "package demo\ntype User struct {\n@Transform(something())\nName string\n}", "function identifier"},
 		{"conflict", "package demo\ntype User struct {\n@Expose()\n@Exclude()\nName string\n}", "cannot decorate"},
 		{"type-mismatch", "package demo\ntype User struct {\n@Type(int)\nName string\n}", "must match"},
-		{"bad-direction", "package demo\ntype User struct {\n@Transform(Fn, \"invalid\")\nName string\n}", "direction"},
+		{"old-direction-removed", "package demo\ntype User struct {\n@Transform(Fn, \"toPlainOnly\")\nName string\n}", "one function identifier"},
+		{"exclude-direction-removed", "package demo\ntype User struct {\n@Exclude(\"toClassOnly\")\nName string\n}", "takes no arguments"},
+		{"duplicate-exclude-input", "package demo\ntype User struct {\n@ExcludeInput()\n@ExcludeInput()\nName string\n}", "duplicate @ExcludeInput"},
+		{"conflicting-exclusion", "package demo\ntype User struct {\n@Exclude()\n@ExcludeOutput()\nName string\n}", "cannot be combined"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
