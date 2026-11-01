@@ -100,6 +100,37 @@ func WithMiddleware(middlewares ...httpadapter.Middleware) Option {
 	return func(c *applicationConfig) { c.pipeline.middleware = append(c.pipeline.middleware, middlewares...) }
 }
 
+// middlewareFromHandler resolves the middleware method once at bootstrap.
+func middlewareFromHandler(handler httpadapter.MiddlewareHandler) httpadapter.Middleware {
+	if handler == nil {
+		return nil
+	}
+	value := reflect.ValueOf(handler)
+	if (value.Kind() == reflect.Ptr || value.Kind() == reflect.Func) && value.IsNil() {
+		return nil
+	}
+	return handler.Use
+}
+
+// WithMiddlewareHandlers installs class-based, compile-time-checked middleware.
+// Instances must be concurrency-safe because they are shared across requests.
+func WithMiddlewareHandlers(handlers ...httpadapter.MiddlewareHandler) Option {
+	return func(c *applicationConfig) {
+		for _, handler := range handlers {
+			c.pipeline.middleware = append(c.pipeline.middleware, middlewareFromHandler(handler))
+		}
+	}
+}
+
+// WithRouteMiddlewareHandlers applies class-based middleware to one route.
+func WithRouteMiddlewareHandlers(method, path string, handlers ...httpadapter.MiddlewareHandler) Option {
+	middlewares := make([]httpadapter.Middleware, 0, len(handlers))
+	for _, handler := range handlers {
+		middlewares = append(middlewares, middlewareFromHandler(handler))
+	}
+	return WithRouteMiddleware(method, path, middlewares...)
+}
+
 // WithRouteMiddleware adds middleware to a specific registered method and path.
 func WithRouteMiddleware(method, path string, middlewares ...httpadapter.Middleware) Option {
 	return func(c *applicationConfig) {

@@ -29,6 +29,10 @@ stop. If not handled, NestGo tries the next filter. Unlike NestJS's
 single-filter selection behavior, NestGo deliberately supports
 **fall-through** when a filter returns `false`.
 
+The compiler automatically generates a Go check for each decorated filter,
+for example `var _ httpadapter.ExceptionFilter = (*BadRequestFilter)(nil)`.
+Incorrect `Catch` signatures fail compilation rather than bootstrap.
+
 ## Method, controller and global registration
 
 ```go

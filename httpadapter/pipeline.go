@@ -19,6 +19,17 @@ type ExecutionContext struct {
 type Next func() error
 type Middleware func(Context, Next) error
 
+// MiddlewareHandler is the struct-based transport-neutral middleware contract.
+// Declare: var _ httpadapter.MiddlewareHandler = (*AuditMiddleware)(nil)
+type MiddlewareHandler interface {
+	Use(Context, Next) error
+}
+
+// Use adapts functional middleware to the same interface contract.
+func (middleware Middleware) Use(ctx Context, next Next) error {
+	return middleware(ctx, next)
+}
+
 // Guard runs before parameter binding and handler invocation.
 type Guard interface {
 	CanActivate(ExecutionContext) (bool, error)
