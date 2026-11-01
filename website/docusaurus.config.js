@@ -12,6 +12,8 @@ const config = {
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   i18n: {defaultLocale: 'en', locales: ['en']},
+  markdown: {mermaid: true},
+  themes: ['@docusaurus/theme-mermaid'],
   presets: [['classic', {
     docs: {sidebarPath: require.resolve('./sidebars.js'), routeBasePath: 'docs', editUrl: 'https://github.com/kevenmiano/nestgo/edit/main/website/'},
     blog: false,
