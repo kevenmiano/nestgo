@@ -2,8 +2,8 @@ package compiler
 
 import ("fmt";"strconv";"strings";"unicode")
 type marker struct {Offset int;Name,Argument string}
-func lexDecorators(path string,src []byte)(string,map[int][]Annotation,[]marker,error){
- out:=append([]byte(nil),src...);annotations:=map[int][]Annotation{};params:=[]marker{};pending:=[]Annotation{};line:=1
+func lexDecorators(path string,src []byte)(string,map[int][]Annotation,[]marker,[]marker,error){
+ out:=append([]byte(nil),src...);annotations:=map[int][]Annotation{};params:=[]marker{};properties:=[]marker{};pending:=[]Annotation{};line:=1
  state:=byte(0);escaped:=false
  for i:=0;i<len(src);{
  c:=src[i]
@@ -20,7 +20,7 @@ func lexDecorators(path string,src []byte)(string,map[int][]Annotation,[]marker,
  if c=='@'&&i+1<len(src)&&(unicode.IsLetter(rune(src[i+1]))||src[i+1]=='_'){
  start:=i;startLine:=line;i++;begin:=i
  for i<len(src)&&(unicode.IsLetter(rune(src[i]))||unicode.IsDigit(rune(src[i]))||src[i]=='_'){i++}
- name:=string(src[begin:i]);if !supported[name]{return "",nil,nil,Diagnostic{path,startLine,"unknown decorator @"+name}}
+ name:=string(src[begin:i]);if !supported[name]{return "",nil,nil,nil,Diagnostic{path,startLine,"unknown decorator @"+name}}
  for i<len(src)&&(src[i]==' '||src[i]=='\t'){i++}
  argument:=""
  if i<len(src)&&src[i]=='('{
@@ -30,17 +30,22 @@ func lexDecorators(path string,src []byte)(string,map[int][]Annotation,[]marker,
  if quote!=0{if esc{esc=false}else if ch=='\\'{esc=true}else if ch==quote{quote=0}}else if ch=='"'||ch=='\''||ch=='`'{quote=ch}else if ch=='('{depth++}else if ch==')'{depth--}
  if depth>0&&ch=='\n'{line++};i++
  }
- if depth!=0{return "",nil,nil,Diagnostic{path,startLine,"unclosed decorator argument"}}
+ if depth!=0{return "",nil,nil,nil,Diagnostic{path,startLine,"unclosed decorator argument"}}
  argument=strings.TrimSpace(string(src[argStart:i-1]))
  }
  for k:=start;k<i;k++{if out[k]!='\n'{out[k]=' '}}
  if name=="Body"||name=="Param"||name=="Query"||name=="Headers"{
- if argument!=""{v,e:=strconv.Unquote(argument);if e!=nil{return "",nil,nil,Diagnostic{path,startLine,"parameter decorator expects quoted string"}};argument=v}
+ if argument!=""{v,e:=strconv.Unquote(argument);if e!=nil{return "",nil,nil,nil,Diagnostic{path,startLine,"parameter decorator expects quoted string"}};argument=v}
  params=append(params,marker{start,name,argument})
+ }else if name=="Expose"||name=="Exclude"||name=="Transform"||name=="Type"{
+ lineStart:=start;for lineStart>0&&src[lineStart-1]!='\n'{lineStart--}
+ lineEnd:=i;for lineEnd<len(src)&&src[lineEnd]!='\n'{lineEnd++}
+ if strings.TrimSpace(string(src[lineStart:start]))!=""||strings.TrimSpace(string(src[i:lineEnd]))!=""{return "",nil,nil,nil,Diagnostic{path,startLine,"property decorator must be on its own line"}}
+ properties=append(properties,marker{start,name,argument})
  }else{
  lineStart:=start;for lineStart>0&&src[lineStart-1]!='\n'{lineStart--}
  lineEnd:=i;for lineEnd<len(src)&&src[lineEnd]!='\n'{lineEnd++}
- if strings.TrimSpace(string(src[lineStart:start]))!=""||strings.TrimSpace(string(src[i:lineEnd]))!=""{return "",nil,nil,Diagnostic{path,startLine,"declaration decorator must be on its own line"}}
+ if strings.TrimSpace(string(src[lineStart:start]))!=""||strings.TrimSpace(string(src[i:lineEnd]))!=""{return "",nil,nil,nil,Diagnostic{path,startLine,"declaration decorator must be on its own line"}}
  pending=append(pending,Annotation{name,argument,startLine})
  };continue
  }
@@ -49,7 +54,7 @@ func lexDecorators(path string,src []byte)(string,map[int][]Annotation,[]marker,
  }
  i++
  }
- if len(pending)>0{return "",nil,nil,Diagnostic{path,pending[0].Line,"dangling decorator"}}
+ if len(pending)>0{return "",nil,nil,nil,Diagnostic{path,pending[0].Line,"dangling decorator"}}
  if len(out)!=len(src){panic(fmt.Sprintf("offset drift %d != %d",len(out),len(src)))}
- return string(out),annotations,params,nil
+ return string(out),annotations,params,properties,nil
 }
