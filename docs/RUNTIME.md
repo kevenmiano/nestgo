@@ -20,7 +20,7 @@ log.Fatal(app.Listen(":8080"))
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
-| `WithDebug(true)` | Enable detailed per-provider diagnostics |
+| `WithMiddleware(...)` | Register global middleware |\n| `WithRouteMiddleware(method, path, ...)` | Register middleware for an exact route |\n| `WithGuards(...)` | Register global guards |\n| `WithPipes(...)` | Register global parameter pipes |\n| `WithFilters(...)` | Register global exception filters |\n| `WithDebug(true)` | Enable detailed per-provider diagnostics |
 | `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
 
 Do not combine `WithRegistry` and `WithPackages`. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
@@ -51,6 +51,6 @@ Generated invokers can bypass reflective calls, while other handlers use reflect
 
 Use `WithBootstrapMetrics` for route registration, lifecycle initialization and total durations. The `BenchmarkApplicationBootstrapProviders` benchmark and CI baseline comparison cover 1/10/100 providers.
 
-Constructor injection, request scopes, automatic OS signals, universal filters/guards/interceptors and arbitrary resource disposal are not implemented. Successful application construction does not mean the HTTP port is bound.
+Constructor injection, request scopes, automatic OS signals, interceptors and arbitrary resource disposal are not implemented. See [request pipeline](REQUEST_PIPELINE.md) for middleware/guards/pipes/filters and limitations. Successful application construction does not mean the HTTP port is bound.
 
 See [HTTP adapters](HTTP_ADAPTERS.md) and [lifecycle guide](../website/docs/fundamentals/lifecycle.md).
