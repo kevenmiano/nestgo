@@ -14,7 +14,7 @@ func TestCompiledCrossPackageModulesBootstrap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	module := "module example.com/nestgo-cross-package-test\n\ngo 1.23.0\n\nrequire github.com/kevenmiano/nestgo v0.0.0\n\nreplace github.com/kevenmiano/nestgo => " + filepath.ToSlash(repo) + "\n"
+	module := "module example.com/nestgo-cross-package-test\n\ngo 1.27.0\n\nrequire github.com/kevenmiano/nestgo v0.0.0\n\nreplace github.com/kevenmiano/nestgo => " + filepath.ToSlash(repo) + "\n"
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(module), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -48,8 +48,8 @@ func (g *GreeterService) Greet() string { return "from-external-interface" }
 
 @Controller("/ready")
 type AppController struct {
-    Greeter external.Greeter
-    Repository *external.Repository
+    Greeter external.Greeter NESTGO_INJECT_TAG
+    Repository *external.Repository NESTGO_INJECT_TAG
     Optional external.Unused NESTGO_OPTIONAL_TAG
 }
 
@@ -76,11 +76,19 @@ func TestCompiledCrossPackageBootstrap(t *testing.T) {
 `,
 	}
 	for path, content := range files {
-		if err := os.WriteFile(path, []byte(strings.ReplaceAll(content, "NESTGO_OPTIONAL_TAG", "`nestgo:\"optional\"`")), 0600); err != nil {
+		if err := os.WriteFile(path, []byte(strings.ReplaceAll(strings.ReplaceAll(content, "NESTGO_OPTIONAL_TAG", "`nestgo:\"optional\"`"), "NESTGO_INJECT_TAG", "`nestgo:\"inject\"`")), 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
 	for _, dir := range []string{external, app} {
+		if dir == app {
+			cmd := exec.Command("go", "mod", "tidy")
+			cmd.Dir = root
+			cmd.Env = append(os.Environ(), "GOWORK=off")
+			if output, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("resolve fixture module dependencies: %v\n%s", err, strings.TrimSpace(string(output)))
+			}
+		}
 		if err := CompileDir(dir); err != nil {
 			t.Fatalf("compile %s: %v", dir, err)
 		}
