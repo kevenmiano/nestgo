@@ -96,6 +96,32 @@ func TestCompiledCrossPackageBootstrap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("compiled external modules must build and bootstrap: %v\n%s", err, strings.TrimSpace(string(output)))
 	}
+	// Verify the published-style package without the original .mgo sources.
+	externalSource := filepath.Join(external, "module.mgo")
+	if err := os.Remove(externalSource); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompileDir(app); err != nil {
+		t.Fatalf("module contract must resolve external concrete provider without mgo: %v", err)
+	}
+	// Reject unavailable export contracts rather than permitting implicit DI.
+	contractPath := filepath.Join(external, moduleContractFile)
+	contractBytes, err := os.ReadFile(contractPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(contractPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompileDir(app); err == nil || !strings.Contains(err.Error(), "module export contract unavailable") {
+		t.Fatalf("missing external contract must fail closed: %v", err)
+	}
+	if err := os.WriteFile(contractPath, contractBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(externalSource, []byte(files[externalSource]), 0600); err != nil {
+		t.Fatal(err)
+	}
 	// A module import alone must not authorize a private concrete provider.
 	privateSource := strings.ReplaceAll(files[filepath.Join(external, "module.mgo")], "exports:[Repository]", "exports:[]")
 	if err := os.WriteFile(filepath.Join(external, "module.mgo"), []byte(privateSource), 0600); err != nil {
