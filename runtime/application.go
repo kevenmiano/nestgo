@@ -25,6 +25,7 @@ type applicationConfig struct {
 	packages    []metadata.Package
 	registry    []string
 	logger      *logging.Service
+	loggerConfigured bool
 	debug       bool
 	onBootstrap func(BootstrapMetrics)
 	configOptions []config.Option
@@ -51,7 +52,7 @@ func WithAdapter(adapter httpadapter.Adapter) Option {
 
 // WithLogger enables structured framework bootstrap diagnostics.
 func WithLogger(logger *logging.Service) Option {
-	return func(c *applicationConfig) { c.logger = logger }
+	return func(c *applicationConfig) { c.logger = logger; c.loggerConfigured = true }
 }
 
 // WithDebug enables per-provider bootstrap diagnostics when a logger is configured.
@@ -102,6 +103,9 @@ func New(options ...Option) (*Application, error) {
 			return nil, fmt.Errorf("nil application option at index %d", i)
 		}
 		option(&cfg)
+	}
+	if cfg.loggerConfigured && cfg.logger == nil {
+		return nil, errors.New("runtime: nil logger")
 	}
 	if len(cfg.registry) > 0 && len(cfg.packages) > 0 {
 		return nil, errors.New("WithRegistry and WithPackages cannot be combined")
