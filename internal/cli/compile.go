@@ -34,12 +34,18 @@ func newCompileCommand() *cobra.Command {
 				return finishCompilerCommand(cmd, format, "compile", "", err)
 			}
 			dialects, err := parseConnectionDialects(connections)
-			if err != nil { return finishCompilerCommand(cmd, format, "compile", "", err) }
+			if err != nil {
+				return finishCompilerCommand(cmd, format, "compile", "", err)
+			}
 			if !watch {
 				if cmd.Flags().Changed("poll-interval") {
 					return finishCompilerCommand(cmd, format, "compile", "", fmt.Errorf("--poll-interval requires --watch"))
 				}
-				if len(dialects) == 0 { err = compiler.CompileDir(path) } else { err = compiler.CompileDirWithDialects(path, dialects) }
+				if len(dialects) == 0 {
+					err = compiler.CompileDir(path)
+				} else {
+					err = compiler.CompileDirWithDialects(path, dialects)
+				}
 				return finishCompilerCommand(cmd, format, "compile", "compiled "+path, err)
 			}
 			if interval <= 0 {
@@ -53,7 +59,9 @@ func newCompileCommand() *cobra.Command {
 				}
 				cmd.Printf("compiled %s\n", path)
 			}
-			if len(dialects) == 0 { return compiler.WatchDir(cmd.Context(), path, interval, report) }
+			if len(dialects) == 0 {
+				return compiler.WatchDir(cmd.Context(), path, interval, report)
+			}
 			return compiler.WatchDirWithDialects(cmd.Context(), path, interval, dialects, report)
 		},
 	}
