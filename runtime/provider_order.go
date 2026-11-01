@@ -20,6 +20,12 @@ func typeLess(a, b reflect.Type) int {
 	if a.String() != b.String() {
 		return strings.Compare(a.String(), b.String())
 	}
+	if a.Kind() == reflect.Ptr {
+		a = a.Elem()
+	}
+	if b.Kind() == reflect.Ptr {
+		b = b.Elem()
+	}
 	return strings.Compare(a.PkgPath(), b.PkgPath())
 }
 
@@ -80,9 +86,15 @@ func orderBootstrap(packages []metadata.Package, graph *bootstrapGraph) error {
 
 	// Match each field's resolved provider *identity*. Scanning the
 	// declared interface type alone could create false dependencies.
-	byPointer := make(map[uintptr]reflect.Type, len(graph.providers))
+	// Distinct zero-sized provider instances may have identical addresses in Go.
+	// Include the concrete provider type in the identity key.
+	type identity struct {
+		typ reflect.Type
+		ptr uintptr
+	}
+	byPointer := make(map[identity]reflect.Type, len(graph.providers))
 	for typ, instance := range graph.providers {
-		byPointer[instance.Pointer()] = typ
+		byPointer[identity{typ: typ, ptr: instance.Pointer()}] = typ
 	}
 	edges := make(map[reflect.Type][]providerEdge, len(graph.providers))
 	for typ, instance := range graph.providers {
@@ -103,7 +115,7 @@ func orderBootstrap(packages []metadata.Package, graph *bootstrapGraph) error {
 			if field.Kind() != reflect.Ptr || field.IsNil() {
 				continue
 			}
-			if dep, ok := byPointer[field.Pointer()]; ok {
+			if dep, ok := byPointer[identity{typ: field.Type(), ptr: field.Pointer()}]; ok {
 				edges[typ] = append(edges[typ], providerEdge{target: dep, field: fieldInfo.Name})
 			}
 		}

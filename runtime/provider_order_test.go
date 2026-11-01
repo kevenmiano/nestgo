@@ -251,3 +251,28 @@ func TestLifecycleNoInitHooksBeforeControllerValidation(t *testing.T) {
 	if _,err:=New(WithPackages(pkg));err==nil{t.Fatal("missing controller dependency accepted")}
 	if lifecycleValidationHookCalls.Load()!=10{t.Fatalf("initialized before validation or skipped rollback: calls=%d",lifecycleValidationHookCalls.Load())}
 }
+
+type lifecycleZeroA struct{}
+type lifecycleZeroB struct{}
+type lifecycleZeroConsumer struct {
+	Source *lifecycleZeroA `nestgo:"inject"`
+}
+func TestLifecycleZeroSizedProvidersDoNotAliasDependencyIdentity(t *testing.T) {
+	a:=reflect.TypeOf((*lifecycleZeroA)(nil))
+	b:=reflect.TypeOf((*lifecycleZeroB)(nil))
+	consumer:=reflect.TypeOf((*lifecycleZeroConsumer)(nil))
+	pkg:=metadata.Package{Providers:[]metadata.Provider{{Type:consumer},{Type:b},{Type:a}}}
+	for i:=0;i<20;i++ {
+		graph,err:=prepareBootstrap([]metadata.Package{pkg},nil,nil)
+		if err!=nil {t.Fatal(err)}
+		var indexA,indexB,indexConsumer int
+		for j,typ:=range graph.orderedProviders {
+			if typ==a {indexA=j}
+			if typ==b {indexB=j}
+			if typ==consumer {indexConsumer=j}
+		}
+		if indexA>=indexConsumer || indexB>indexConsumer {
+			t.Fatalf("invalid dependency order %v (wanted concrete zero-size A before consumer)",graph.orderedProviders)
+		}
+	}
+}
