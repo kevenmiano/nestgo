@@ -39,7 +39,7 @@ flowchart TD
   App --> Serve["Listen / Serve"]
 ```
 
-Module validation rejects missing imports, invalid exports, conflicting ownership and module import cycles. Provider injection supports exported pointer or interface fields, and `nestgo:"optional"` allows missing optional dependencies. Scope visibility honors `Imports`, `Providers` and `Exports`; no constructor injection is provided. Module import and resolved provider injection cycles are rejected before lifecycle hooks run. Provider hooks execute in dependency-first order (including interface and present optional injections); controllers run after providers.
+Module validation rejects missing imports, invalid exports, conflicting ownership and module import cycles. Provider injection supports exported pointer or interface fields, and `nestgo:"optional"` allows missing optional dependencies. Scope visibility honors `Imports`, `Providers` and `Exports`; no constructor injection is provided. Module import and resolved provider injection cycles are rejected before lifecycle hooks run. Provider hooks execute in dependency-first order (including interface and present optional injections); controllers run after providers. Dynamic dependencies used only inside generated provider factories cannot be inferred; expose lifecycle dependencies through explicitly injected fields.
 
 ## Request processing
 

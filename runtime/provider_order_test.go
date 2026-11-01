@@ -361,3 +361,60 @@ func TestLifecycleZeroSizedProvidersDoNotAliasDependencyIdentity(t *testing.T) {
 		}
 	}
 }
+
+type lifecyclePartialFactoryResource struct{}
+type lifecycleFailingFactoryResource struct{}
+
+var lifecycleFactoryRollbackCount atomic.Int64
+
+func (*lifecyclePartialFactoryResource) OnModuleDestroy(context.Context) error {
+	lifecycleFactoryRollbackCount.Add(1)
+	return nil
+}
+
+func TestLifecycleRollsBackSuccessfulFactoryOnSubsequentFailure(t *testing.T) {
+	lifecycleFactoryRollbackCount.Store(0)
+	pkg := metadata.Package{Providers: []metadata.Provider{
+		{
+			Type: reflect.TypeOf((*lifecyclePartialFactoryResource)(nil)),
+			Factory: func(resolve func(reflect.Type) (any, bool)) (any, error) {
+				return &lifecyclePartialFactoryResource{}, nil
+			},
+		},
+		{
+			Type: reflect.TypeOf((*lifecycleFailingFactoryResource)(nil)),
+			Factory: func(resolve func(reflect.Type) (any, bool)) (any, error) {
+				return nil, errors.New("simulated factory failure")
+			},
+		},
+	}}
+	_, err := New(WithPackages(pkg))
+	if err == nil || !strings.Contains(err.Error(), "simulated factory failure") {
+		t.Fatalf("factory error lost: %v", err)
+	}
+	if got := lifecycleFactoryRollbackCount.Load(); got != 1 {
+		t.Fatalf("factory resource closed %d times, want 1", got)
+	}
+}
+
+type lifecycleCallerOwnedService struct{}
+var lifecycleCallerCleanupCount atomic.Int64
+
+func (*lifecycleCallerOwnedService) OnModuleDestroy(context.Context) error {
+	lifecycleCallerCleanupCount.Add(1)
+	return nil
+}
+
+func TestLifecycleRollsBackExternalProviderOnInvalidController(t *testing.T) {
+	lifecycleCallerCleanupCount.Store(0)
+	pkg := metadata.Package{Controllers: []metadata.Controller{{
+		Type: reflect.TypeOf((*lifecycleUnregisteredController)(nil)),
+	}}}
+	_, err := New(WithPackages(pkg), WithProvider(&lifecycleCallerOwnedService{}))
+	if err == nil || !strings.Contains(err.Error(), "missing required dependency") {
+		t.Fatalf("invalid controller accepted: %v", err)
+	}
+	if got := lifecycleCallerCleanupCount.Load(); got != 1 {
+		t.Fatalf("external provider cleanup invoked %d times", got)
+	}
+}

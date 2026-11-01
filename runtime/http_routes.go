@@ -29,6 +29,11 @@ func registerRoutesWithLifecycleAndInstances(adapter httpadapter.Adapter, packag
 	}
 	graph, err := prepareBootstrapWithInstances(packages, instances, onProvider, nil)
 	if err != nil {
+		// A factory can have acquired resources before a later factory, DI
+		// or module validation fails. The outer bootstrap rollback owns them.
+		if lifecycle != nil {
+			lifecycle.instances = append(lifecycle.instances, graph.allocated...)
+		}
 		return err
 	}
 	if lifecycle != nil {

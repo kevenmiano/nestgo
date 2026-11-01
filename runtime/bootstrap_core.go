@@ -16,6 +16,8 @@ type bootstrapGraph struct {
 	orderedProviders []reflect.Type
 	controllers      []metadata.Controller
 	visibility       map[reflect.Type]map[reflect.Type]bool
+	// Retain only caller-owned or factory-constructed resources on errors.
+	allocated []any
 }
 
 // prepareBootstrap is retained for the adapter runtime while both paths share
@@ -41,27 +43,28 @@ func prepareBootstrapWithInstances(packages []metadata.Package, instances []any,
 	}
 	for _, external := range instances {
 		if external == nil {
-			return bootstrapGraph{}, fmt.Errorf("nil external provider instance")
+			return graph, fmt.Errorf("nil external provider instance")
 		}
 		instance := reflect.ValueOf(external)
 		if instance.Kind() != reflect.Ptr || instance.IsNil() || instance.Elem().Kind() != reflect.Struct {
-			return bootstrapGraph{}, fmt.Errorf("external provider must be a non-nil pointer to struct: %T", external)
+			return graph, fmt.Errorf("external provider must be a non-nil pointer to struct: %T", external)
 		}
 		if _, exists := graph.providers[instance.Type()]; exists {
-			return bootstrapGraph{}, fmt.Errorf("duplicate external provider: %s", instance.Type())
+			return graph, fmt.Errorf("duplicate external provider: %s", instance.Type())
 		}
 		graph.providers[instance.Type()] = instance
 		graph.orderedProviders = append(graph.orderedProviders, instance.Type())
+		graph.allocated = append(graph.allocated, external)
 	}
 	declaredProviders := make(map[reflect.Type]bool)
 	factoryProviders := make(map[reflect.Type]metadata.Provider)
 	for _, pkg := range packages {
 		for _, p := range pkg.Providers {
 			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
-				return bootstrapGraph{}, fmt.Errorf("invalid provider %v: must be pointer to struct", p.Type)
+				return graph, fmt.Errorf("invalid provider %v: must be pointer to struct", p.Type)
 			}
 			if declaredProviders[p.Type] {
-				return bootstrapGraph{}, fmt.Errorf("duplicate provider: %v", p.Type)
+				return graph, fmt.Errorf("duplicate provider: %v", p.Type)
 			}
 			declaredProviders[p.Type] = true
 			if p.Factory != nil {
@@ -105,17 +108,18 @@ func prepareBootstrapWithInstances(packages []metadata.Package, instances []any,
 			return value.Interface(), true
 		})
 		if err != nil {
-			return bootstrapGraph{}, fmt.Errorf("provider factory %s: %w", typ, err)
+			return graph, fmt.Errorf("provider factory %s: %w", typ, err)
 		}
 		value := reflect.ValueOf(result)
 		if !value.IsValid() || value.Type() != typ || value.IsNil() {
-			return bootstrapGraph{}, fmt.Errorf("provider factory %s returned wrong or nil type", typ)
+			return graph, fmt.Errorf("provider factory %s returned wrong or nil type", typ)
 		}
 		graph.providers[typ] = value
+		graph.allocated = append(graph.allocated, result)
 	}
 	visibility, err := moduleVisibility(packages)
 	if err != nil {
-		return bootstrapGraph{}, err
+		return graph, err
 	}
 	graph.visibility = visibility
 	slices.SortFunc(graph.orderedProviders, func(a, b reflect.Type) int {
@@ -123,11 +127,11 @@ func prepareBootstrapWithInstances(packages []metadata.Package, instances []any,
 	})
 	for _, typ := range graph.orderedProviders {
 		if err := graph.inject(graph.providers[typ]); err != nil {
-			return bootstrapGraph{}, err
+			return graph, err
 		}
 	}
 	if err := orderBootstrap(packages, &graph); err != nil {
-		return bootstrapGraph{}, err
+		return graph, err
 	}
 	return graph, nil
 }
