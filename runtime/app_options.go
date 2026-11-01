@@ -44,7 +44,7 @@ func NewApp(ctx context.Context, options ...AppOption) (*App, error) {
 	boot, err := bootstrap(ctx, bootstrapOptions{
 		ConfigOptions:   opts.config,
 		DatabaseOptions: opts.database,
-		Runtime:         Options{Logger: opts.logger, Debug: opts.debug, Instances: opts.instances},
+		Runtime:         handlerOptions{Logger: opts.logger, Debug: opts.debug, Instances: opts.instances},
 	}, opts.packages...)
 	if err != nil {
 		return nil, err
