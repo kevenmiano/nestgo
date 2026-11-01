@@ -95,6 +95,27 @@ source <(nestgo completion zsh)
 
 Use `nestgo completion --help` for detailed persistent installation instructions for bash, zsh, fish and PowerShell.
 
+
+## Day-to-day workflow
+
+1. Add `.mgo` files only when opting into NestGo decorators.
+2. Run `nestgo compile ./path/to/package` after editing decorated source.
+3. Run `go test ./...` to test the generated Go application.
+4. Optionally run `nestgo diagnose -app ./path/to/package -strict` to inspect registrations and graphs.
+5. Use ordinary `go build` and deployment tooling. The NestGo CLI is not a production application runtime.
+
+## Troubleshooting
+
+| Symptom | Suggested fix |
+| --- | --- |
+| `nestgo: command not found` | Check `go env GOBIN`, `go env GOPATH`, and your shell `PATH`. |
+| `expected .mgo file` | Pass a directory or file ending in `.mgo`. |
+| `go list ...` fails during `diagnose` | Run inside the relevant Go module and provide a resolvable importable package. |
+| `package main cannot be imported` | Point `-app` at an importable compiled package, not your executable entrypoint. |
+| `use -app ... or -example` | Explicitly choose a diagnostic target. |
+| `-app cannot be combined with -example or -scale` | Remove incompatible flags; `-scale` only operates on the fixture. |
+| `-strict` reports errors | Inspect `report.html`, `graph.json` and `modules.json` to find dependency problems. |
+
 ## Contributing to the CLI
 
 The Cobra command tree and tests live under `internal/cli`. The installed binary is `cmd/nestgo`, and its reference generator lives in `cmd/nestgo-docs`.

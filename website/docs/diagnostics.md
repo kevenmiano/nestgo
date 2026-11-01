@@ -23,7 +23,7 @@ go run ./cmd/nestgo diagnose -app ./examples/shop -out diagnostics-real -samples
 
 The CLI compiles a temporary, linked Go diagnostic runner and imports the application's generated metadata registration. It does not edit user files. The package must be importable (not `package main`), and its generated metadata must register with NestGo. **Importing that package executes its `init()` functions**; analyze trusted application code only.
 
-The current metadata only exposes provider/controller and module descriptors; module import/export edges are not yet defined. Thus the provider graph is real, but it is **not yet a complete NestJS-style module graph**.
+The report includes provider and module dependency graph descriptors. Supported `.mgo` module decorators can emit typed imports and exports, but cross-package graph validation and complete NestJS module semantics remain under development. See the [CLI guide](./cli/overview.md) for the command flags, diagnostics modes and output files.
 
 ## Files
 
