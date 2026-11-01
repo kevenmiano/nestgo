@@ -14,6 +14,10 @@ import (
 // registerRoutes resolves injectable fields once during bootstrap and registers
 // engine-independent handlers. Generated static invokers can replace reflect.Call.
 func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) error {
+    return registerRoutesWithLifecycle(adapter, packages, nil)
+}
+
+func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
 	providers := map[reflect.Type]reflect.Value{}
 	controllers := []metadata.Controller{}
 	for _, pkg := range packages {
@@ -84,6 +88,9 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 			return err
 		}
 	}
+    if lifecycle != nil {
+        for _, providerType := range orderedProviders { lifecycle.instances = append(lifecycle.instances, providers[providerType].Interface()) }
+    }
 	seen := map[string]bool{}
 	for _, controller := range controllers {
 		if controller.Type == nil || controller.Type.Kind() != reflect.Ptr || controller.Type.Elem().Kind() != reflect.Struct {
@@ -93,6 +100,7 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 		if err := inject(instance); err != nil {
 			return err
 		}
+        if lifecycle != nil { lifecycle.instances = append(lifecycle.instances, instance.Interface()) }
 		for _, route := range controller.Routes {
 			method := instance.MethodByName(route.Handler)
 			if !method.IsValid() {
