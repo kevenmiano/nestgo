@@ -11,14 +11,14 @@ import (
 // ConnectionOptions configures a standard Go SQL driver without depending on
 // a specific database, ORM, query builder or cloud provider.
 type ConnectionOptions struct {
-	Name string
-	Driver string
-	DSN string
-	MaxOpenConns int
-	MaxIdleConns int
+	Name            string
+	Driver          string
+	DSN             string
+	MaxOpenConns    int
+	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
 	ConnMaxIdleTime time.Duration
-	PingTimeout time.Duration
+	PingTimeout     time.Duration
 }
 
 // OpenConnection creates a pooled connection and verifies it before exposing it
