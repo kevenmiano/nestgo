@@ -66,7 +66,7 @@ O módulo `config/viper` é opcional e não é importado automaticamente. DSNs e
 
 **Dialetos por conexão:** `CompileDir` mantém PostgreSQL como padrão para projetos simples. Para repositórios mistos, use `CompileDirWithDialects(dir, map[string]sqlgen.Dialect{"users": sqlgen.PostgreSQL, "billing": sqlgen.Question})` ou `go run ./cmd/modforge compile ./path --connection=users:postgres --connection=billing:mysql`. O compilador valida a associação ao `@Repository(Entity, "connection")`; ainda falta validar incompatibilidades entre dialeto compilado e driver configurado em runtime (#90).
 
-Somente `SELECT` com resultados `*Entity` / `[]Entity` é gerado atualmente. Escritas, DTOs arbitrários, relações, migrations e autocomplete permanecem nas issues #89, #91 e #93. `@Column` não é suportado.
+O gerador suporta `SELECT` para `*Entity` / `[]Entity` e `INSERT`, `UPDATE` e `DELETE` com retorno `(int64, error)` para linhas afetadas; `RETURNING` PostgreSQL aceita entidade tipada. Combinações incompatíveis são rejeitadas pelo compilador. CTEs, DTOs arbitrários, relações, migrations e autocomplete permanecem nas issues #89, #91 e #93. `@Column` ainda não é suportado.
 
 ## Propriedade e desligamento
 
