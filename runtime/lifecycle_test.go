@@ -107,3 +107,15 @@ func TestApplicationLifecycleShutdownFailure(t *testing.T) {
 		t.Fatalf("shutdown errors first=%v second=%v", first, second)
 	}
 }
+
+type rollbackLifecycleProvider struct{}
+var rollbackCalls int
+func (*rollbackLifecycleProvider) OnModuleInit(context.Context) error { return errors.New("startup failed") }
+func (*rollbackLifecycleProvider) OnModuleDestroy(context.Context) error { rollbackCalls++; return nil }
+
+func TestFailedBootstrapReleasesProviders(t *testing.T) {
+    rollbackCalls=0
+    _,err:=NewApplication(ApplicationOptions{}, metadata.Package{Providers:[]metadata.Provider{{Type:reflect.TypeOf((*rollbackLifecycleProvider)(nil))}}})
+    if err==nil || !strings.Contains(err.Error(),"startup failed"){ t.Fatalf("expected startup error: %v",err) }
+    if rollbackCalls!=1 {t.Fatalf("destroy calls=%d, want 1",rollbackCalls)}
+}
