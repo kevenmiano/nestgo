@@ -48,8 +48,8 @@ func BenchmarkRequestPipeline(b *testing.B) {
 	pipe := &benchmarkIdentityPipe{}
 	filter := &benchmarkPassthroughFilter{}
 	cases := []struct {
-		name string
-		static bool
+		name    string
+		static  bool
 		options []Option
 	}{
 		{name: "baseline/static", static: true},
@@ -77,26 +77,34 @@ func BenchmarkRequestPipeline(b *testing.B) {
 			if tc.static {
 				route.StaticHTTP = func(receiver any, ctx httpadapter.Context) (any, int, error) {
 					id, status, err := httpadapter.BindParam(ctx, "id", 0)
-					if err != nil { return nil, status, err }
+					if err != nil {
+						return nil, status, err
+					}
 					return receiver.(*pipelineBenchmarkController).Lookup(id), 0, nil
 				}
 			}
 			pkg := metadata.Package{Controllers: []metadata.Controller{{
-				Type: reflect.TypeOf((*pipelineBenchmarkController)(nil)),
+				Type:   reflect.TypeOf((*pipelineBenchmarkController)(nil)),
 				Prefix: "/bench", Routes: []metadata.Route{route},
 			}}}
 			adapter := &capturedAdapter{}
 			opts := []Option{WithAdapter(adapter), WithPackages(pkg)}
 			opts = append(opts, tc.options...)
-			if _, err := New(opts...); err != nil { b.Fatal(err) }
+			if _, err := New(opts...); err != nil {
+				b.Fatal(err)
+			}
 			handler := adapter.routes["GET /bench/{id}"]
-			if handler == nil { b.Fatal("route was not registered") }
+			if handler == nil {
+				b.Fatal("route was not registered")
+			}
 			ctx := &capturedContext{params: map[string]string{"id": "123"}}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				ctx.body = ""
-				if err := handler(ctx); err != nil { b.Fatal(err) }
+				if err := handler(ctx); err != nil {
+					b.Fatal(err)
+				}
 			}
 			b.StopTimer()
 			if ctx.status != 200 || ctx.body != "\"123\"\n" {
