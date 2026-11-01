@@ -14,7 +14,7 @@ import (
 type bootstrapOptions struct {
 	ConfigOptions   []config.Option
 	DatabaseOptions []database.Option
-	Runtime         Options
+	Runtime         handlerOptions
 }
 
 // bootstrapped owns initialized services and must be closed after use.
