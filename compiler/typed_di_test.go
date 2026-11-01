@@ -85,3 +85,38 @@ func TestCompileDirDoesNotWriteOnTypeError(t *testing.T) {
 		}
 	}
 }
+
+func TestGeneratedRepositoryImplementsInjectedInterface(t *testing.T) {
+	source := `package demo
+import "context"
+@Entity({table: "users"})
+type User struct{ ID int64 }
+@Repository(User, "users")
+type UsersRepository struct{}
+@Query("SELECT id FROM users WHERE id=:id")
+func (r *UsersRepository) FindByID(ctx context.Context, id int64) (*User, error) { return nil, nil }
+type UserReader interface {
+	FindByID(ctx context.Context, id int64) (*User, error)
+}
+@Injectable()
+type UsersService struct { Repo UserReader \`nestgo:"inject"\` }
+@Module({providers:[UsersService]})
+type UsersModule struct{}
+`
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "users.mgo"), []byte(source), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompileDir(dir); err != nil {
+		t.Fatalf("generated repository interface must resolve at compile time: %v", err)
+	}
+	// The compiler must reject an interface that the generated type does not implement.
+	invalid := strings.Replace(source, "FindByID(ctx context.Context, id int64) (*User, error)\\n}", "UnknownMethod(ctx context.Context, id int64) (*User, error)\\n}", 1)
+	invalidDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(invalidDir, "users.mgo"), []byte(invalid), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := CompileDir(invalidDir); err == nil || !strings.Contains(err.Error(), "missing interface dependency") {
+		t.Fatalf("non-implemented generated repository interface incorrectly accepted: %v", err)
+	}
+}
