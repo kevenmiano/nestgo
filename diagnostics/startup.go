@@ -77,6 +77,8 @@ func MeasureStartup(scenario string, packages []metadata.Package, samples, itera
 
 func startMeasuredApp(packages ...metadata.Package) (struct{}, error) {
 	app, err := nestgoruntime.New(nestgoruntime.WithPackages(packages...))
-	if err != nil { return struct{}{}, err }
+	if err != nil {
+		return struct{}{}, err
+	}
 	return struct{}{}, app.Close()
 }
