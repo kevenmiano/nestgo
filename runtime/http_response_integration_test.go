@@ -41,7 +41,7 @@ func (*responseTestController) Cookies() httpresponse.Response {
 func (*responseTestController) Failure() (string, error) {
 	return "", httpresponse.NotFound("user missing")
 }
-func (*responseTestController) GenericFailure() (string, error)     { return "", errors.New("secret") }
+func (*responseTestController) GenericFailure() (string, error) { return "", errors.New("secret") }
 
 func (*responseTestController) MissingWrite(w *httpresponse.Writer) {}
 func responseTestPackage() metadata.Package {
