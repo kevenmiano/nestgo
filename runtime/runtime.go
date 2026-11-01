@@ -58,13 +58,17 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 		providers[value.Type()] = value
 		orderedProviders = append(orderedProviders, value.Type())
 	}
+	declaredProviders := map[reflect.Type]bool{}
 	for _, pkg := range packages {
 		moduleStart := time.Now()
 		for _, p := range pkg.Providers {
 			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
 				return fail(fmt.Errorf("provider must be pointer to struct: %v", p.Type))
 			}
-			
+			if declaredProviders[p.Type] {
+				return fail(fmt.Errorf("duplicate provider: %v", p.Type))
+			}
+			declaredProviders[p.Type] = true
 			if existing, ok := providers[p.Type]; !ok {
 				providers[p.Type] = reflect.New(p.Type.Elem())
 				orderedProviders = append(orderedProviders, p.Type)
