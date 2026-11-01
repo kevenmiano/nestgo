@@ -31,6 +31,9 @@ func TestCompiledCrossPackageModulesBootstrap(t *testing.T) {
 @Injectable()
 type Repository struct{}
 
+type Greeter interface { Greet() string }
+type Unused interface { Unused() string }
+
 @Module({providers:[Repository],exports:[Repository]})
 type RepositoryModule struct{}
 `,
@@ -38,8 +41,16 @@ type RepositoryModule struct{}
 
 import "example.com/nestgo-cross-package-test/external"
 
+@Injectable()
+type GreeterService struct{}
+
+func (g *GreeterService) Greet() string { return "from-external-interface" }
+
 @Controller("/ready")
-type AppController struct{}
+type AppController struct {
+    Greeter external.Greeter
+    Optional external.Unused `nestgo:"optional"`
+}
 
 @Get("/")
 func (c *AppController) Ready() string { return c.Greeter.Greet() }
