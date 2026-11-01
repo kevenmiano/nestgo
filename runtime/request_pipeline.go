@@ -147,7 +147,9 @@ func handleHTTPException(err error, exec httpadapter.ExecutionContext, filters [
 		}
 	}
 	var validationErrors validation.Errors
-	if errors.As(err, &validationErrors) { return respondValidationError(exec.Request, err) }
+	if errors.As(err, &validationErrors) {
+		return respondValidationError(exec.Request, err)
+	}
 	var pipelineError *httpadapter.HTTPException
 	if errors.As(err, &pipelineError) && pipelineError != nil {
 		message := pipelineError.Message
