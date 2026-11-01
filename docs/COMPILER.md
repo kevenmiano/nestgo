@@ -29,10 +29,16 @@ For every input `name.mgo`, the compiler writes `name_generated.go`. It also wri
 | `@Param("id")` | Method parameter | Binds a string URL path variable |
 | `@Query("page")` | Method parameter | Binds a string query value |
 | `@Headers("name")` | Method parameter | Recognized by the compiler; **not supported by the runtime** |
+| `@Expose("alias")` | DTO struct field | Exposes or renames a JSON property |
+| `@Exclude()` | DTO struct field | Excludes JSON fields, optionally direction-scoped |
+| `@Transform(Fn)` | DTO struct field | Invokes a typed custom transformation |
+| `@Type(T)` | DTO struct field | Verifies the declared nested Go field type |
 
 Declaration annotations must occupy their own line. Route decorators must be attached to methods with a receiver whose controller type is declared in the same `.mgo` file. Only a single HTTP method decorator is permitted per handler.
 
 The compiler accepts only a subset of annotation expressions. Controller, module and route arguments are string literals; `@HttpCode` takes a numeric HTTP status.
+
+For property transformation behavior, custom callbacks and limitations, see [DTO property transformers](DTO_TRANSFORMERS.md). Decorated DTOs generate an additional `*_transformers_generated.go` file with typed JSON codec methods.
 
 ## Compilation stages
 
