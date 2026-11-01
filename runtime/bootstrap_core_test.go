@@ -19,22 +19,32 @@ func TestSharedBootstrapGraphInjectsProvidersAndControllers(t *testing.T) {
 		},
 	}
 	graph, err := prepareBootstrap([]metadata.Package{pkg}, nil, nil)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	consumer := graph.providers[reflect.TypeOf((*sharedBootstrapConsumer)(nil))].Interface().(*sharedBootstrapConsumer)
-	if consumer.Dependency == nil { t.Fatal("provider dependency not injected") }
+	if consumer.Dependency == nil {
+		t.Fatal("provider dependency not injected")
+	}
 	controller, err := graph.newController(reflect.TypeOf((*sharedBootstrapController)(nil)))
 	if err != nil { t.Fatal(err) }
 	resolved := controller.Interface().(*sharedBootstrapController)
-	if resolved.Dependency != consumer.Dependency { t.Fatal("controller and provider must share singleton instance") }
+	if resolved.Dependency != consumer.Dependency {
+		t.Fatal("controller and provider must share singleton instance")
+	}
 }
 
 func TestSharedBootstrapGraphRejectsUnresolvedDependency(t *testing.T) {
 	pkg := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*sharedBootstrapConsumer)(nil))}}}
-	if _, err := prepareBootstrap([]metadata.Package{pkg}, nil, nil); err == nil { t.Fatal("expected missing dependency") }
+	if _, err := prepareBootstrap([]metadata.Package{pkg}, nil, nil); err == nil {
+		t.Fatal("expected missing dependency")
+	}
 }
 
 func TestSharedBootstrapGraphRejectsInvalidController(t *testing.T) {
 	graph, err := prepareBootstrap(nil, nil, nil)
 	if err != nil { t.Fatal(err) }
-	if _, err := graph.newController(reflect.TypeOf(123)); err == nil { t.Fatal("expected invalid controller error") }
+	if _, err := graph.newController(reflect.TypeOf(123)); err == nil {
+		t.Fatal("expected invalid controller error")
+	}
 }
