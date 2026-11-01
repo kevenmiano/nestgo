@@ -13,14 +13,14 @@ import (
 	"time"
 )
 
-// Options controls framework lifecycle diagnostics without affecting request handling.
-type Options struct {
+// handlerOptions controls framework lifecycle diagnostics without affecting request handling.
+type handlerOptions struct {
 	Logger    *logging.Service
 	Debug     bool
 	Instances []any
 }
 
-func newHandler(options Options, packages ...metadata.Package) (http.Handler, error) {
+func newHandler(options handlerOptions, packages ...metadata.Package) (http.Handler, error) {
 	logger := options.Logger
 	if logger == nil {
 		logger = logging.New(logging.Config{MinLevel: logging.LevelInfo})
