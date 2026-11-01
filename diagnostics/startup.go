@@ -1,7 +1,6 @@
 package diagnostics
 
 import (
-	"context"
 	"fmt"
 	"runtime"
 	"sort"
@@ -41,7 +40,7 @@ func percentile(sorted []float64, fraction float64) float64 {
 	return sorted[index]
 }
 
-// MeasureStartup measures runtime.NewApp with prebuilt metadata. It does not include
+// MeasureStartup measures runtime.New with prebuilt metadata. It does not include
 // Go compilation, OS launch, imported package init(), or network listening.
 // The workload excludes graph analysis, avoiding measurement contamination.
 func MeasureStartup(scenario string, packages []metadata.Package, samples, iterations int, commit string) (Startup, error) {
@@ -77,7 +76,7 @@ func MeasureStartup(scenario string, packages []metadata.Package, samples, itera
 }
 
 func startMeasuredApp(packages ...metadata.Package) (struct{}, error) {
-	app, err := nestgoruntime.NewApp(context.Background(), nestgoruntime.WithPackages(packages...))
+	app, err := nestgoruntime.New(nestgoruntime.WithPackages(packages...))
 	if err != nil { return struct{}{}, err }
 	return struct{}{}, app.Close()
 }
