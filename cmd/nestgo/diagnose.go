@@ -34,7 +34,7 @@ func diagnose(args []string) error {
 		return err
 	}
 	if *coldChild {
-		_, err := nestgoruntime.New(samplePackage())
+		_, err := nestgoruntime.New(nestgoruntime.WithPackages(samplePackage()))
 		return err
 	}
 	if *coldSamples < 0 || *coldSamples > 50 {
