@@ -25,6 +25,7 @@ type Controller struct {
 type Provider struct {
 	Type  reflect.Type
 	Scope string
+	Factory func(resolve func(reflect.Type) (any, bool)) (any, error)
 }
 
 // Module declares an optional static module dependency contract.
