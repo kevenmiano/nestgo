@@ -112,8 +112,10 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 						args[i] = v.Elem()
 					}
 					results := handler.Call(args)
-					if len(results) == 2 && !results[1].IsNil() {
-						return respondError(ctx, 500, results[1].Interface().(error).Error())
+					if len(results) == 2 {
+						if handlerErr := reflectedHandlerError(results[1]); handlerErr != nil {
+							return respondError(ctx, 500, handlerErr.Error())
+						}
 					}
 					result = results[0].Interface()
 				}
@@ -141,6 +143,9 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 	return nil
 }
 func respondError(ctx httpadapter.Context, status int, message string) error {
+	if status >= 500 {
+		message = "Internal server error"
+	}
 	ctx.Status(status)
 	ctx.SetHeader("Content-Type", "text/plain; charset=utf-8")
 	return ctx.Write([]byte(message + "\n"))
