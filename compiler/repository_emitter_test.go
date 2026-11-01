@@ -68,7 +68,7 @@ func TestGenerateRepositorySupportsPartialReorderedProjections(t *testing.T) {
 func TestGeneratedRepositoryRejectsAmbiguousColumnMappings(t *testing.T) {
 	_, err := GenerateRepository(RepositoryDefinition{
 		Package: "users", Name: "UsersRepository", Entity: "User", Dialect: sqlgen.PostgreSQL,
-		Fields: []RepositoryField{{Name: "UserID"}, {Name: "UserId"}},
+		Fields:  []RepositoryField{{Name: "UserID"}, {Name: "UserId"}},
 		Methods: []RepositoryMethod{{Name: "Find", SQL: "SELECT user_id FROM users"}},
 	})
 	if err == nil || !strings.Contains(err.Error(), "ambiguous result column") {
@@ -78,7 +78,7 @@ func TestGeneratedRepositoryRejectsAmbiguousColumnMappings(t *testing.T) {
 
 func TestGeneratedRepositoriesSupportDMLRowsAffected(t *testing.T) {
 	for _, tc := range []struct {
-		sql string
+		sql     string
 		dialect sqlgen.Dialect
 		wantSQL string
 	}{
@@ -88,7 +88,7 @@ func TestGeneratedRepositoriesSupportDMLRowsAffected(t *testing.T) {
 	} {
 		out, err := GenerateRepository(RepositoryDefinition{
 			Package: "users", Name: "Repo", Entity: "User", Dialect: tc.dialect,
-			Fields: []RepositoryField{{Name: "ID"}},
+			Fields:  []RepositoryField{{Name: "ID"}},
 			Methods: []RepositoryMethod{{Name: "Write", SQL: tc.sql, Exec: true, Parameters: []RepositoryParameter{{Name: "id", Type: "int64"}}}},
 		})
 		if err != nil {
@@ -108,7 +108,7 @@ func TestGeneratedRepositoriesSupportDMLRowsAffected(t *testing.T) {
 func TestGeneratedRepositoryReturningValidation(t *testing.T) {
 	def := RepositoryDefinition{
 		Package: "users", Name: "Repo", Entity: "User", Dialect: sqlgen.PostgreSQL,
-		Fields: []RepositoryField{{Name: "ID"}},
+		Fields:  []RepositoryField{{Name: "ID"}},
 		Methods: []RepositoryMethod{{Name: "Insert", SQL: "INSERT INTO users (id) VALUES (:id) RETURNING id", Parameters: []RepositoryParameter{{Name: "id", Type: "int64"}}}},
 	}
 	if out, err := GenerateRepository(def); err != nil || !strings.Contains(string(out), "QueryContext(ctx, query, id)") {
