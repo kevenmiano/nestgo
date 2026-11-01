@@ -19,6 +19,10 @@ type bootstrapGraph struct {
 }
 
 func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type), onPackage func()) (bootstrapGraph, error) {
+	if len(packages) == 0 {
+		// Code-first applications do not need provider allocation or module graph validation.
+		return bootstrapGraph{}, nil
+	}
 	providerCount, controllerCount := 0, 0
 	for _, pkg := range packages {
 		providerCount += len(pkg.Providers)

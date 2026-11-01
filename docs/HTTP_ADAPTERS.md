@@ -43,3 +43,46 @@ Fasthttp uses native `fasthttp.RequestCtx` (no net/http adaptor); the standard-l
 Validate route precedence, 404/405, trailing slash, JSON body-size limits, headers, status codes, and graceful shutdown across engines. Benchmark startup, allocations and p95/p99 HTTP latency before production use. WebSockets and streaming are not guaranteed by the current adapter contract.
 
 No separate legacy `http.Handler` constructor exists.
+
+## Request limits and network security
+
+The built-in transports enforce secure defaults for untrusted HTTP traffic. Configure them with functional options, not an additional wrapper server:
+
+```go
+limits := httpadapter.ServerLimits{
+    ReadHeaderTimeout: 5 * time.Second,
+    ReadTimeout:       10 * time.Second,
+    WriteTimeout:      15 * time.Second,
+    IdleTimeout:       30 * time.Second,
+    MaxHeaderBytes:    16 << 10,
+    MaxBodyBytes:      1 << 20,
+}
+app, err := runtime.New(runtime.WithAdapter(nethttp.New(nethttp.WithLimits(limits))))
+// Or: runtime.WithAdapter(fastadapter.New(fastadapter.WithLimits(limits)))
+```
+
+All fields are positive-only overrides: zero or negative values retain the defaults. The `net/http` engine enforces its header-specific timeout, the total read deadline, a maximum header size, and a bounded body read (up to configured limit plus one byte) **before** invoking the handler; oversized Content-Length or chunked bodies return 413. The FastHTTP engine enforces the maximum request body size during parsing, a bounded request/header read buffer, and a total read deadline. FastHTTP's public server API does not provide an independent `ReadHeaderTimeout`, so `ReadTimeout` protects the entire request. On both engines, oversized requests return 413.
+
+The generated JSON binder also applies a 1 MiB safety ceiling. Raising `MaxBodyBytes` beyond 1 MiB does not override that application-layer ceiling for generated JSON endpoints. Direct `WithRoutes` handlers can accept up to the configured adapter limit.
+
+For Internet-facing production deployments, enforce equivalent or stricter ingress/reverse-proxy limits (headers, body size, requests per connection, idle timeouts). Proxy configuration and the application must agree on request framing to avoid request smuggling. Tightening read deadlines may reject legitimate slow uploads; adjust positive limits for the deployment and validate with the actual reverse proxy. Test suites exercise incomplete headers, chunked oversized requests, concurrent requests and graceful shutdown on a loopback listener.
+
+## Engine-independent responses
+
+Import `github.com/kevenmiano/nestgo/http` for transport-independent response helpers.
+Controllers may return ordinary DTOs, `http.Response[DTO]` for typed response metadata,
+or `http.Result` for untyped response contracts. HTTP errors and status constants
+also live in this package; see [HTTP responses](HTTP_RESPONSES.md).
+
+## Real Nginx security regression suite
+
+The CI workflow `.github/workflows/security-nginx-proxy.yml` installs an actual Nginx binary on a disposable Linux runner, places it in front of both built-in NestGo HTTP engines, and tests only loopback addresses. The test is opt-in for local development:
+
+```sh
+# Install Nginx with your system package manager first.
+NESTGO_NGINX_E2E=1 go test ./runtime -run '^TestNginxProxySecurityBoundaries$' -count=1 -v
+```
+
+The suite creates its own Nginx configuration with `proxy_request_buffering on`, `proxy_http_version 1.1`, `Connection: close`, a 128-byte proxy body cap and a smaller 64-byte application body cap. It checks successful forwarding, upstream and proxy HTTP 413 responses, malformed request-line handling, contradictory Content-Length and Transfer-Encoding framing, duplicate lengths, oversized headers, slow incomplete headers, and **a real Nginx response cache** with explicit cache keys. The cached tests verify that distinct resource IDs remain isolated (separate MISS/HIT entries), and a whitespace-normalized request cannot silently switch to another cached resource. In the tested Nginx configuration, extra whitespace in an HTTP request line is **normalized and forwarded** as one canonical request (HTTP 200), rather than rejected as HTTP 400; the test asserts exactly one downstream dispatch. Do not assume the same parser policy at other proxies, caches or CDNs.
+
+**Scope:** This validates a representative, isolated Nginx reverse-proxy setup, **not** every deployment, intermediary chain, CDN or shared-cache configuration. No production endpoint is targeted. In production, test the **actual** edge/cache configuration and enforce compatible request framing and body/header limits before marking the overall release security gate complete. A passing response-parsing test does not itself prove that every class of request smuggling or cache poisoning is impossible.

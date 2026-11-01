@@ -3,11 +3,12 @@ package fasthttp
 import (
 	"context"
 	"errors"
-	"github.com/kevenmiano/nestgo/httpadapter"
-	fast "github.com/valyala/fasthttp"
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/kevenmiano/nestgo/httpadapter"
+	fast "github.com/valyala/fasthttp"
 )
 
 type Adapter struct {
@@ -15,12 +16,29 @@ type Adapter struct {
 	routes  []httpadapter.Route
 	keys    map[string]bool
 	server  *fast.Server
+	limits  httpadapter.ServerLimits
 	started bool
 }
 
 var _ httpadapter.Adapter = (*Adapter)(nil)
 
-func New() *Adapter { return &Adapter{keys: map[string]bool{}} }
+// Option configures the fasthttp adapter before it starts.
+type Option func(*Adapter)
+
+// WithLimits overrides positive resource limits without disabling defaults.
+func WithLimits(limits httpadapter.ServerLimits) Option {
+	return func(a *Adapter) { a.limits = a.limits.Override(limits) }
+}
+
+func New(options ...Option) *Adapter {
+	a := &Adapter{keys: map[string]bool{}, limits: httpadapter.DefaultServerLimits()}
+	for _, option := range options {
+		if option != nil {
+			option(a)
+		}
+	}
+	return a
+}
 func (a *Adapter) Register(route httpadapter.Route) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -58,21 +76,35 @@ func (a *Adapter) Serve(listener net.Listener) error {
 	}
 	a.started = true
 	routes := compileRoutes(a.routes)
-	server := &fast.Server{Handler: func(c *fast.RequestCtx) {
-		handler, params, foundPath := routes.lookup(string(c.Method()), string(c.Path()))
-		if handler != nil {
-			ctx := &requestContext{r: c, params: params, status: 200}
-			if err := handler(ctx); err != nil && !ctx.wrote {
-				c.Error("Internal server error", 500)
+	server := &fast.Server{
+		ReadTimeout:        a.limits.ReadTimeout,
+		WriteTimeout:       a.limits.WriteTimeout,
+		IdleTimeout:        a.limits.IdleTimeout,
+		ReadBufferSize:     a.limits.MaxHeaderBytes,
+		MaxRequestBodySize: a.limits.MaxBodyBytes,
+		ErrorHandler: func(c *fast.RequestCtx, err error) {
+			if errors.Is(err, fast.ErrBodyTooLarge) {
+				c.Error("request body too large", 413)
+				return
 			}
-			return
-		}
-		if foundPath {
-			c.Error("Method Not Allowed", 405)
-		} else {
-			c.Error("Not Found", 404)
-		}
-	}}
+			c.Error("Bad Request", 400)
+		},
+		Handler: func(c *fast.RequestCtx) {
+			handler, params, foundPath := routes.lookup(string(c.Method()), string(c.Path()))
+			if handler != nil {
+				ctx := &requestContext{r: c, params: params, status: 200}
+				if err := handler(ctx); err != nil && !ctx.wrote {
+					c.Error("Internal server error", 500)
+				}
+				return
+			}
+			if foundPath {
+				c.Error("Method Not Allowed", 405)
+			} else {
+				c.Error("Not Found", 404)
+			}
+		},
+	}
 	a.server = server
 	a.mu.Unlock()
 	return server.Serve(listener)
@@ -128,6 +160,7 @@ func (c *requestContext) Header(n string) string { return string(c.r.Request.Hea
 func (c *requestContext) Body() []byte           { return c.r.PostBody() }
 func (c *requestContext) Status(n int)           { c.status = n }
 func (c *requestContext) SetHeader(k, v string)  { c.r.Response.Header.Set(k, v) }
+func (c *requestContext) AddHeader(k, v string)  { c.r.Response.Header.Add(k, v) }
 func (c *requestContext) Write(b []byte) error {
 	if !c.wrote {
 		c.r.SetStatusCode(c.status)

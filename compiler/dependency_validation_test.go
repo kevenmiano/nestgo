@@ -6,7 +6,7 @@ import (
 )
 
 func TestMissingDependencyValidation(t *testing.T) {
-	f, err := Parse("missing.mgo", []byte("package demo\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo }\n"))
+	f, err := Parse("missing.mgo", []byte("package demo\ntype Repo struct{}\n@Injectable()\ntype Service struct { Repo *Repo `nestgo:\"inject\"` }\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,11 +27,21 @@ func TestDeclaredDependencyPassesValidation(t *testing.T) {
 }
 
 func TestMissingControllerDependencyValidation(t *testing.T) {
-	f, err := Parse("controller.mgo", []byte("package demo\ntype Repo struct{}\n@Controller(\"/\")\ntype C struct { Repo *Repo }\n"))
+	f, err := Parse("controller.mgo", []byte("package demo\ntype Repo struct{}\n@Controller(\"/\")\ntype C struct { Repo *Repo `nestgo:\"inject\"` }\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Generate([]*File{f}); err == nil || !strings.Contains(err.Error(), "missing required provider") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestExplicitlyExcludedDependencyPassesCompile(t *testing.T) {
+	f, err := Parse("ignored.mgo", []byte("package demo\ntype External struct{}\n@Injectable()\ntype Service struct { External *External `nestgo:\"-\"` }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Generate([]*File{f}); err != nil {
+		t.Fatalf("ignored field must not require provider: %v", err)
 	}
 }

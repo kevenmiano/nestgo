@@ -10,7 +10,7 @@ import (
 )
 
 type importedModuleConsumer struct {
-	Repository *externalmodule.Repository
+	Repository *externalmodule.Repository `nestgo:"inject"`
 }
 type importedModuleRoot struct{}
 

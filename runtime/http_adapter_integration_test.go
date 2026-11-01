@@ -71,6 +71,7 @@ func TestHTTPAdapterConformance(t *testing.T) {
 					t.Errorf("%s %s: status %d, want %d", tc.method, tc.path, response.StatusCode, tc.want)
 				}
 			}
+			client.CloseIdleConnections()
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 			if err := a.Shutdown(ctx); err != nil {

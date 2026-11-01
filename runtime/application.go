@@ -19,14 +19,16 @@ import (
 type Option func(*applicationConfig)
 
 type applicationConfig struct {
-	adapter     httpadapter.Adapter
-	packages    []metadata.Package
-	routes      []Route
-	registry    []string
-	logger      *logging.Service
-	debug       bool
-	onBootstrap func(BootstrapMetrics)
-	pipeline    requestPipelineConfig
+	adapter      httpadapter.Adapter
+	packages     []metadata.Package
+	routes       []Route
+	registry     []string
+	logger       *logging.Service
+	debug        bool
+	onBootstrap  func(BootstrapMetrics)
+	bootstrapCtx context.Context
+	contextSet   bool
+	pipeline     requestPipelineConfig
 }
 
 // WithPackages supplies already-generated metadata to the application.
@@ -44,6 +46,7 @@ type Handler = httpadapter.Handler
 type Route = httpadapter.Route
 
 // WithRoutes registers ordinary Go HTTP handlers on the selected adapter.
+// These routes participate in the same bootstrap error handling and shutdown.
 func WithRoutes(routes ...Route) Option {
 	return func(c *applicationConfig) { c.routes = append(c.routes, routes...) }
 }
@@ -57,6 +60,16 @@ func WithRegistry(names ...string) Option {
 // WithAdapter selects an HTTP engine; the default is fasthttp.
 func WithAdapter(adapter httpadapter.Adapter) Option {
 	return func(c *applicationConfig) { c.adapter = adapter }
+}
+
+// WithContext supplies the bootstrap context for lifecycle hooks.
+// Use the context passed by the calling service; it is not an automatic
+// request context, and cancellation does not shut down an already started app.
+func WithContext(ctx context.Context) Option {
+	return func(c *applicationConfig) {
+		c.bootstrapCtx = ctx
+		c.contextSet = true
+	}
 }
 
 // WithLogger enables structured framework bootstrap diagnostics.
@@ -119,6 +132,9 @@ func New(options ...Option) (*Application, error) {
 		}
 		option(&cfg)
 	}
+	if cfg.contextSet && cfg.bootstrapCtx == nil {
+		return nil, errors.New("nil bootstrap context")
+	}
 	if len(cfg.registry) > 0 && len(cfg.packages) > 0 {
 		return nil, errors.New("WithRegistry and WithPackages cannot be combined")
 	}
@@ -137,7 +153,10 @@ func New(options ...Option) (*Application, error) {
 		adapter = fastadapter.New()
 	}
 	registry := &lifecycleRegistry{}
-	ctx := context.Background()
+	ctx := cfg.bootstrapCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	logger := cfg.logger
 	if logger != nil {
 		logger.Info(ctx, "NestFactory", "Starting NestGo application...")
@@ -160,9 +179,7 @@ func New(options ...Option) (*Application, error) {
 		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
 	}
 	registrationStarted := time.Now()
-	if err := validatePipeline(cfg.pipeline); err != nil {
-		return fail(err)
-	}
+	if err := validatePipeline(cfg.pipeline); err != nil { return fail(err) }
 	if err := registerRoutesWithPipeline(adapter, packages, registry, cfg.pipeline, cfg.routes...); err != nil {
 		return fail(err)
 	}
@@ -209,4 +226,11 @@ func (a *Application) Shutdown(ctx context.Context) error {
 		return a.adapter.Shutdown(ctx)
 	}
 	return a.lifecycle.shutdown(ctx, a.adapter.Shutdown)
+}
+
+// Close implements io.Closer. Use Shutdown(ctx) instead when the caller must
+// enforce a shutdown deadline. Both operations share idempotent lifecycle
+// cleanup so callers may safely invoke them repeatedly.
+func (a *Application) Close() error {
+	return a.Shutdown(context.Background())
 }

@@ -44,7 +44,7 @@ type File struct {
 	Declarations          []Declaration
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "UseGuards": true, "UsePipes": true, "UseFilters": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Header": true, "Redirect": true, "Res": true, "Response": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true, "UseGuards": true, "UsePipes": true, "UseFilters": true}
 
 func Parse(path string, src []byte) (*File, error) {
 	source, annotations, paramMarkers, err := lexDecorators(path, src)
@@ -107,7 +107,7 @@ func Parse(path string, src []byte) (*File, error) {
 				}
 			}
 			for _, a := range ann {
-				if !isRoute(a.Name) && a.Name != "HttpCode" && a.Name != "UseGuards" && a.Name != "UsePipes" && a.Name != "UseFilters" {
+				if !isRoute(a.Name) && a.Name != "HttpCode" && a.Name != "Header" && a.Name != "Redirect" && a.Name != "UseGuards" && a.Name != "UsePipes" && a.Name != "UseFilters" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a function"}
 				}
 			}
@@ -214,15 +214,15 @@ func typedHTTPInvoker(d Declaration) string {
 			if !token.IsIdentifier(typ) || typ == "any" || typ == "interface{}" {
 				return ""
 			}
-			fmt.Fprintf(&body, "%s,code,err:=httpadapter.DecodeBodyAt[%s](ctx,%d);if err!=nil{return nil,code,err};", identifier, typ, i)
+			fmt.Fprintf(&body, "%s,code,err:=httpadapter.DecodeBody[%s](ctx);if err!=nil{return nil,code,err};", identifier, typ)
 		case "Param", "Query":
 			if typ != "string" {
 				return ""
 			}
 			if mark.Kind == "Param" {
-				fmt.Fprintf(&body, "%s,code,err:=httpadapter.BindParam(ctx,%q,%d);if err!=nil{return nil,code,err};", identifier, mark.Name, i)
+				fmt.Fprintf(&body, "%s:=ctx.Param(%q);", identifier, mark.Name)
 			} else {
-				fmt.Fprintf(&body, "%s,code,err:=httpadapter.BindQuery(ctx,%q,%d);if err!=nil{return nil,code,err};", identifier, mark.Name, i)
+				fmt.Fprintf(&body, "%s:=ctx.Query(%q);", identifier, mark.Name)
 			}
 		default:
 			return ""
@@ -436,13 +436,32 @@ func Generate(files []*File) ([]byte, error) {
 			}
 			status := 0
 			routeCount := 0
+			headers := []string{}
+			redirectURL := ""
+			redirectStatus := 0
 			for _, a := range d.Annotations {
-				if a.Name == "HttpCode" {
+				switch a.Name {
+				case "HttpCode":
 					n, err := strconv.Atoi(a.Argument)
 					if err != nil || n < 100 || n > 599 {
 						return nil, fmt.Errorf("%s:%d: invalid HTTP status", f.Path, a.Line)
 					}
 					status = n
+				case "Header":
+					name, value, err := parseHeaderDecorator(a.Argument)
+					if err != nil {
+						return nil, Diagnostic{f.Path, a.Line, "@Header: " + err.Error()}
+					}
+					headers = append(headers, fmt.Sprintf("{Name:%q,Value:%q}", name, value))
+				case "Redirect":
+					if redirectURL != "" {
+						return nil, Diagnostic{f.Path, a.Line, "duplicate @Redirect"}
+					}
+					url, code, err := parseRedirectDecorator(a.Argument)
+					if err != nil {
+						return nil, Diagnostic{f.Path, a.Line, "@Redirect: " + err.Error()}
+					}
+					redirectURL, redirectStatus = url, code
 				}
 			}
 			for _, a := range d.Annotations {
@@ -470,10 +489,8 @@ func Generate(files []*File) ([]byte, error) {
 					needsHTTPAdapter = true
 				}
 				pipelineFields, err := pipelineMetadata(f.Path, d.Annotations, providerNames)
-				if err != nil {
-					return nil, err
-				}
-				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Parameters:[]metadata.Parameter{%s}%s%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(params, ","), pipelineFields, staticInvoke))
+				if err != nil { return nil, err }
+				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Headers:[]metadata.Header{%s},RedirectURL:%q,RedirectStatus:%d,Parameters:[]metadata.Parameter{%s}%s%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(headers, ","), redirectURL, redirectStatus, strings.Join(params, ","), pipelineFields, staticInvoke))
 			}
 			if routeCount > 1 {
 				return nil, fmt.Errorf("%s: multiple HTTP method decorators on %s", f.Path, d.Name)

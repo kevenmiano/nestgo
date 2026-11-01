@@ -14,7 +14,7 @@ type transitiveExternalModule struct{}
 type transitiveRootModule struct{}
 type transitiveMiddleModule struct{}
 type transitiveConsumer struct {
-	Repo *externalmodule.Repository
+	Repo *externalmodule.Repository `nestgo:"inject"`
 }
 
 var transitiveFixtureOnce sync.Once

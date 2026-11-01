@@ -14,7 +14,7 @@ import (
 type exportBoundaryModule struct{}
 type exportBoundaryConsumerModule struct{}
 type exportBoundaryConsumer struct {
-	Repository *externalmodule.Repository
+	Repository *externalmodule.Repository `nestgo:"inject"`
 }
 type exportBoundaryOptionalConsumer struct {
 	Repository *externalmodule.Repository `nestgo:"optional"`

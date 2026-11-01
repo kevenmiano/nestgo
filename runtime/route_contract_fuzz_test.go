@@ -31,7 +31,7 @@ func FuzzRouteContractRejectsInvalidBindings(f *testing.F) {
 			Parameters: []metadata.Parameter{{Index: index, Kind: kind, Name: name}},
 		}
 		_, err := compileRouteContract("/api", route, method)
-		validKind := kind == "Param" || kind == "Query" || kind == "Body"
+		validKind := kind == "Param" || kind == "Query" || kind == "Body" || kind == "Headers"
 		if err == nil && (index != 0 || !validKind) {
 			t.Fatalf("accepted invalid binding: kind=%q index=%d", kind, index)
 		}
