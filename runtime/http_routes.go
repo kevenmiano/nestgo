@@ -7,7 +7,6 @@ import (
 	"github.com/kevenmiano/nestgo/httpadapter"
 	"github.com/kevenmiano/nestgo/metadata"
 	"reflect"
-	"sort"
 	"strings"
 )
 
@@ -18,51 +17,19 @@ func registerRoutes(adapter httpadapter.Adapter, packages []metadata.Package) er
 }
 
 func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry) error {
-	providers := map[reflect.Type]reflect.Value{}
-	controllers := []metadata.Controller{}
-	for _, pkg := range packages {
-		for _, p := range pkg.Providers {
-			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
-				return fmt.Errorf("invalid provider %v", p.Type)
-			}
-			if _, ok := providers[p.Type]; ok {
-				return fmt.Errorf("duplicate provider %v", p.Type)
-			}
-			providers[p.Type] = reflect.New(p.Type.Elem())
-		}
-		controllers = append(controllers, pkg.Controllers...)
-	}
-	visibility, err := moduleVisibility(packages)
+	graph, err := prepareBootstrap(packages, nil, nil)
 	if err != nil {
 		return err
 	}
-	orderedProviders := make([]reflect.Type, 0, len(providers))
-	for providerType := range providers {
-		orderedProviders = append(orderedProviders, providerType)
-	}
-	sort.Slice(orderedProviders, func(i, j int) bool {
-		return orderedProviders[i].String() < orderedProviders[j].String()
-	})
-	inject := func(v reflect.Value) error {
-		return injectFields(v, providers, orderedProviders, visibility)
-	}
-	for _, providerType := range orderedProviders {
-		if err := inject(providers[providerType]); err != nil {
-			return err
-		}
-	}
 	if lifecycle != nil {
-		for _, typ := range orderedProviders {
-			lifecycle.instances = append(lifecycle.instances, providers[typ].Interface())
+		for _, typ := range graph.orderedProviders {
+			lifecycle.instances = append(lifecycle.instances, graph.providers[typ].Interface())
 		}
 	}
 	seen := map[string]bool{}
-	for _, controller := range controllers {
-		if controller.Type == nil || controller.Type.Kind() != reflect.Ptr || controller.Type.Elem().Kind() != reflect.Struct {
-			return fmt.Errorf("invalid controller %v", controller.Type)
-		}
-		instance := reflect.New(controller.Type.Elem())
-		if err := inject(instance); err != nil {
+	for _, controller := range graph.controllers {
+		instance, err := graph.newController(controller.Type)
+		if err != nil {
 			return err
 		}
 		if lifecycle != nil {
@@ -74,33 +41,22 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				return fmt.Errorf("handler %s not found", route.Handler)
 			}
 			typ := method.Type()
-			errType := reflect.TypeOf((*error)(nil)).Elem()
-			if typ.NumOut() < 1 || typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(errType)) {
-				return fmt.Errorf("invalid signature %s", route.Handler)
+			contract, contractErr := compileRouteContract(controller.Prefix, route, typ)
+			if contractErr != nil {
+				return formatRouteContractError(contractErr, false)
 			}
-			path := strings.TrimSuffix(controller.Prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
-			key := route.Method + " " + path
+			path := contract.Path
+			key := contract.Key
 			if seen[key] {
 				return fmt.Errorf("duplicate route %s", key)
 			}
 			seen[key] = true
-			bindings := map[int]metadata.Parameter{}
-			for _, p := range route.Parameters {
-				if p.Index < 0 || p.Index >= typ.NumIn() {
-					return fmt.Errorf("invalid parameter index %d", p.Index)
-				}
-				bindings[p.Index] = p
-			}
-			for i := 0; i < typ.NumIn(); i++ {
-				if _, ok := bindings[i]; !ok && typ.In(i).Kind() != reflect.String {
-					return fmt.Errorf("missing parameter decorator for %s", route.Handler)
-				}
-			}
+			bindings := contract.Bindings
 			handler := method
 			rt := route
 			params := bindings
 			methodType := typ
-			err := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
+			registrationErr := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
 				var result any
 				if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
 					value, err := rt.StaticInvoke(instance.Interface())
@@ -168,8 +124,8 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				}
 				return ctx.Write(append(data, '\n'))
 			}})
-			if err != nil {
-				return fmt.Errorf("register %s: %w", key, err)
+			if registrationErr != nil {
+				return fmt.Errorf("register %s: %w", key, registrationErr)
 			}
 		}
 	}

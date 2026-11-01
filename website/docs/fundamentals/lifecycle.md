@@ -17,13 +17,15 @@ flowchart TD
   Entry -->|"NewApplication with packages"| App["NewApplication"]
   Imports --> App
   App --> Adapter["Select HTTP adapter (fasthttp default)"]
-  Adapter --> Routes["registerRoutes"]
-  Routes --> Instances["Instantiate providers"]
+  Adapter --> Core["prepareBootstrap (shared core)"]
+  Core --> Instances["Allocate provider instances"]
   Instances --> Graph["Validate modules and visibility"]
-  Graph --> Inject["Inject provider fields"]
+  Graph --> Inject["Inject provider fields in deterministic order"]
   Inject --> Controllers["Instantiate and inject controllers"]
-  Controllers --> Map["Validate and register routes"]
-  Map --> Ready["Application constructed"]
+  Controllers --> Contract["compileRouteContract (shared checks)"]
+  Contract --> Map["Register transport-specific routes"]
+  Map --> Hooks["OnModuleInit / OnApplicationBootstrap"]
+  Hooks --> Ready["Application constructed"]
   Ready --> Listen["Listen / Serve (blocking)"]
   Listen --> Requests["HTTP dispatch"]
   Ready --> Shutdown["Shutdown(ctx)"]
@@ -34,7 +36,7 @@ The registry-based path resolves the **transitive registered package import clos
 
 ## Bootstrap metrics
 
-The adapter-based factory accepts an optional `ApplicationOptions.OnBootstrap` callback with a `BootstrapMetrics` value. It reports `RouteRegistration`, `LifecycleInitialization` and `Total` durations on successful construction. Use `go test ./runtime -run '^
+The adapter-based factory accepts an optional `ApplicationOptions.OnBootstrap` callback with a `BootstrapMetrics` value. It reports `RouteRegistration`, `LifecycleInitialization` and `Total` durations on successful construction. Use `go test ./runtime -run '^$' -bench BenchmarkApplicationBootstrapProviders -benchmem` to benchmark startup overhead with 1, 10 and 100 provider types.
 
 The adapter-based API is the recommended entry point when selecting an HTTP engine or controlling shutdown.
 
@@ -54,21 +56,23 @@ sequenceDiagram
   participant Main as main
   participant Registry as metadata registry
   participant Factory as runtime.ApplicationFromRegistry
-  participant DI as registerRoutes / DI
+  participant DI as prepareBootstrap / registerRoutes
   participant Adapter as HTTP adapter
   Main->>Factory: ApplicationFromRegistry(options, names...)
   Factory->>Registry: registryImportClosure(names)
   Registry-->>Factory: packages (or error)
   Factory->>Adapter: Select options.Adapter or fasthttp.New()
-  Factory->>DI: registerRoutes(adapter, packages)
+  Factory->>DI: prepareBootstrap(packages)
   DI->>DI: Instantiate provider pointers
   DI->>DI: Validate module visibility / imports / cycles
   DI->>DI: Inject provider fields
   DI->>DI: Create and inject controllers
+  DI->>DI: compileRouteContract()
   loop Each route
     DI->>Adapter: Register(Route)
   end
   DI-->>Factory: nil or bootstrap error
+  Factory->>DI: Invoke initialization hooks
   Factory-->>Main: *Application or error
   Main->>Adapter: Listen -> Serve(listener)
   Note over Adapter: Serve blocks while serving requests
@@ -95,7 +99,7 @@ flowchart LR
 
 ### Startup failure behavior
 
-Construction returns an error when dependency/route validation or registration fails. The current `NewApplication` does not expose transactional rollback of already registered adapter routes or resource cleanup for arbitrary user-managed provider resources. Do not reuse an adapter after a failed bootstrap without checking its state.
+Construction returns an error when dependency/route validation or registration fails. The adapter-based factory performs best-effort lifecycle cleanup on failure, but route registration is not transactional and arbitrary resources without cleanup hooks remain unmanaged. Do not reuse an adapter after a failed bootstrap without checking its state.
 
 ## Two APIs, two dispatch implementations
 
@@ -103,7 +107,7 @@ Construction returns an error when dependency/route validation or registration f
 | --- | --- | --- |
 | Return value | `*runtime.Application` | `http.Handler` |
 | HTTP platform | `fasthttp` default; customizable adapter | Go `net/http` ServeMux |
-| DI | `registerRoutes` in `runtime/http_routes.go` | `NewWithOptions` in `runtime/runtime.go` |
+| DI | Shared `prepareBootstrap` graph | Shared `prepareBootstrap` graph |
 | HTTP serving | `Application.Listen/Serve` | Caller runs `http.Server` |
 | Shutdown | `Application.Shutdown(ctx)` delegates to adapter | Caller owns server shutdown |
 | Static zero-arg invoker | Uses generated `StaticInvoke` when eligible | Uses generated `StaticInvoke` when eligible |
@@ -150,12 +154,15 @@ if err := app.Shutdown(ctx); err != nil {
 flowchart TD
   Signal["Caller receives termination signal"] --> Caller["Caller creates shutdown context"]
   Caller --> API["Application.Shutdown(ctx)"]
-  API --> Adapter["Adapter.Shutdown(ctx)"]
+  API --> Before["BeforeApplicationShutdown hooks"]
+  Before --> Adapter["Adapter.Shutdown(ctx)"]
   Adapter --> Native{"HTTP platform"}
   Native -->|"fasthttp"| Fast["fasthttp ShutdownWithContext"]
   Native -->|"net/http"| Net["http.Server.Shutdown"]
-  Fast --> Done["Return error / nil"]
-  Net --> Done
+  Fast --> Destroy["OnModuleDestroy hooks"]
+  Net --> Destroy
+  Destroy --> Final["OnApplicationShutdown hooks"]
+  Final --> Done["Return joined errors / nil"]
 ```
 
 NestGo does **not** automatically register OS signal handlers. The adapter-based Application API now invokes provider and controller shutdown hooks when implemented; legacy http.Handler entry points do not. The application owner must orchestrate signal handling, deadline, and termination.
@@ -180,7 +187,8 @@ These hooks currently exist only in `NewApplication` / `ApplicationFromRegistry`
 | `OnApplicationShutdown` | Implemented for adapter-based applications |
 | Explicit application shutdown via adapter | Implemented |
 | Automatic shutdown signals | Not implemented |
-| Unified bootstrap across both HTTP APIs | Not implemented |
+| Shared provider graph, injection and route contract validation | Implemented in both bootstrap paths |
+| Unified lifecycle and shutdown across both HTTP APIs | Not implemented |
 
 ### Proposed unified lifecycle (design target; currently only the adapter path has hooks)
 
@@ -209,7 +217,9 @@ Before unifying this lifecycle, specify dependency-topological ordering, cancell
 ## Source of truth
 
 - [`runtime/application.go`](https://github.com/kevenmiano/nestgo/blob/main/runtime/application.go): application factory, Serve/Listen/Shutdown.
-- [`runtime/http_routes.go`](https://github.com/kevenmiano/nestgo/blob/main/runtime/http_routes.go): adapter-route DI and request dispatch.
+- [`runtime/bootstrap_core.go`](https://github.com/kevenmiano/nestgo/blob/main/runtime/bootstrap_core.go): shared provider/controller bootstrap graph.
+- [`runtime/route_contract.go`](https://github.com/kevenmiano/nestgo/blob/main/runtime/route_contract.go): shared route metadata validation.
+- [`runtime/http_routes.go`](https://github.com/kevenmiano/nestgo/blob/main/runtime/http_routes.go): adapter route registration and dispatch.
 - [`runtime/runtime.go`](https://github.com/kevenmiano/nestgo/blob/main/runtime/runtime.go): legacy net/http bootstrap and logs.
 - [`runtime/module_visibility.go`](https://github.com/kevenmiano/nestgo/blob/main/runtime/module_visibility.go): graph validation and provider visibility.
 - [`runtime/registry_imports.go`](https://github.com/kevenmiano/nestgo/blob/main/runtime/registry_imports.go): registered package closure.

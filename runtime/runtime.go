@@ -40,49 +40,22 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 			logger.Debug(ctx, component, message, attrs...)
 		}
 	}
-	providers := map[reflect.Type]reflect.Value{}
-	orderedProviders := make([]reflect.Type, 0)
-	controllers := []metadata.Controller{}
-	for _, pkg := range packages {
-		moduleStart := time.Now()
-		for _, p := range pkg.Providers {
-			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
-				return fail(fmt.Errorf("provider must be pointer to struct: %v", p.Type))
-			}
-			if _, exists := providers[p.Type]; exists {
-				return fail(fmt.Errorf("duplicate provider: %v", p.Type))
-			}
-			providers[p.Type] = reflect.New(p.Type.Elem())
-			orderedProviders = append(orderedProviders, p.Type)
-			logDebug("InstanceLoader", "Provider instantiated", slog.String("provider", p.Type.String()))
-		}
-		controllers = append(controllers, pkg.Controllers...)
-		logger.Startup(ctx, "InstanceLoader", "Package providers registered", moduleStart)
-	}
-	visibility, err := moduleVisibility(packages)
+	diStart := time.Now()
+	graph, err := prepareBootstrap(packages, func(typ reflect.Type) {
+		logDebug("InstanceLoader", "Provider instantiated", slog.String("provider", typ.String()))
+	}, func() {
+		logger.Info(ctx, "InstanceLoader", "Package providers registered")
+	})
 	if err != nil {
 		return fail(err)
-	}
-	inject := func(v reflect.Value) error {
-		return injectFields(v, providers, orderedProviders, visibility)
-	}
-	diStart := time.Now()
-	for _, providerType := range orderedProviders {
-		v := providers[providerType]
-		if err := inject(v); err != nil {
-			return fail(err)
-		}
 	}
 	logger.Startup(ctx, "InstanceLoader", "Provider dependencies resolved", diStart)
 	routeStart := time.Now()
 	mux := http.NewServeMux()
 	seen := map[string]bool{}
-	for _, c := range controllers {
-		if c.Type == nil || c.Type.Kind() != reflect.Ptr || c.Type.Elem().Kind() != reflect.Struct {
-			return fail(fmt.Errorf("invalid controller %v", c.Type))
-		}
-		instance := reflect.New(c.Type.Elem())
-		if err := inject(instance); err != nil {
+	for _, c := range graph.controllers {
+		instance, err := graph.newController(c.Type)
+		if err != nil {
 			return fail(err)
 		}
 		logger.Info(ctx, "RoutesResolver", "Controller registered", slog.String("controller", c.Type.String()), slog.String("prefix", c.Prefix))
@@ -92,30 +65,17 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				return fail(fmt.Errorf("missing handler %s.%s", c.Type, route.Handler))
 			}
 			typ := method.Type()
-			if typ.NumOut() < 1 || typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem())) {
-				return fail(fmt.Errorf("unsupported signature %s", route.Handler))
+			contract, contractErr := compileRouteContract(c.Prefix, route, typ)
+			if contractErr != nil {
+				return fail(formatRouteContractError(contractErr, true))
 			}
-			path := strings.TrimSuffix(c.Prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
-			if path == "" {
-				path = "/"
-			}
-			key := route.Method + " " + path
+			path := contract.Path
+			key := contract.Key
 			if seen[key] {
 				return fail(fmt.Errorf("duplicate route %s", key))
 			}
 			seen[key] = true
-			bindings := map[int]metadata.Parameter{}
-			for _, p := range route.Parameters {
-				if p.Index < 0 || p.Index >= typ.NumIn() {
-					return fail(fmt.Errorf("invalid parameter index %d", p.Index))
-				}
-				bindings[p.Index] = p
-			}
-			for i := 0; i < typ.NumIn(); i++ {
-				if _, ok := bindings[i]; !ok && typ.In(i).Kind() != reflect.String {
-					return fail(fmt.Errorf("missing decorator for argument %d of %s", i, route.Handler))
-				}
-			}
+			bindings := contract.Bindings
 			handler := method
 			spec := route
 			mux.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
