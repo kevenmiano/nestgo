@@ -25,8 +25,8 @@ func FuzzRouteContractRejectsInvalidBindings(f *testing.F) {
 			t.Skip()
 		}
 		route := metadata.Route{
-			Method: "GET",
-			Path:   "/{id}",
+			Method:  "GET",
+			Path:    "/{id}",
 			Handler: "Echo",
 			Parameters: []metadata.Parameter{{Index: index, Kind: kind, Name: name}},
 		}
