@@ -1,0 +1,96 @@
+name: Compare typed string fallback bindings
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/string_route_invoker.go'
+      - 'runtime/string_route_invoker_test.go'
+      - 'runtime/http_routes.go'
+      - '.github/workflows/string-binding-compare.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          path: baseline
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: candidate/go.mod
+          cache: false
+      - name: Validate typed fallback and existing binding contract
+        working-directory: candidate
+        run: go test ./runtime ./compiler ./httpadapter -count=1
+      - name: Measure the exact same binding workloads on both revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          { go version; uname -a; } | tee results/environment.txt
+          for variant in baseline candidate; do
+            (
+              cd "$variant"
+              GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPBinding$' -benchtime=300ms -count=5 -benchmem -timeout=10m
+            ) | tee "results/$variant.txt"
+          done
+      - name: Compare median request-time cost and allocations
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, statistics
+          root = pathlib.Path("results")
+          pattern = re.compile(r"^BenchmarkHTTPBinding/(path|query|body)/(typed|reflection)-\d+\s+\d+\s+([\d.]+) ns/op\s+(\d+) B/op\s+(\d+) allocs/op")
+          def load(name):
+              data = {}
+              for row in (root / (name + ".txt")).read_text().splitlines():
+                  match = pattern.match(row)
+                  if match:
+                      key = match[1] + "/" + match[2]
+                      data.setdefault(key, []).append(tuple(float(v) for v in match.groups()[2:]))
+              expected = {f"{scenario}/{mode}" for scenario in ("path","query","body") for mode in ("typed","reflection")}
+              if set(data) != expected or any(len(samples) != 5 for samples in data.values()):
+                  raise SystemExit(f"Missing or incomplete benchmark samples: {name} {data.keys()}")
+              return {key: tuple(statistics.median(sample[i] for sample in samples) for i in range(3)) for key, samples in data.items()}
+          old, new = load("baseline"), load("candidate")
+          lines = [
+              "| Binding | main ns/op | PR ns/op | Δ | main B/op | PR B/op | main allocs | PR allocs |",
+              "|---|---:|---:|---:|---:|---:|---:|---:|",
+          ]
+          for key in ("path/reflection","query/reflection","body/reflection","path/typed","query/typed","body/typed"):
+              a, b = old[key], new[key]
+              lines.append(f"| {key} | {a[0]:.1f} | {b[0]:.1f} | {(b[0]/a[0]-1)*100:+.1f}% | {a[1]:.0f} | {b[1]:.0f} | {a[2]:.0f} | {b[2]:.0f} |")
+          result = "\n".join(lines) + "\n"
+          (root / "comparison.md").write_text(result)
+          print(result)
+          PY
+      - name: Profile CPU and allocations separately on both revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for variant in baseline candidate; do
+            (
+              cd "$variant"
+              GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPBinding$/^(path|query)$/^reflection$' -benchtime=500ms -count=1 -cpuprofile="../results/$variant.cpu.pprof" -timeout=10m
+              GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPBinding$/^(path|query)$/^reflection$' -benchtime=500ms -count=1 -memprofile="../results/$variant.mem.pprof" -timeout=10m
+              go tool pprof -top -nodecount=15 "../results/$variant.cpu.pprof" > "../results/$variant.cpu.txt"
+              go tool pprof -alloc_space -top -nodecount=15 "../results/$variant.mem.pprof" > "../results/$variant.alloc.txt"
+            )
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: typed-string-fallback-${{ github.run_id }}
+          path: results/
+          retention-days: 30
