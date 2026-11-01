@@ -145,7 +145,7 @@ func lexDecorators(path string, src []byte) (string, map[int][]Annotation, []mar
 					argument = v
 				}
 				params = append(params, marker{start, name, argument})
-			} else if name == "Expose" || name == "Exclude" || name == "ExcludeInput" || name == "ExcludeOutput" || name == "Transform" || name == "TransformInput" || name == "TransformOutput" || name == "Type" {
+			} else if name == "Expose" || name == "Exclude" || name == "ExcludeInput" || name == "ExcludeOutput" || name == "Transform" || name == "TransformInput" || name == "TransformOutput" || name == "Type" || isDTOValidator(name) {
 				lineStart := start
 				for lineStart > 0 && src[lineStart-1] != '\n' {
 					lineStart--
