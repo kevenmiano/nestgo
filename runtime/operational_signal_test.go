@@ -60,6 +60,12 @@ func TestOperationalSIGTERMWorker(t *testing.T) {
 		Route{Method: "GET", Path: "/internal/fail", Handler: func(Context) error {
 			return errors.New("SENSITIVE_TOKEN_SHOULD_NOT_LEAK")
 		}},
+		Route{Method: "GET", Path: "/inflight", Handler: func(c Context) error {
+			fmt.Println("NESTGO_INFLIGHT_STARTED")
+			time.Sleep(500 * time.Millisecond)
+			c.Status(http.StatusOK)
+			return c.Write([]byte("inflight-complete"))
+		}},
 	))
 	if err != nil {
 		t.Fatalf("initialize worker: %v", err)
@@ -117,6 +123,7 @@ func TestOperationalSIGTERMRealProcess(t *testing.T) {
 				}
 			})
 			addresses := make(chan string, 1)
+			inflightStarted := make(chan struct{}, 1)
 			stopped := make(chan bool, 1)
 			go func() {
 				scanner := bufio.NewScanner(stdout)
@@ -124,6 +131,9 @@ func TestOperationalSIGTERMRealProcess(t *testing.T) {
 					line := scanner.Text()
 					if addr, ok := strings.CutPrefix(line, "NESTGO_READY="); ok {
 						addresses <- addr
+					}
+					if line == "NESTGO_INFLIGHT_STARTED" {
+						inflightStarted <- struct{}{}
 					}
 					if line == "NESTGO_STOPPED" {
 						stopped <- true
@@ -162,10 +172,39 @@ func TestOperationalSIGTERMRealProcess(t *testing.T) {
 					t.Fatalf("HTTP response exposed internal error details on %s", tc.path)
 				}
 			}
-			client.CloseIdleConnections()
+			type inflightResult struct {
+				body   string
+				status int
+				err    error
+			}
+			inflightDone := make(chan inflightResult, 1)
+			go func() {
+				response, err := client.Get("http://" + address + "/inflight")
+				if err != nil {
+					inflightDone <- inflightResult{err: err}
+					return
+				}
+				body, readErr := io.ReadAll(response.Body)
+				_ = response.Body.Close()
+				inflightDone <- inflightResult{body: string(body), status: response.StatusCode, err: readErr}
+			}()
+			select {
+			case <-inflightStarted:
+			case <-time.After(4 * time.Second):
+				t.Fatalf("inflight handler was not entered before SIGTERM; stderr=%s", stderr.String())
+			}
 			if err := command.Process.Signal(syscall.SIGTERM); err != nil {
 				t.Fatal(err)
 			}
+			select {
+			case response := <-inflightDone:
+				if response.err != nil || response.status != 200 || response.body != "inflight-complete" {
+					t.Fatalf("inflight request interrupted by SIGTERM: status=%d body=%q err=%v", response.status, response.body, response.err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("inflight request did not finish during graceful shutdown")
+			}
+			client.CloseIdleConnections()
 			wait := make(chan error, 1)
 			go func() { wait <- command.Wait() }()
 			select {
