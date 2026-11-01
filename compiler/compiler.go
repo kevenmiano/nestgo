@@ -178,6 +178,7 @@ func Parse(path string, src []byte) (*File, error) {
 	}
 	return result, nil
 }
+
 // typedHTTPInvoker generates direct Go calls only for fully decorated,
 // locally representable method signatures. Others retain reflection fallback.
 func typedHTTPInvoker(d Declaration) string {
