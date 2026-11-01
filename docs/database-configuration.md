@@ -59,17 +59,20 @@ O Viper está disponível no módulo **opcional** `config/viper`. O carregamento
 - `config.Load`, `database.Bootstrap`, `database.BootstrapFromConfig` e `database.New(executor)` continuam disponíveis.
 - `@Repository` com seleção de conexão, módulos dinâmicos declarativos e DI gerado ainda não estão implementados. Não confundir o registry Go com a integração completa ao compilador.
 
-## Generated repositories and runtime injection (experimental)
+## Generated repository injection (experimental)
 
-For `@Repository(User, "users")` on a `.mgo` type with supported `@Query` methods, `CompileDir` emits a typed constructor and `zz_modforge_repositories.go`. After opening the named pools, construct the providers and pass their instances to runtime:
+The standard `CompileDir` command now generates a typed repository constructor and registers a provider factory in the generated `metadata.Package`. The runtime executes the factory once during bootstrap and injects the resulting repository into compatible provider/controller fields.
 
 ```go
-repositories, err := NewGeneratedRepositories(connections)
-if err != nil { return err }
+// Once the named database pools have been opened:
 handler, err := runtime.NewWithOptions(
-    runtime.Options{Instances: append([]any{settings, connections}, repositories.Instances()...)},
+    runtime.Options{Instances: []any{settings, connections}},
     generatedMetadata,
 )
 ```
 
-The compiler still does **not** automatically wire these instances from `@Module({imports:[...]})`. The generated registry is a bootstrap bridge rather than completed declarative DI. Static SQL support remains limited to SELECT, named binding and fields matching the entity's scan order. These limitations are tracked in #87, #88 and #89.
+No manual `NewGeneratedRepositories` call is needed when the module is compiled with the new factory metadata. `@Repository(User, "users")` selects the named pool at startup; query handlers reuse the selected executor without a registry lookup on every request.
+
+For a single local `@Module`, compiled repository providers are assigned automatically. With multiple local modules, specify the generated provider type in the owning module's `providers` declaration, for example `@Module({providers:[UsersRepositoryGenerated]})`. A repository owned by zero or multiple modules is a compile error.
+
+**Limits:** database pools still need explicit initialization and must be provided to `runtime.Options.Instances`; decorators do not currently instantiate `DatabaseModule.NewModule(...)` themselves. Only the supported repository `SELECT` subset is emitted. The `@Query` editor autocomplete and full schema/migrations remain separate outstanding issues (#89–#93).
