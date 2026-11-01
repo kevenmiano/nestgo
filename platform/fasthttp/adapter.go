@@ -12,15 +12,13 @@ import (
 )
 
 type Adapter struct {
-	mu      sync.Mutex
-	routes  []httpadapter.Route
-	keys    map[string]bool
-	// Dynamic patterns require overlap checking; literal paths only conflict
-	// with their exact method/path duplicate, already handled by keys.
+	mu         sync.Mutex
+	routes     []httpadapter.Route
+	keys       map[string]bool
+	server     *fast.Server
+	limits     httpadapter.ServerLimits
 	hasDynamic bool
-	server  *fast.Server
-	limits  httpadapter.ServerLimits
-	started bool
+	started    bool
 }
 
 var _ httpadapter.Adapter = (*Adapter)(nil)
