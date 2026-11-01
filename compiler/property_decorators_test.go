@@ -13,6 +13,7 @@ const dtoSource = `package demodto
 import (
     "net/url"
     "strings"
+    "github.com/kevenmiano/nestgo/transform"
 )
 
 type Address struct { City string ` + "\u0060json:\"city\"\u0060" + ` }
@@ -27,13 +28,13 @@ type User struct {
     @TransformInput(url.PathUnescape)
     Slug string ` + "\u0060json:\"slug\"\u0060" + `
     @TransformOutput(Uppercase)
-    @TransformOutput(&AddSuffix{})
+    @TransformOutput(AddSuffix)
     Label string ` + "\u0060json:\"label\"\u0060" + `
     @ExcludeOutput()
     Token string ` + "\u0060json:\"token\"\u0060" + `
     @ExcludeInput()
     ServerID string ` + "\u0060json:\"server_id\"\u0060" + `
-    @TransformInput(TrimTenant{})
+    @TransformInput(TrimTenant)
     Tenant string ` + "\u0060json:\"tenant\"\u0060" + `
     @Type(Address)
     Address Address ` + "\u0060json:\"address\"\u0060" + `
@@ -43,8 +44,10 @@ type User struct {
 func NormalizeEmail(value string) (string,error) { return strings.ToLower(value),nil }
 func Uppercase(value string) (string,error) { return strings.ToUpper(value),nil }
 type TrimTenant struct{}
+var _ transform.Transformer[string] = (*TrimTenant)(nil)
 func (TrimTenant) Transform(value string) (string,error) { return strings.TrimSpace(value),nil }
 type AddSuffix struct{}
+var _ transform.Transformer[string] = (*AddSuffix)(nil)
 func (*AddSuffix) Transform(value string) (string,error) { return value+"!",nil }
 `
 
@@ -60,7 +63,7 @@ func TestPropertyDecoratorsCompileAndRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"MarshalJSON()", "UnmarshalJSON(data []byte)", "ApplyFunc[string](p", "Apply[string](p", "TrimTenant{}", "&AddSuffix{}", "display_name"} {
+	for _, expected := range []string{"MarshalJSON()", "UnmarshalJSON(data []byte)", "ApplyFunc[string](p", "Apply[string](p", "new(TrimTenant)", "new(AddSuffix)", "var _ __nestgo_transform.Transformer[string]", "display_name"} {
 		if !strings.Contains(string(codec), expected) {
 			t.Fatalf("missing %q from generated codec:\n%s", expected, codec)
 		}
