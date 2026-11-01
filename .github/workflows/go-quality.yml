@@ -22,16 +22,16 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Resolve dependency lockfile (temporary #115 review)
+      - name: Verify dependency graph and checksums
         shell: bash
         run: |
-          go mod tidy
-          echo '===NESTGO-RESOLVED-MOD-START==='
-          cat go.mod
-          echo '===NESTGO-RESOLVED-MOD-END==='
-          echo '===NESTGO-RESOLVED-SUM-START==='
-          cat go.sum
-          echo '===NESTGO-RESOLVED-SUM-END==='
+          go mod tidy -diff
+          go mod verify
+      - name: Check for known vulnerabilities
+        shell: bash
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
       - name: Unit and integration tests
         run: go test ./...
       - name: Static analysis
