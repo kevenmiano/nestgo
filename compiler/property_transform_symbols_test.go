@@ -23,7 +23,9 @@ func TestNamedStructTransformerAcrossGoSourceFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	gen, err := os.ReadFile(filepath.Join(dir, "dto_transformers_generated.go"))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(string(gen), "new(TrimName)") || !strings.Contains(string(gen), "Transformer[string]") {
 		t.Fatalf("cross-file type was not statically resolved: %s", gen)
 	}
@@ -31,11 +33,13 @@ func TestNamedStructTransformerAcrossGoSourceFiles(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	mod := "module dto\n\ngo 1.23\n\nrequire github.com/kevenmiano/nestgo v0.0.0\nreplace github.com/kevenmiano/nestgo => " + filepath.ToSlash(filepath.Dir(root)) + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0644); err != nil { t.Fatal(err) }
-	testSource := "package dto\nimport (\"encoding/json\"; \"testing\")\nfunc TestTrimName(t *testing.T) { var user User; if err := json.Unmarshal([]byte(`{\"Name\":\"  Ada  \"}`), &user); err != nil { t.Fatal(err) }; if user.Name != \"Ada\" { t.Fatalf(\"got %q\", user.Name) } }\n"
+	testSource := "package dto\nimport (\"encoding/json\"; \"testing\")\nfunc TestTrimName(t *testing.T) { var user User; if err := json.Unmarshal([]byte(`{"Name":"  Ada  "}`), &user); err != nil { t.Fatal(err) }; if user.Name != \"Ada\" { t.Fatalf(\"got %q\", user.Name) } }\n"
 	if err := os.WriteFile(filepath.Join(dir, "dto_test.go"), []byte(testSource), 0644); err != nil { t.Fatal(err) }
 	cmd := exec.Command("go", "test", "-mod=mod", ".")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	output, err := cmd.CombinedOutput()
-	if err != nil { t.Fatalf("cross-file generated DTO failed: %v\n%s", err, output) }
+	if err != nil {
+		t.Fatalf("cross-file generated DTO failed: %v\n%s", err, output)
+	}
 }
