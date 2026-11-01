@@ -58,3 +58,18 @@ O Viper está disponível no módulo **opcional** `config/viper`. O carregamento
 - Erros de validação não devem incluir DSNs ou segredos.
 - `config.Load`, `database.Bootstrap`, `database.BootstrapFromConfig` e `database.New(executor)` continuam disponíveis.
 - `@Repository` com seleção de conexão, módulos dinâmicos declarativos e DI gerado ainda não estão implementados. Não confundir o registry Go com a integração completa ao compilador.
+
+## Generated repositories and runtime injection (experimental)
+
+For `@Repository(User, "users")` on a `.mgo` type with supported `@Query` methods, `CompileDir` emits a typed constructor and `zz_modforge_repositories.go`. After opening the named pools, construct the providers and pass their instances to runtime:
+
+```go
+repositories, err := NewGeneratedRepositories(connections)
+if err != nil { return err }
+handler, err := runtime.NewWithOptions(
+    runtime.Options{Instances: append([]any{settings, connections}, repositories.Instances()...)},
+    generatedMetadata,
+)
+```
+
+The compiler still does **not** automatically wire these instances from `@Module({imports:[...]})`. The generated registry is a bootstrap bridge rather than completed declarative DI. Static SQL support remains limited to SELECT, named binding and fields matching the entity's scan order. These limitations are tracked in #87, #88 and #89.
