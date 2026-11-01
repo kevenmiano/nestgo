@@ -5,7 +5,10 @@
   "scripts": {
     "start": "docusaurus start",
     "build": "docusaurus build",
-    "serve": "docusaurus serve"
+    "serve": "docusaurus serve",
+    "generate:cli": "go run ../cmd/nestgo-docs ./docs/cli/reference",
+    "prestart": "npm run generate:cli",
+    "prebuild": "npm run generate:cli"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",

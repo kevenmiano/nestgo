@@ -9,13 +9,13 @@ slug: /intro
 
 ## Requirements
 
-- Go 1.23 or newer
+- Go 1.27 or newer
 - Go module dependencies resolved through `go.mod` and `go.sum`
 - Node.js 22 only when building the Docusaurus documentation website
 
 ## Install NestGo
 
-Import the ordinary Go runtime using `go get github.com/kevenmiano/nestgo@latest`. No NestGo compiler is needed for plain Go handlers. The CLI (`go install github.com/kevenmiano/nestgo/cmd/nestgo@latest`) is optional and only required for `.mgo` decorators. See [installation](./installation.md).
+Import the ordinary Go runtime using `go get github.com/kevenmiano/nestgo@latest`. No NestGo compiler is needed for plain Go handlers. The CLI (`go install github.com/kevenmiano/nestgo/cmd/nestgo@latest`) is optional and only required for `.mgo` decorators. See [installation](./installation.md) and the [CLI guide](./cli/overview.md).
 
 ## Quick start: plain Go server
 
@@ -38,7 +38,7 @@ This is a normal imported Go library, similar to creating a gRPC server. Go link
 ```bash
 git clone https://github.com/kevenmiano/nestgo.git
 cd nestgo
-go run ./cmd/modforge compile ./examples/shop
+go run ./cmd/nestgo compile ./examples/shop
 go test ./...
 ```
 
@@ -60,7 +60,7 @@ Decorators are accepted in `.mgo` files by the NestGo compiler, **not** by the s
 
 ## Application runtime
 
-The single factory `runtime.New(runtime.WithRoutes(...))` or `runtime.New(runtime.WithRegistry("shop"))` creates `*runtime.Application` with a native fasthttp adapter by default. Use `runtime.WithAdapter(nethttp.New())` to switch engines. Both engines share DI, route contracts, initialization hooks and explicit `app.Shutdown(ctx)`. Declarative modules support imports, providers, controllers and exports with runtime graph checks.
+The single factory `runtime.New(runtime.WithRoutes(...))` or `runtime.New()` creates `*runtime.Application` with a native fasthttp adapter by default. Use `runtime.WithAdapter(nethttp.New())` to switch engines. Both engines share DI, route contracts, initialization hooks and explicit `app.Shutdown(ctx)`. Declarative modules support imports, providers, controllers and exports with runtime graph checks.
 
 The compiler can emit direct invocation wrappers for eligible zero-argument handlers, retaining reflective invocation for other signatures. These are experimental features, not evidence of production-scale performance or complete adapter parity.
 
