@@ -68,4 +68,4 @@ not TypeScript exception classes.
 :::
 
 Read the [request lifecycle](./request-pipeline.md) or run the
-[exception filter sample](https://github.com/kevenmiano/nestgo/tree/feat/http-request-pipeline/examples/pipeline).
+[exception filter sample](https://github.com/kevenmiano/nestgo/tree/main/examples/pipeline).
