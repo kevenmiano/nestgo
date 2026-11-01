@@ -13,7 +13,7 @@ import (
 
 // Options controls dotenv loading. Environment variables take precedence over files.
 type Options struct {
-	EnvFiles []string
+	EnvFiles      []string
 	IgnoreEnvFile bool
 }
 
@@ -60,7 +60,7 @@ func readEnv(path string, values map[string]string) error {
 		}
 		value = strings.TrimSpace(value)
 		if len(value) >= 2 && (value[0] == '"' && value[len(value)-1] == '"' || value[0] == '\'' && value[len(value)-1] == '\'') {
-			value = value[1:len(value)-1]
+			value = value[1 : len(value)-1]
 		}
 		if _, exists := values[key]; !exists {
 			values[key] = value
@@ -111,7 +111,7 @@ func (s *Service) Decode(prefix string, target any) error {
 		}
 		key := name
 		if prefix != "" {
-			key = prefix+"_"+name
+			key = prefix + "_" + name
 		}
 		value, exists := s.Get(key)
 		required := false
