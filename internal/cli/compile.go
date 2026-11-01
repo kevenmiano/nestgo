@@ -14,6 +14,7 @@ import (
 func newCompileCommand() *cobra.Command {
 	var watch bool
 	var interval time.Duration
+	var format string
 	cmd := &cobra.Command{
 		Use:     "compile <directory|file.mgo>",
 		Short:   "Compile .mgo decorators into ordinary Go sources and metadata",
@@ -21,19 +22,22 @@ func newCompileCommand() *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		Example: "  nestgo compile ./examples/shop\n  nestgo compile --watch ./myapp\n  nestgo compile ./myapp --watch",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if format != "text" && format != "json" {
+				return fmt.Errorf("unsupported --format %q (expected text or json)", format)
+			}
+			if watch && format == "json" {
+				return finishCompilerCommand(cmd, format, "compile", "", fmt.Errorf("--format=json is only supported for single-shot compile; use text mode with --watch"))
+			}
 			path, err := resolveCompileTarget(args[0])
 			if err != nil {
-				return err
+				return finishCompilerCommand(cmd, format, "compile", "", err)
 			}
 			if !watch {
 				if cmd.Flags().Changed("poll-interval") {
-					return fmt.Errorf("--poll-interval requires --watch")
+					return finishCompilerCommand(cmd, format, "compile", "", fmt.Errorf("--poll-interval requires --watch"))
 				}
-				if err := compiler.CompileDir(path); err != nil {
-					return err
-				}
-				cmd.Printf("compiled %s\n", path)
-				return nil
+			err := compiler.CompileDir(path)
+			return finishCompilerCommand(cmd, format, "compile", "compiled "+path, err)
 			}
 			if interval <= 0 {
 				return fmt.Errorf("--poll-interval must be positive")
@@ -48,6 +52,7 @@ func newCompileCommand() *cobra.Command {
 			})
 		},
 	}
+	cmd.Flags().StringVar(&format, "format", "text", "diagnostic output format: text or json (single-shot only)")
 	cmd.Flags().BoolVarP(&watch, "watch", "w", false, "recompile when top-level .mgo sources change")
 	cmd.Flags().DurationVar(&interval, "poll-interval", 250*time.Millisecond, "source polling interval in watch mode")
 	return cmd
