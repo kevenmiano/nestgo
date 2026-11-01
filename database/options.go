@@ -19,9 +19,9 @@ type Options struct {
 	Connections []ConnectionOptions
 }
 
-// New builds a connection descriptor without opening sockets or reading env.
+// NewModule builds a connection descriptor without opening sockets or reading env.
 // Call Open to validate connectivity and start the owned connection pools.
-func New(opts ...Option) (*Module, error) {
+func NewModule(opts ...Option) (*Module, error) {
 	plan := Options{}
 	for _, apply := range opts {
 		if apply == nil {
