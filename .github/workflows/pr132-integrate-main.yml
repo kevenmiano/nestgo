@@ -55,3 +55,5 @@ jobs:
           git add -A
           git commit -m "merge: integrate DTO transformers and validators with current NestGo main"
           git push origin HEAD:feat/dto-property-transformers
+
+# Run integration patch revision 2
