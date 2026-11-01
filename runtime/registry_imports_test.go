@@ -13,7 +13,7 @@ import (
 type registryRootModule struct{}
 type registryMissingImportModule struct{}
 type registryConsumer struct {
-	Repo *externalmodule.Repository
+	Repo *externalmodule.Repository `nestgo:"inject"`
 }
 
 var registerClosureFixtures sync.Once
