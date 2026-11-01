@@ -40,51 +40,20 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 			logger.Debug(ctx, component, message, attrs...)
 		}
 	}
-	providers := map[reflect.Type]reflect.Value{}
-	orderedProviders := make([]reflect.Type, 0)
-	controllers := []metadata.Controller{}
-	for _, pkg := range packages {
-		moduleStart := time.Now()
-		for _, p := range pkg.Providers {
-			if p.Type == nil || p.Type.Kind() != reflect.Ptr || p.Type.Elem().Kind() != reflect.Struct {
-				return fail(fmt.Errorf("provider must be pointer to struct: %v", p.Type))
-			}
-			if _, exists := providers[p.Type]; exists {
-				return fail(fmt.Errorf("duplicate provider: %v", p.Type))
-			}
-			providers[p.Type] = reflect.New(p.Type.Elem())
-			orderedProviders = append(orderedProviders, p.Type)
-			logDebug("InstanceLoader", "Provider instantiated", slog.String("provider", p.Type.String()))
-		}
-		controllers = append(controllers, pkg.Controllers...)
-		logger.Startup(ctx, "InstanceLoader", "Package providers registered", moduleStart)
-	}
-	visibility, err := moduleVisibility(packages)
-	if err != nil {
-		return fail(err)
-	}
-	inject := func(v reflect.Value) error {
-		return injectFields(v, providers, orderedProviders, visibility)
-	}
 	diStart := time.Now()
-	for _, providerType := range orderedProviders {
-		v := providers[providerType]
-		if err := inject(v); err != nil {
-			return fail(err)
-		}
-	}
+	graph, err := prepareBootstrap(packages, func(typ reflect.Type) {
+		logDebug("InstanceLoader", "Provider instantiated", slog.String("provider", typ.String()))
+	}, func() {
+		logger.Info(ctx, "InstanceLoader", "Package providers registered")
+	})
+	if err != nil { return fail(err) }
 	logger.Startup(ctx, "InstanceLoader", "Provider dependencies resolved", diStart)
 	routeStart := time.Now()
 	mux := http.NewServeMux()
 	seen := map[string]bool{}
-	for _, c := range controllers {
-		if c.Type == nil || c.Type.Kind() != reflect.Ptr || c.Type.Elem().Kind() != reflect.Struct {
-			return fail(fmt.Errorf("invalid controller %v", c.Type))
-		}
-		instance := reflect.New(c.Type.Elem())
-		if err := inject(instance); err != nil {
-			return fail(err)
-		}
+	for _, c := range graph.controllers {
+		instance, err := graph.newController(c.Type)
+		if err != nil { return fail(err) }
 		logger.Info(ctx, "RoutesResolver", "Controller registered", slog.String("controller", c.Type.String()), slog.String("prefix", c.Prefix))
 		for _, route := range c.Routes {
 			method := instance.MethodByName(route.Handler)
