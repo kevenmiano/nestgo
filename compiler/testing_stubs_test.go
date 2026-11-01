@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -154,5 +155,12 @@ func TestCompileDirRejectsInvalidUserTestBeforeAppend(t *testing.T) {
 	}
 	if err := CompileDir(dir); err == nil {
 		t.Fatal("expected malformed existing test to be reported")
+	}
+}
+
+func TestCompilerSourceGofmt(t *testing.T) {
+	output, err := exec.Command("gofmt", "-d", "testing_stubs.go").CombinedOutput()
+	if err != nil || len(output) != 0 {
+		t.Fatalf("compiler source gofmt diff:\n%s (err=%v)", output, err)
 	}
 }
