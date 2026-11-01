@@ -1,9 +1,10 @@
-package main
+package cli
 
 import (
 	"errors"
-	"flag"
 	"fmt"
+
+	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,20 +20,54 @@ type sampleController struct{ Service *sampleService }
 
 func (*sampleController) Ping() string { return "ok" }
 
-func diagnose(args []string) error {
-	flags := flag.NewFlagSet("diagnose", flag.ContinueOnError)
-	example := flags.Bool("example", false, "run a built-in example fixture")
-	app := flags.String("app", "", "an importable Go application package to diagnose")
-	out := flags.String("out", "nestgo-diagnostics", "output directory for self-contained report")
-	samples := flags.Int("samples", 15, "independent measurement batches")
-	iterations := flags.Int("iterations", 100, "runtime.New calls per batch")
-	coldSamples := flags.Int("cold-samples", 3, "number of fresh process launches (0 disables cold measurement)")
-	withScale := flags.Bool("scale", false, "benchmark synthetic 1, 10 and 100 provider startup scenarios")
-	coldChild := flags.Bool("cold-child", false, "internal process benchmark child")
-	strict := flags.Bool("strict", false, "return failure for provider cycles or injection findings")
-	if err := flags.Parse(args); err != nil {
-		return err
+type diagnoseOptions struct {
+	example     bool
+	app         string
+	out         string
+	samples     int
+	iterations  int
+	coldSamples int
+	withScale   bool
+	coldChild   bool
+	strict      bool
+}
+
+func newDiagnoseCommand() *cobra.Command {
+	options := &diagnoseOptions{}
+	cmd := &cobra.Command{
+		Use:   "diagnose",
+		Short: "Inspect dependency graphs and measure application startup",
+		Long: "Generate offline HTML, JSON and DOT diagnostics for compiled NestGo metadata or a built-in fixture. Importing an app package executes its Go init functions; use trusted packages.",
+		Args:  cobra.NoArgs,
+		Example: "  nestgo diagnose -example -out diagnostics-output\n  nestgo diagnose -app ./examples/shop -strict -cold-samples 3",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runDiagnose(cmd, options)
+		},
 	}
+	flags := cmd.Flags()
+	flags.BoolVar(&options.example, "example", false, "run a built-in example fixture")
+	flags.StringVar(&options.app, "app", "", "an importable Go application package to diagnose")
+	flags.StringVar(&options.out, "out", "nestgo-diagnostics", "output directory for self-contained report")
+	flags.IntVar(&options.samples, "samples", 15, "independent measurement batches")
+	flags.IntVar(&options.iterations, "iterations", 100, "runtime.New calls per batch")
+	flags.IntVar(&options.coldSamples, "cold-samples", 3, "fresh process launches; 0 disables cold measurement")
+	flags.BoolVar(&options.withScale, "scale", false, "benchmark synthetic 1, 10 and 100 provider startup scenarios")
+	flags.BoolVar(&options.coldChild, "cold-child", false, "internal process benchmark child")
+	flags.BoolVar(&options.strict, "strict", false, "fail for provider cycles or injection findings")
+	_ = flags.MarkHidden("cold-child")
+	return cmd
+}
+
+func runDiagnose(cmd *cobra.Command, options *diagnoseOptions) error {
+	example := &options.example
+	app := &options.app
+	out := &options.out
+	samples := &options.samples
+	iterations := &options.iterations
+	coldSamples := &options.coldSamples
+	withScale := &options.withScale
+	coldChild := &options.coldChild
+	strict := &options.strict
 	if *coldChild {
 		_, err := nestgoruntime.New(nestgoruntime.WithPackages(samplePackage()))
 		return err
@@ -103,7 +138,7 @@ func diagnose(args []string) error {
 			return err
 		}
 	}
-	fmt.Printf("NestGo diagnostics: %s (warm median %.2f µs; p95 %.2f µs; %d allocs/op)\n", filepath.Join(*out, "report.html"), startup.MedianNS/1000, startup.P95NS/1000, startup.AllocsPerOp)
+	cmd.Printf("NestGo diagnostics: %s (warm median %.2f µs; p95 %.2f µs; %d allocs/op)\n", filepath.Join(*out, "report.html"), startup.MedianNS/1000, startup.P95NS/1000, startup.AllocsPerOp)
 	if *strict && (len(graph.Cycles) > 0 || len(graph.Findings) > 0 || len(modules.Cycles) > 0 || len(modules.Findings) > 0) {
 		return errors.New("strict diagnostics found cyclic or unresolved dependencies")
 	}
