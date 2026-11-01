@@ -29,8 +29,8 @@ func TestRootAndSubcommandHelp(t *testing.T) {
 	}{
 		{[]string{"--help"}, []string{"compile", "diagnose", "completion"}},
 		{[]string{"compile", "--help"}, []string{"<directory|file.mgo>", "Compile", "--format"}},
-		{[]string{"check", "--help"}, []string{"<directory|file.mgo>", "--format"},
-		{"diagnose", "--help"}, []string{"--app", "--cold-samples", "--strict"}},
+		{[]string{"check", "--help"}, []string{"<directory|file.mgo>", "--format"}},
+		{[]string{"diagnose", "--help"}, []string{"--app", "--cold-samples", "--strict"}},
 		{[]string{"completion", "--help"}, []string{"bash", "zsh", "fish", "powershell"}},
 		{[]string{"--version"}, []string{"dev"}},
 		{[]string{"version"}, []string{"dev"}},
