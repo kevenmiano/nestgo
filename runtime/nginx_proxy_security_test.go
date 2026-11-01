@@ -214,7 +214,7 @@ http {
 					t.Fatal(err)
 				}
 				defer conn.Close()
-				if err := conn.SetDeadline(time.Now().Add(3*time.Second)); err != nil {
+				if err := conn.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
 					t.Fatal(err)
 				}
 				if _, err := io.WriteString(conn, "GET /probe HTTP/1.1\r\nHost: "); err != nil {
@@ -235,7 +235,7 @@ func nginxRawStatus(addr, request string) (int, error) {
 		return 0, err
 	}
 	defer conn.Close()
-	if err := conn.SetDeadline(time.Now().Add(3*time.Second)); err != nil {
+	if err := conn.SetDeadline(time.Now().Add(3 * time.Second)); err != nil {
 		return 0, err
 	}
 	if _, err := io.WriteString(conn, request); err != nil {
