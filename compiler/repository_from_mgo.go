@@ -125,10 +125,15 @@ func RepositoryFromMGO(file *File, dialect sqlgen.Dialect) (RepositoryDefinition
 			method.Parameters = append(method.Parameters, RepositoryParameter{Name: parameter.Names[0].Name, Type: typ.Name})
 		}
 		if fn.Type.Results == nil || len(fn.Type.Results.List) != 2 {
-			return RepositoryDefinition{}, fmt.Errorf("repository: %s must return (*Entity, error) or ([]Entity, error)", method.Name)
+			return RepositoryDefinition{}, fmt.Errorf("repository: %s must return (*Entity, error), ([]Entity, error), or (int64, error) for rows affected", method.Name)
 		}
 		resultType := fn.Type.Results.List[0].Type
 		switch typ := resultType.(type) {
+		case *ast.Ident:
+			if typ.Name != "int64" {
+				return RepositoryDefinition{}, fmt.Errorf("repository: %s returns unsupported scalar type", method.Name)
+			}
+			method.Exec = true
 		case *ast.StarExpr:
 			id, ok := typ.X.(*ast.Ident)
 			if !ok || id.Name != result.Entity {
