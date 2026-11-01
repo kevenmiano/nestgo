@@ -485,7 +485,28 @@ func CompileDirWithDialect(dir string, dialect sqlgen.Dialect) error {
 		hasRepo := false
 		for _, declaration := range file.Declarations {
 			for _, annotation := range declaration.Annotations {
-				if annotation.Name == "Repository" { hasRepo = true }
+				switch annotation.Name {
+				case "Repository":
+					hasRepo = true
+				case "Entity":
+					// Entity metadata is not yet emitted. It is only supported as
+					// a local model for a compiled repository in this file.
+				case "Query":
+					if declaration.Kind == "func" {
+						matched := false
+						for _, candidate := range file.Declarations {
+							if candidate.Kind != "type" || candidate.Name != declaration.Receiver {
+								continue
+							}
+							for _, a := range candidate.Annotations {
+								if a.Name == "Repository" { matched = true }
+							}
+						}
+						if !matched {
+							return Diagnostic{File: file.Path, Line: annotation.Line, Message: "@Query requires a local @Repository receiver"}
+						}
+					}
+				}
 			}
 		}
 		if hasRepo {
