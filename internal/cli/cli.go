@@ -29,7 +29,7 @@ func New() *cobra.Command {
 			return cmd.Help()
 		},
 	}
-	root.AddCommand(newCompileCommand(), newDiagnoseCommand(), newVersionCommand())
+	root.AddCommand(newCompileCommand(), newCheckCommand(), newDiagnoseCommand(), newVersionCommand())
 	return root
 }
 
