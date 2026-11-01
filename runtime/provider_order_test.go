@@ -398,6 +398,7 @@ func TestLifecycleRollsBackSuccessfulFactoryOnSubsequentFailure(t *testing.T) {
 }
 
 type lifecycleCallerOwnedService struct{}
+
 var lifecycleCallerCleanupCount atomic.Int64
 
 func (*lifecycleCallerOwnedService) OnModuleDestroy(context.Context) error {
