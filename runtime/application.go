@@ -168,20 +168,29 @@ func New(options ...Option) (*Application, error) {
 		}
 		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
 	}
-	settings, err := config.New(cfg.configOptions...)
-	if err != nil {
-		return fail(err)
+	// No environment scan or SQL connection planning for applications that
+	// have not configured these features. Both services remain injectable.
+	settings := config.DeferredEnvironment()
+	if len(cfg.configOptions) > 0 {
+		var err error
+		settings, err = config.New(cfg.configOptions...)
+		if err != nil {
+			return fail(err)
+		}
 	}
-	module, err := database.NewModule(cfg.databaseOptions...)
-	if err != nil {
-		return fail(err)
+	connections := database.NewConnections()
+	if len(cfg.databaseOptions) > 0 {
+		module, err := database.NewModule(cfg.databaseOptions...)
+		if err != nil {
+			return fail(err)
+		}
+		connections, err = module.Open(ctx)
+		if err != nil {
+			return fail(err)
+		}
+		// Register first so pools close after provider lifecycle hooks.
+		registry.instances = append(registry.instances, &ownedSQLConnections{connections})
 	}
-	connections, err := module.Open(ctx)
-	if err != nil {
-		return fail(err)
-	}
-	// Register first so the pool closes after all controller/provider hooks.
-	registry.instances = append(registry.instances, &ownedSQLConnections{connections})
 	instances := append([]any{settings, connections}, cfg.instances...)
 	registrationStarted := time.Now()
 	if err := registerRoutesWithLifecycleAndInstances(adapter, packages, registry, instances, cfg.routes...); err != nil {
