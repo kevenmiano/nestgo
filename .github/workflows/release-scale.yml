@@ -48,7 +48,7 @@ jobs:
 
           directory = pathlib.Path("scale-results")
           entries = collections.defaultdict(list)
-          pattern = re.compile(r"([0-9]+(?:\\.[0-9]+)?)\\s+(p95-ms|p99-ms|req/s|startup-ms|B/op|allocs/op)")
+          pattern = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s+(p95-ms|p99-ms|req/s|startup-ms|B/op|allocs/op)")
           for line in (directory / "bench.txt").read_text().splitlines():
               if not line.startswith("BenchmarkReleaseScale/"):
                   continue
@@ -79,15 +79,15 @@ jobs:
               }
               for key, samples in sorted(entries.items())
           }
-          (directory / "summary.json").write_text(json.dumps(summary, indent=2) + "\\n")
+          (directory / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
           with (directory / "summary.md").open("w") as output:
-              output.write("# NestGo release-scale benchmarks\\n\\n")
-              output.write("Three samples per scenario, GOMAXPROCS=2, HTTP loopback including Go client.\\n")
-              output.write("Startup includes metadata/DI/route registration and excludes listener setup.\\n")
-              output.write("Runner details and the exact commit are recorded in environment.txt.\\n")
-              output.write("These medians are baselines, not production SLAs or agreed regression thresholds.\\n\\n")
-              output.write("| Engine / Routes / Providers | Startup median (ms) | p95 median (ms) | p99 median (ms) | Throughput median (req/s) | Bytes/op median | Allocs/op median |\\n")
-              output.write("|---|---:|---:|---:|---:|---:|---:|\\n")
+              output.write("# NestGo release-scale benchmarks\n\n")
+              output.write("Three samples per scenario, GOMAXPROCS=2, HTTP loopback including Go client.\n")
+              output.write("Startup includes metadata/DI/route registration and excludes listener setup.\n")
+              output.write("Runner details and the exact commit are recorded in environment.txt.\n")
+              output.write("These medians are baselines, not production SLAs or agreed regression thresholds.\n\n")
+              output.write("| Engine / Routes / Providers | Startup median (ms) | p95 median (ms) | p99 median (ms) | Throughput median (req/s) | Bytes/op median | Allocs/op median |\n")
+              output.write("|---|---:|---:|---:|---:|---:|---:|\n")
               for key, data in summary.items():
                   output.write(
                       f"| {key.replace('BenchmarkReleaseScale/', '')} "
@@ -96,7 +96,7 @@ jobs:
                       f"| {data['p99-ms']['median']:.4f} "
                       f"| {data['req/s']['median']:.0f} "
                       f"| {data['B/op']['median']:.0f} "
-                      f"| {data['allocs/op']['median']:.0f} |\\n"
+                      f"| {data['allocs/op']['median']:.0f} |\n"
                   )
           PY
       - uses: actions/upload-artifact@v4
