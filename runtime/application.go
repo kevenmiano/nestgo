@@ -25,7 +25,7 @@ type applicationConfig struct {
 	logger      *logging.Service
 	debug       bool
 	onBootstrap func(BootstrapMetrics)
-	pipeline requestPipelineConfig
+	pipeline    requestPipelineConfig
 }
 
 // WithPackages supplies already-generated metadata to the application.
@@ -67,7 +67,9 @@ func WithMiddleware(middlewares ...httpadapter.Middleware) Option {
 // WithRouteMiddleware adds middleware to a specific registered method and path.
 func WithRouteMiddleware(method, path string, middlewares ...httpadapter.Middleware) Option {
 	return func(c *applicationConfig) {
-		if c.pipeline.routeMiddleware == nil { c.pipeline.routeMiddleware = make(map[string][]httpadapter.Middleware) }
+		if c.pipeline.routeMiddleware == nil {
+			c.pipeline.routeMiddleware = make(map[string][]httpadapter.Middleware)
+		}
 		key := method + " " + path
 		c.pipeline.routeMiddleware[key] = append(c.pipeline.routeMiddleware[key], middlewares...)
 	}
@@ -143,7 +145,9 @@ func New(options ...Option) (*Application, error) {
 		return nil, errors.Join(err, registry.shutdown(ctx, adapter.Shutdown))
 	}
 	registrationStarted := time.Now()
-	if err := validatePipeline(cfg.pipeline); err != nil { return fail(err) }
+	if err := validatePipeline(cfg.pipeline); err != nil {
+		return fail(err)
+	}
 	if err := registerRoutesWithPipeline(adapter, packages, registry, cfg.pipeline); err != nil {
 		return fail(err)
 	}

@@ -299,14 +299,20 @@ func Generate(files []*File) ([]byte, error) {
 	}
 	for _, f := range files {
 		for _, d := range f.Declarations {
-			if d.Kind != "type" { continue }
+			if d.Kind != "type" {
+				continue
+			}
 			_, isController := controllers[d.Name]
 			bindings, err := pipelineMetadata(f.Path, d.Annotations, providerNames)
-			if err != nil { return nil, err }
+			if err != nil {
+				return nil, err
+			}
 			if !isController && bindings != "" {
 				return nil, Diagnostic{File: f.Path, Line: d.Annotations[0].Line, Message: "@UseGuards/@UsePipes/@UseFilters require @Controller"}
 			}
-			if isController { controllerPipeline[d.Name] = bindings }
+			if isController {
+				controllerPipeline[d.Name] = bindings
+			}
 		}
 	}
 	if err := validateRequiredConcreteDependencies(files, providerNames, controllers); err != nil {
@@ -464,7 +470,9 @@ func Generate(files []*File) ([]byte, error) {
 					needsHTTPAdapter = true
 				}
 				pipelineFields, err := pipelineMetadata(f.Path, d.Annotations, providerNames)
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Parameters:[]metadata.Parameter{%s}%s%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(params, ","), pipelineFields, staticInvoke))
 			}
 			if routeCount > 1 {

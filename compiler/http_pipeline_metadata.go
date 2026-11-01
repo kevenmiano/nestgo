@@ -16,14 +16,16 @@ func pipelineMetadata(path string, annotations []Annotation, providers map[strin
 		names := []string{}
 		seen := map[string]bool{}
 		for _, a := range annotations {
-			if a.Name != item.Decorator { continue }
+			if a.Name != item.Decorator {
+				continue
+			}
 			if a.Argument == "" {
 				return "", Diagnostic{File: path, Line: a.Line, Message: "@" + a.Name + " requires one or more local provider types"}
 			}
 			// Accept both @UseGuards(A, B) and @UseGuards([A, B]).
 			arg := strings.TrimSpace(a.Argument)
 			if strings.HasPrefix(arg, "[") && strings.HasSuffix(arg, "]") {
-				arg = strings.TrimSpace(arg[1:len(arg)-1])
+				arg = strings.TrimSpace(arg[1 : len(arg)-1])
 			}
 			for _, raw := range strings.Split(arg, ",") {
 				name := strings.TrimSpace(raw)

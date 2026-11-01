@@ -24,9 +24,15 @@ func DecodeBody[T any](ctx Context) (T, int, error) {
 func TransformBody[T any](ctx Context, value T, index int) (T, int, error) {
 	meta := ArgumentMetadata{Index: index, Kind: "Body", Type: reflect.TypeOf((*T)(nil)).Elem()}
 	transformed, err := ApplyPipes(ctx, value, meta)
-	if err != nil { var zero T; return zero, StatusOf(err), err }
+	if err != nil {
+		var zero T
+		return zero, StatusOf(err), err
+	}
 	result, ok := transformed.(T)
-	if !ok { var zero T; return zero, 400, NewHTTPException(400, "body pipe returned an incompatible type") }
+	if !ok {
+		var zero T
+		return zero, 400, NewHTTPException(400, "body pipe returned an incompatible type")
+	}
 	return result, 0, nil
 }
 
@@ -34,7 +40,9 @@ func TransformBody[T any](ctx Context, value T, index int) (T, int, error) {
 func DecodeBodyAt[T any](ctx Context, index int) (T, int, error) {
 	var value T
 	body := ctx.Body()
-	if len(body) > 1<<20 { return value, 413, NewHTTPException(413, "request body too large") }
+	if len(body) > 1<<20 {
+		return value, 413, NewHTTPException(413, "request body too large")
+	}
 	if err := json.Unmarshal(body, &value); err != nil {
 		return value, 400, NewHTTPException(400, fmt.Sprintf("invalid JSON: %v", err))
 	}

@@ -52,7 +52,9 @@ type HTTPException struct {
 }
 
 func (e *HTTPException) Error() string {
-	if e == nil { return "HTTP exception" }
+	if e == nil {
+		return "HTTP exception"
+	}
 	return e.Message
 }
 func NewHTTPException(status int, message string) *HTTPException {
@@ -72,7 +74,9 @@ func WriteError(ctx Context, err error) error {
 	message := "Internal Server Error"
 	if status < 500 {
 		message = err.Error()
-		if message == "" { message = "Bad Request" }
+		if message == "" {
+			message = "Bad Request"
+		}
 	}
 	ctx.Status(status)
 	ctx.SetHeader("Content-Type", "text/plain; charset=utf-8")
@@ -94,9 +98,13 @@ func ApplyPipes(ctx Context, value any, meta ArgumentMetadata) (any, error) {
 
 func bindString(ctx Context, value string, kind, name string, index int) (string, int, error) {
 	result, err := ApplyPipes(ctx, value, ArgumentMetadata{Index: index, Kind: kind, Name: name, Type: reflect.TypeOf("")})
-	if err != nil { return "", StatusOf(err), err }
+	if err != nil {
+		return "", StatusOf(err), err
+	}
 	s, ok := result.(string)
-	if !ok { return "", 400, NewHTTPException(400, fmt.Sprintf("%s pipe must return string", kind)) }
+	if !ok {
+		return "", 400, NewHTTPException(400, fmt.Sprintf("%s pipe must return string", kind))
+	}
 	return s, 0, nil
 }
 

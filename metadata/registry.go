@@ -24,12 +24,12 @@ type Route struct {
 	Parameters            []Parameter
 }
 type Controller struct {
-	Type   reflect.Type
-	Prefix string
-	Guards []reflect.Type
-	Pipes []reflect.Type
+	Type    reflect.Type
+	Prefix  string
+	Guards  []reflect.Type
+	Pipes   []reflect.Type
 	Filters []reflect.Type
-	Routes []Route
+	Routes  []Route
 }
 type Provider struct {
 	Type  reflect.Type

@@ -21,11 +21,17 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 }
 
 func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata.Package, lifecycle *lifecycleRegistry, pipeline requestPipelineConfig) error {
-	if err := validatePipeline(pipeline); err != nil { return err }
+	if err := validatePipeline(pipeline); err != nil {
+		return err
+	}
 	var onProvider func(reflect.Type)
-	if lifecycle != nil { onProvider = lifecycle.onProvider }
+	if lifecycle != nil {
+		onProvider = lifecycle.onProvider
+	}
 	graph, err := prepareBootstrap(packages, onProvider, nil)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	if lifecycle != nil {
 		for _, typ := range graph.orderedProviders {
 			lifecycle.instances = append(lifecycle.instances, graph.providers[typ].Interface())
@@ -34,34 +40,56 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 	seen := map[string]bool{}
 	for _, controller := range graph.controllers {
 		instance, err := graph.newController(controller.Type)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		if lifecycle != nil {
 			lifecycle.instances = append(lifecycle.instances, instance.Interface())
-			if lifecycle.onController != nil { lifecycle.onController(controller.Type, controller.Prefix) }
+			if lifecycle.onController != nil {
+				lifecycle.onController(controller.Type, controller.Prefix)
+			}
 		}
 		controllerGuards, err := resolveGuards(&graph, controller.Type, controller.Guards)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		controllerPipes, err := resolvePipes(&graph, controller.Type, controller.Pipes)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		controllerFilters, err := resolveFilters(&graph, controller.Type, controller.Filters)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 
 		for _, route := range controller.Routes {
 			method := instance.MethodByName(route.Handler)
-			if !method.IsValid() { return fmt.Errorf("handler %s not found", route.Handler) }
+			if !method.IsValid() {
+				return fmt.Errorf("handler %s not found", route.Handler)
+			}
 			typ := method.Type()
 			contract, contractErr := compileRouteContract(controller.Prefix, route, typ)
-			if contractErr != nil { return contractErr }
+			if contractErr != nil {
+				return contractErr
+			}
 			key := contract.Key
-			if seen[key] { return fmt.Errorf("duplicate route %s", key) }
+			if seen[key] {
+				return fmt.Errorf("duplicate route %s", key)
+			}
 			seen[key] = true
 
 			localGuards, err := resolveGuards(&graph, controller.Type, route.Guards)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			localPipes, err := resolvePipes(&graph, controller.Type, route.Pipes)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			localFilters, err := resolveFilters(&graph, controller.Type, route.Filters)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			guards := make([]httpadapter.Guard, 0, len(pipeline.guards)+len(controllerGuards)+len(localGuards))
 			guards = append(guards, pipeline.guards...)
 			guards = append(guards, controllerGuards...)
@@ -88,11 +116,17 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 				routeExecution := func() error {
 					for _, guard := range guards {
 						allowed, err := guard.CanActivate(exec)
-						if err != nil { return err }
-						if !allowed { return httpadapter.NewHTTPException(403, "Forbidden") }
+						if err != nil {
+							return err
+						}
+						if !allowed {
+							return httpadapter.NewHTTPException(403, "Forbidden")
+						}
 					}
 					bindingContext := ctx
-					if len(pipes) != 0 { bindingContext = &pipeContext{Context: ctx, pipes: pipes} }
+					if len(pipes) != 0 {
+						bindingContext = &pipeContext{Context: ctx, pipes: pipes}
+					}
 					var result any
 					if rt.StaticHTTP != nil {
 						value, status, err := rt.StaticHTTP(controllerInstance, bindingContext)
@@ -105,7 +139,9 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 						result = value
 					} else if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
 						value, err := rt.StaticInvoke(controllerInstance)
-						if err != nil { return err }
+						if err != nil {
+							return err
+						}
 						result = value
 					} else {
 						args := make([]reflect.Value, methodType.NumIn())
@@ -116,7 +152,9 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 								switch p.Kind {
 								case "Body":
 									body := bindingContext.Body()
-									if len(body) > 1<<20 { return httpadapter.NewHTTPException(413, "request body too large") }
+									if len(body) > 1<<20 {
+										return httpadapter.NewHTTPException(413, "request body too large")
+									}
 									if err := json.Unmarshal(body, v.Interface()); err != nil {
 										return httpadapter.NewHTTPException(400, "invalid JSON: "+err.Error())
 									}
@@ -128,7 +166,9 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 									return fmt.Errorf("unsupported parameter decorator")
 								}
 								transformed, err := httpadapter.ApplyPipes(bindingContext, v.Elem().Interface(), httpadapter.ArgumentMetadata{Index: i, Kind: p.Kind, Name: p.Name, Type: t})
-								if err != nil { return err }
+								if err != nil {
+									return err
+								}
 								value := reflect.ValueOf(transformed)
 								if !value.IsValid() || !value.Type().AssignableTo(t) {
 									return httpadapter.NewHTTPException(400, "pipe returned an incompatible parameter type")
@@ -145,15 +185,23 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 							args[i] = v.Elem()
 						}
 						results := handler.Call(args)
-						if len(results) == 2 && !results[1].IsNil() { return results[1].Interface().(error) }
+						if len(results) == 2 && !results[1].IsNil() {
+							return results[1].Interface().(error)
+						}
 						result = results[0].Interface()
 					}
 					status := rt.Status
 					if status == 0 {
-						if rt.Method == "POST" { status = 201 } else { status = 200 }
+						if rt.Method == "POST" {
+							status = 201
+						} else {
+							status = 200
+						}
 					}
 					payload, err := json.Marshal(result)
-					if err != nil { return fmt.Errorf("failed to encode HTTP response: %w", err) }
+					if err != nil {
+						return fmt.Errorf("failed to encode HTTP response: %w", err)
+					}
 					ctx.Status(status)
 					ctx.SetHeader("Content-Type", "application/json")
 					return ctx.Write(append(payload, '\n'))
@@ -165,8 +213,12 @@ func registerRoutesWithPipeline(adapter httpadapter.Adapter, packages []metadata
 				// only, as in NestJS.
 				return handleHTTPException(runMiddleware(ctx, middlewares, managedExecution), exec, pipeline.filters)
 			}}
-			if err := adapter.Register(registered); err != nil { return fmt.Errorf("register %s: %w", key, err) }
-			if lifecycle != nil && lifecycle.onRoute != nil { lifecycle.onRoute(rt.Method, contract.Path) }
+			if err := adapter.Register(registered); err != nil {
+				return fmt.Errorf("register %s: %w", key, err)
+			}
+			if lifecycle != nil && lifecycle.onRoute != nil {
+				lifecycle.onRoute(rt.Method, contract.Path)
+			}
 		}
 	}
 	return nil
