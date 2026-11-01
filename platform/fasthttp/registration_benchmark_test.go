@@ -35,6 +35,13 @@ func TestLiteralRegistrationPreservesWildcardSafety(t *testing.T) {
 		if err := a.Register(literals[0]); err == nil {
 			t.Fatal("exact duplicate must be rejected")
 		}
+		for _, alias := range []string{"/users/me/", "//users/me"} {
+			if err := a.Register(httpadapter.Route{
+				Method: "GET", Path: alias, Handler: handler,
+			}); err == nil {
+				t.Fatalf("normalized literal alias %q must be rejected", alias)
+			}
+		}
 		if err := a.Register(httpadapter.Route{
 			Method: "GET", Path: "/users/{other}", Handler: handler,
 		}); err == nil {
