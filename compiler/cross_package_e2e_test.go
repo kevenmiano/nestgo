@@ -31,6 +31,9 @@ func TestCompiledCrossPackageModulesBootstrap(t *testing.T) {
 @Injectable()
 type Repository struct{}
 
+type Greeter interface { Greet() string }
+type Unused interface { Unused() string }
+
 @Module({providers:[Repository],exports:[Repository]})
 type RepositoryModule struct{}
 `,
@@ -38,13 +41,21 @@ type RepositoryModule struct{}
 
 import "example.com/nestgo-cross-package-test/external"
 
+@Injectable()
+type GreeterService struct{}
+
+func (g *GreeterService) Greet() string { return "from-external-interface" }
+
 @Controller("/ready")
-type AppController struct{}
+type AppController struct {
+    Greeter external.Greeter
+    Optional external.Unused NESTGO_OPTIONAL_TAG
+}
 
 @Get("/")
-func (c *AppController) Ready() string { return "ready" }
+func (c *AppController) Ready() string { return c.Greeter.Greet() }
 
-@Module({imports:[external.RepositoryModule],controllers:[AppController]})
+@Module({imports:[external.RepositoryModule],providers:[GreeterService],controllers:[AppController]})
 type AppModule struct{}
 `,
 		filepath.Join(app, "bootstrap_test.go"): `package app
@@ -62,13 +73,13 @@ func TestCompiledCrossPackageBootstrap(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/ready/", nil))
-	if w.Code != 200 || w.Body.String() != "\"ready\"\n" { t.Fatalf("status %d, body %q", w.Code, w.Body.String()) }
+	if w.Code != 200 || w.Body.String() != "\"from-external-interface\"\n" { t.Fatalf("status %d, body %q", w.Code, w.Body.String()) }
 	if _, err := runtime.ApplicationFromRegistry(runtime.ApplicationOptions{}, "app"); err != nil { t.Fatal(err) }
 }
 `,
 	}
 	for path, content := range files {
-		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		if err := os.WriteFile(path, []byte(strings.ReplaceAll(content, "NESTGO_OPTIONAL_TAG", "`nestgo:\"optional\"`")), 0600); err != nil {
 			t.Fatal(err)
 		}
 	}
