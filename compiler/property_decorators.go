@@ -182,7 +182,7 @@ func validateDTOField(path string, field DTOField) error {
 	if exclude && (excludeInput || excludeOutput) {
 		return Diagnostic{path, field.Annotations[0].Line, "@Exclude cannot be combined with @ExcludeInput or @ExcludeOutput"}
 	}
-	return nil
+	return validateDTOValidators(path, field)
 }
 
 // transformerSpec accepts only a bare Go function name or named struct type.
