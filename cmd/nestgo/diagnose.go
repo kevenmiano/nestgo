@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -25,7 +26,7 @@ func diagnose(args []string) error {
 	app := flags.String("app", "", "an importable Go application package to diagnose")
 	out := flags.String("out", "nestgo-diagnostics", "output directory for self-contained report")
 	samples := flags.Int("samples", 15, "independent measurement batches")
-	iterations := flags.Int("iterations", 100, "runtime.New calls per batch")
+	iterations := flags.Int("iterations", 100, "runtime.NewApp calls per batch")
 	coldSamples := flags.Int("cold-samples", 3, "number of fresh process launches (0 disables cold measurement)")
 	withScale := flags.Bool("scale", false, "benchmark synthetic 1, 10 and 100 provider startup scenarios")
 	coldChild := flags.Bool("cold-child", false, "internal process benchmark child")
@@ -34,8 +35,9 @@ func diagnose(args []string) error {
 		return err
 	}
 	if *coldChild {
-		_, err := nestgoruntime.New(samplePackage())
-		return err
+		app, err := nestgoruntime.NewApp(context.Background(), nestgoruntime.WithPackages(samplePackage()))
+		if err != nil { return err }
+		return app.Close()
 	}
 	if *coldSamples < 0 || *coldSamples > 50 {
 		return errors.New("cold-samples must be 0..50")
