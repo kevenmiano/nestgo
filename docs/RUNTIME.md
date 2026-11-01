@@ -64,7 +64,9 @@ flowchart TD
   Hooks --> Application["Application ready"]
 ```
 
-Providers are initialized in stable type-name order and controllers follow metadata order. Field injection supports exported pointer and interface fields. The `nestgo:"optional"` tag permits missing optional dependencies; module scopes control imports and exports.
+Providers are initialized in stable type-name order and controllers follow metadata order. Field injection supports exported pointer and interface fields. The supported explicit markers are `nestgo:"inject"` (required), `nestgo:"optional"` (missing provider is permitted), and `nestgo:"-"` (exclude a field from injection even if a provider exists). Invalid tags, tagged unexported fields, tagged non-pointer fields, ambiguous interface matches, and nil providers fail at bootstrap. Dependencies for each object are validated before writing any field, preventing partially injected objects after validation failure. Module scopes control imports and exports.
+
+**Migration warning:** untagged exported pointer and interface fields currently retain the prior implicit-*required* injection behavior to avoid silently changing existing compiled modules. New code should use explicit tags, especially `nestgo:"-"` for non-dependency pointers. Removing implicit behavior entirely remains a separate breaking-change step for #53; do not describe this migration as complete.
 
 Direct Go handlers execute without reflective controller dispatch. For decorator-generated controllers, generated invokers can bypass reflective calls, while other handlers use reflection as needed. Both native `platform/fasthttp` and `platform/nethttp` use the same route namespace and lifecycle. Conflicts between direct and controller-generated routes are rejected at bootstrap.
 
