@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"go/ast"
 	"go/importer"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
 	"go/parser"
 	"go/token"
 	"go/types"
 	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 // validateTypedInterfaceDependencies resolves local interfaces using go/types.
@@ -138,7 +138,6 @@ func sortedProviderNames(providers map[string]bool) []string {
 	return names
 }
 
- 
 // moduleAwareImporter loads compiled export data in the source module context.
 // go/importer.Default cannot resolve Go module replace directives or local modules.
 func moduleAwareImporter(fset *token.FileSet, dir string) types.Importer {
