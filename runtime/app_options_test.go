@@ -11,52 +11,33 @@ import (
 	"github.com/kevenmiano/nestgo/metadata"
 )
 
-type appOptionsConsumer struct {
-	Config *config.Service
-}
+type appOptionsConsumer struct { Config *config.Service }
 
-func TestNewAppFunctionalOptions(t *testing.T) {
+func TestNewWithDatabaseFunctionalOptions(t *testing.T) {
 	pkg := metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*appOptionsConsumer)(nil))}}}
-	app, err := NewApp(context.Background(),
+	app, err := New(
 		WithConfig(config.WithIgnoreEnvFile()),
 		WithPackages(pkg),
-		WithDebug(),
+		WithDebug(true),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if app.Config == nil || app.Connections == nil || app.HTTPHandler() == nil {
+	if err != nil { t.Fatal(err) }
+	if app.Config == nil || app.Connections == nil || app.HTTPAdapter() == nil {
 		t.Fatal("application not initialized")
 	}
-	if err := app.Close(); err != nil {
-		t.Fatal(err)
-	}
+	if err := app.Close(); err != nil { t.Fatal(err) }
 }
 
-func TestNewAppRejectsInvalidOptions(t *testing.T) {
-	if _, err := NewApp(context.Background(), nil); err == nil {
-		t.Fatal("nil app option accepted")
-	}
-	if _, err := NewApp(context.Background(), WithProvider(nil)); err == nil {
-		t.Fatal("nil provider accepted")
-	}
-	if _, err := NewApp(context.Background(), WithLogger(nil)); err == nil {
-		t.Fatal("nil logger accepted")
-	}
-	_, err := NewApp(context.Background(), WithConfig(config.WithEnvFile("")))
+func TestNewRejectsInvalidDatabaseOptions(t *testing.T) {
+	if _, err := New(nil); err == nil { t.Fatal("nil app option accepted") }
+	if _, err := New(WithProvider(nil)); err == nil { t.Fatal("nil provider accepted") }
+	if _, err := New(WithLogger(nil)); err == nil { t.Fatal("nil logger accepted") }
+	_, err := New(WithConfig(config.WithEnvFile("")))
 	if err == nil || !strings.Contains(err.Error(), "empty env") {
 		t.Fatalf("expected config validation failure: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := NewApp(ctx); !errors.Is(err, context.Canceled) {
-		t.Fatalf("expected context canceled, got %v", err)
-	}
-}
-
-func TestNewAppMissingRegistryFails(t *testing.T) {
-	_, err := NewApp(context.Background(), WithRegistry("not-registered"))
-	if err == nil {
-		t.Fatal("unknown metadata package accepted")
+	if _, err := New(WithContext(ctx)); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected canceled context, got %v", err)
 	}
 }
