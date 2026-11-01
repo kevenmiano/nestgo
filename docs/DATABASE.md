@@ -5,7 +5,8 @@ NestGo is SQL-first and persistence is opt-in. It uses `database/sql` and option
 ## Canonical runtime API
 
 ```go
-app, err := runtime.NewApp(ctx,
+app, err := runtime.New(
+    runtime.WithContext(ctx),
     runtime.WithConfig(config.WithEnvFile(".env")),
     runtime.WithDatabase(database.WithConnection("users",
         database.WithDriver("postgres"),
@@ -16,11 +17,10 @@ app, err := runtime.NewApp(ctx,
 )
 if err != nil { return err }
 defer app.Close()
-server := &http.Server{Addr: ":8080", Handler: app.HTTPHandler()}
-return server.ListenAndServe()
+return app.Listen(":8080")
 ```
 
-Import your SQL driver in the application. `NewApp` opens pools and injects `*config.Service` and `*database.Connections` into the DI container.
+Import your SQL driver in the application. `New` opens pools and injects `*config.Service` and `*database.Connections` into the DI container.
 
 ## Generated repositories (experimental)
 
@@ -68,6 +68,6 @@ Import `github.com/kevenmiano/nestgo/database/sqlx` as `nestgosqlx`; application
 
 ## Transactions and ownership
 
-`database.Begin(ctx, db, options)` and `database.WithinTransaction` expose explicit commit and rollback. `database.Native(db)` and `database.New(executor)` wrap caller-owned handles. **`Connections.Register(name, db)` takes ownership on success**; rejected handles remain caller-owned. `runtime.NewApp` owns and closes its opened pools via `App.Close()`, but does not shut down an externally owned HTTP server.
+`database.Begin(ctx, db, options)` and `database.WithinTransaction` expose explicit commit and rollback. `database.Native(db)` and `database.New(executor)` wrap caller-owned handles. **`Connections.Register(name, db)` takes ownership on success**; rejected handles remain caller-owned. `runtime.New` owns and closes its opened pools via `Application.Close()`, but does not shut down an externally owned HTTP server.
 
 Quality gates: gofmt, go vet, race tests, generated-code compile, PostgreSQL/MySQL integration and benchmarks (#94).
