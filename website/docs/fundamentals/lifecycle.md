@@ -194,9 +194,9 @@ stateDiagram-v2
   AppBootstrapHooks --> Ready
   Ready --> Listening
   Listening --> BeforeShutdownHooks
-  BeforeShutdownHooks --> ModuleDestroyHooks
-  ModuleDestroyHooks --> AdapterShutdown
-  AdapterShutdown --> AppShutdownHooks
+  BeforeShutdownHooks --> AdapterShutdown
+  AdapterShutdown --> ModuleDestroyHooks
+  ModuleDestroyHooks --> AppShutdownHooks
   AppShutdownHooks --> Closed
   ResolvingModules --> Failed
   InitializingProviders --> Failed
@@ -204,7 +204,7 @@ stateDiagram-v2
   Failed --> Closed
 ```
 
-Before implementing this target, specify dependency topological ordering, deterministic hooks, cancellation/deadlines, failures and rollback, idempotent shutdown, and parity between HTTP platforms. Do not attach hook names to user code until those contracts exist.
+Before unifying this lifecycle, specify dependency-topological ordering, cancellation and deadlines, complete rollback, and HTTP platform parity. The hooks above are available only in adapter-based applications; this diagram remains a design target for shared bootstrap semantics.
 
 ## Source of truth
 
