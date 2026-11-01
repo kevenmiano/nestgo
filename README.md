@@ -98,7 +98,7 @@ type UsersService struct{}
 
 @Controller("/users")
 type UsersController struct {
-    Service *UsersService `nestgo:"inject"`
+    Service *UsersService
 }
 
 @Get("/")
@@ -116,7 +116,7 @@ type UsersModule struct{}
 Use the generated metadata with the application runtime. For example, after importing your generated package for registration:
 
 ```go
-app, err := runtime.New(runtime.WithRegistry("shop")) // native fasthttp by default
+app, err := runtime.New() // native fasthttp by default
 if err != nil {
     log.Fatal(err)
 }
@@ -128,7 +128,7 @@ Pass `runtime.WithAdapter(nethttp.New())` to switch to the Go standard-library H
 ## Features
 
 - **Modular architecture:** declare controllers, providers, module imports and exports.
-- **Dependency injection:** inject only explicitly tagged fields (`nestgo:"inject"` or `nestgo:"optional"`), validating module visibility at bootstrap.
+- **Dependency injection:** resolve dependencies and validate module visibility at bootstrap.
 - **Compiler-free HTTP:** register ordinary Go functions with `runtime.WithRoutes(...)`.
 - **Optional decorator compiler:** generate standard Go files and metadata from `.mgo` sources.
 - **HTTP adapters:** use native fasthttp or net/http through a platform interface.
