@@ -1,0 +1,25 @@
+name: Format lifecycle work
+on:
+  push:
+    branches: [docs/runtime-lifecycle-mermaid]
+    paths:
+      - 'runtime/lifecycle_test.go'
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/runtime-lifecycle-mermaid
+      - name: Format Go
+        run: |
+          gofmt -w runtime/application.go runtime/http_routes.go runtime/lifecycle.go runtime/lifecycle_test.go runtime/static_adapter_test.go
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add runtime/application.go runtime/http_routes.go runtime/lifecycle.go runtime/lifecycle_test.go runtime/static_adapter_test.go
+            git commit -m "style(runtime): gofmt lifecycle changes"
+            git push origin HEAD:docs/runtime-lifecycle-mermaid
+          fi
