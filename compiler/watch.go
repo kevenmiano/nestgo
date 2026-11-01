@@ -18,18 +18,24 @@ import (
 // Diagnostics are reported without stopping the watcher, so fixing invalid
 // source triggers a fresh compilation. Generated .go files are never watched.
 func WatchDir(ctx context.Context, dir string, interval time.Duration, report func(error)) error {
-	return watchDir(ctx, dir, interval, report, CompileDir)
+	return watchDir(ctx, dir, interval, nil, report)
 }
 
-// WatchDirWithDialects retains the named per-connection SQL dialect mapping on
-// every recompile, instead of falling back silently to PostgreSQL.
+// WatchDirWithDialects retains the named SQL dialect mapping on every incremental
+// recompilation instead of silently switching repositories to PostgreSQL.
 func WatchDirWithDialects(ctx context.Context, dir string, interval time.Duration, dialects map[string]sqlgen.Dialect, report func(error)) error {
-	return watchDir(ctx, dir, interval, report, func(dir string) error {
-		return CompileDirWithDialects(dir, dialects)
-	})
+	if len(dialects) == 0 {
+		return fmt.Errorf("compiler: connection dialect mappings required")
+	}
+	for name, dialect := range dialects {
+		if !schemaIdentifier(name) || (dialect != sqlgen.PostgreSQL && dialect != sqlgen.Question) {
+			return fmt.Errorf("compiler: invalid SQL dialect for connection %q", name)
+		}
+	}
+	return watchDir(ctx, dir, interval, dialects, report)
 }
 
-func watchDir(ctx context.Context, dir string, interval time.Duration, report func(error), compile func(string) error) error {
+func watchDir(ctx context.Context, dir string, interval time.Duration, dialects map[string]sqlgen.Dialect, report func(error)) error {
 	if interval <= 0 {
 		return fmt.Errorf("watch interval must be positive")
 	}
@@ -44,9 +50,13 @@ func watchDir(ctx context.Context, dir string, interval time.Duration, report fu
 	if err != nil {
 		return err
 	}
+	cache := &incrementalCache{}
+	compile := func() error {
+		return compileDirWithCache(dir, sqlgen.PostgreSQL, dialects, false, cache)
+	}
 	if report != nil {
-		report(compile(dir))
-	} else if err := compile(dir); err != nil {
+		report(compile())
+	} else if err := compile(); err != nil {
 		return err
 	}
 	ticker := time.NewTicker(interval)
@@ -67,7 +77,7 @@ func watchDir(ctx context.Context, dir string, interval time.Duration, report fu
 				continue
 			}
 			current = next
-			if err := compile(dir); report != nil {
+			if err := compile(); report != nil {
 				report(err)
 			} else if err != nil {
 				return err
@@ -76,8 +86,9 @@ func watchDir(ctx context.Context, dir string, interval time.Duration, report fu
 	}
 }
 
-// sourceFingerprint includes file names and their contents, not modtimes:
+// sourceFingerprint includes source file names and contents, not modtimes:
 // fast atomic saves and same-size edits must both trigger regeneration.
+// Hand-written Go source is included to invalidate cross-file transformer symbols.
 func sourceFingerprint(dir string) ([sha256.Size]byte, error) {
 	var zero [sha256.Size]byte
 	entries, err := os.ReadDir(dir)
@@ -86,7 +97,7 @@ func sourceFingerprint(dir string) ([sha256.Size]byte, error) {
 	}
 	h := sha256.New()
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".mgo") {
+		if entry.IsDir() || !isWatchedSource(entry.Name()) {
 			continue
 		}
 		name := entry.Name()
@@ -111,4 +122,19 @@ func finishFingerprint(h hash.Hash) [sha256.Size]byte {
 	var sum [sha256.Size]byte
 	copy(sum[:], h.Sum(nil))
 	return sum
+}
+
+// isWatchedSource includes hand-written Go dependencies: a local transformer
+// type can change without modifying the annotated .mgo file. Compiler-owned
+// outputs and test stubs must never retrigger the watcher.
+func isWatchedSource(name string) bool {
+	if strings.HasSuffix(name, ".mgo") {
+		return true
+	}
+	if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") ||
+		strings.HasSuffix(name, "_generated.go") ||
+		strings.HasPrefix(name, "zz_modforge_") || strings.HasPrefix(name, "zz_nestgo_") {
+		return false
+	}
+	return true
 }
