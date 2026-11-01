@@ -35,7 +35,8 @@ func main() {
 }
 
 // prepareForDocusaurus escapes bash/zsh process substitutions from Cobra help.
-// Unescaped "<(" in prose is interpreted by Docusaurus MDX as malformed JSX.\n// Shell ${...} expansions must also be escaped to prevent MDX JS evaluation.
+// Unescaped "<(" in prose is interpreted by Docusaurus MDX as malformed JSX.
+// Shell ${...} expansions must also be escaped to prevent MDX JS evaluation.
 func prepareForDocusaurus(directory string) error {
 	pages, err := filepath.Glob(filepath.Join(directory, "*.md"))
 	if err != nil {

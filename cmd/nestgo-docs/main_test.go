@@ -21,10 +21,10 @@ func TestPrepareForDocusaurus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(result), "source &lt;(nestgo completion bash)") {
+	if !strings.Contains(string(result), "source &lt;(nestgo completion bash) and $&#123;fpath[1]&#125;") {
 		t.Fatalf("non-fenced shell syntax was not escaped: %s", result)
 	}
-	if !strings.Contains(string(result), "if !strings.Contains(string(result), "```bash\nsource <(nestgo completion bash)") {#123;fpath[1]&#125;") {\n\t\tt.Fatalf("shell parameter expansion was not escaped: %s", result)\n\t}\n\tif !strings.Contains(string(result), "```bash\nsource <(nestgo completion bash) and ${fpath[1]}") {
+	if !strings.Contains(string(result), "```bash\nsource <(nestgo completion bash) and ${fpath[1]}") {
 		t.Fatalf("fenced examples must remain unchanged: %s", result)
 	}
 }
