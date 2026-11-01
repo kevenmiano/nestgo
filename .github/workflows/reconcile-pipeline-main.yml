@@ -12,6 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: feat/http-request-pipeline
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
