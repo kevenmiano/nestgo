@@ -62,7 +62,7 @@ func TestCompiledCrossPackageBootstrap(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/ready/", nil))
-	if w.Code != 200 || w.Body.String() != "\"ready\"\\n" { t.Fatalf("status %d, body %q", w.Code, w.Body.String()) }
+	if w.Code != 200 || w.Body.String() != "\"ready\"\n" { t.Fatalf("status %d, body %q", w.Code, w.Body.String()) }
 	if _, err := runtime.ApplicationFromRegistry(runtime.ApplicationOptions{}, "app"); err != nil { t.Fatal(err) }
 }
 `,
