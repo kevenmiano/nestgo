@@ -38,7 +38,6 @@ func (r *UsersRepository) FindByID(ctx context.Context, id int64) (*User, error)
 	}
 }
 
-
 func TestRepositoryFromMGOWriteMethod(t *testing.T) {
 	file, err := Parse("users.mgo", []byte(`package users
 import "context"
