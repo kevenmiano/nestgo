@@ -23,7 +23,7 @@ func TestIndexedRouterCompatibility(t *testing.T) {
 		param           string
 	}{
 		{"GET", "/users/42", true, true, "42"},
-		{"GET", "/users/me", true, true, "me"},
+		{"GET", "/users/me", true, true, ""},
 		{"POST", "/orders/7", true, true, "7"},
 		{"GET", "/orders/7", false, true, ""},
 		{"GET", "/missing", false, false, ""},
@@ -91,5 +91,58 @@ func BenchmarkRouteLookup(b *testing.B) {
 				}
 			})
 		}
+	}
+}
+
+func TestIndexedRouterPrefersSpecificRoutes(t *testing.T) {
+	for _, reverse := range []bool{false, true} {
+		chosen := ""
+		dynamic := httpadapter.Route{
+			Method: "GET", Path: "/users/{id}",
+			Handler: func(httpadapter.Context) error { chosen = "dynamic"; return nil },
+		}
+		literal := httpadapter.Route{
+			Method: "GET", Path: "/users/me",
+			Handler: func(httpadapter.Context) error { chosen = "literal"; return nil },
+		}
+		routes := []httpadapter.Route{dynamic, literal}
+		if reverse {
+			routes[0], routes[1] = routes[1], routes[0]
+		}
+		handler, params, _ := compileRoutes(routes).lookup("GET", "/users/me")
+		if handler == nil {
+			t.Fatal("specific route missing")
+		}
+		if err := handler(nil); err != nil {
+			t.Fatal(err)
+		}
+		if chosen != "literal" || len(params) != 0 {
+			t.Fatalf("reverse=%v: handler=%q params=%v", reverse, chosen, params)
+		}
+	}
+}
+
+func TestRegisterRejectsAmbiguousOverlappingRoutes(t *testing.T) {
+	handler := func(httpadapter.Context) error { return nil }
+	for _, tc := range []struct {
+		first, second string
+		reject        bool
+	}{
+		{"/{left}/foo", "/bar/{right}", true},
+		{"/users/{id}", "/users/{other}", true},
+		{"/users/{id}", "/users/me", false},
+		{"/users/me", "/users/{id}", false},
+		{"/users/{id}", "/orders/{id}", false},
+	} {
+		t.Run(tc.first+" vs "+tc.second, func(t *testing.T) {
+			a := New()
+			if err := a.Register(httpadapter.Route{Method: "GET", Path: tc.first, Handler: handler}); err != nil {
+				t.Fatal(err)
+			}
+			err := a.Register(httpadapter.Route{Method: "GET", Path: tc.second, Handler: handler})
+			if (err != nil) != tc.reject {
+				t.Fatalf("register error=%v; want rejected=%v", err, tc.reject)
+			}
+		})
 	}
 }
