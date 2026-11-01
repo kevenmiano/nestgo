@@ -2,7 +2,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 
@@ -29,5 +28,4 @@ func main() {
 	defer app.Close()
 	log.Print("SQL example listening on :8080; GET /sql-users/postgres/{id} or /sql-users/mysql/{id}")
 	log.Fatal(app.Listen(":8080"))
-	_ = context.Background()
 }
