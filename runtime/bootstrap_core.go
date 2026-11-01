@@ -24,9 +24,9 @@ func prepareBootstrap(packages []metadata.Package, onProvider func(reflect.Type)
 		controllerCount += len(pkg.Controllers)
 	}
 	graph := bootstrapGraph{
-		providers: make(map[reflect.Type]reflect.Value, providerCount),
+		providers:        make(map[reflect.Type]reflect.Value, providerCount),
 		orderedProviders: make([]reflect.Type, 0, providerCount),
-		controllers: make([]metadata.Controller, 0, controllerCount),
+		controllers:      make([]metadata.Controller, 0, controllerCount),
 	}
 	for _, pkg := range packages {
 		for _, p := range pkg.Providers {

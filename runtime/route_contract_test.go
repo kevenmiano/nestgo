@@ -14,16 +14,18 @@ func TestSharedRouteContract(t *testing.T) {
 			Parameters: []metadata.Parameter{{Index: 0, Kind: "Param", Name: "id"}}}
 		method := reflect.TypeOf(func(string) string { return "" })
 		contract, err := compileRouteContract("/api", route, method)
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		if contract.Path != "/api/{id}" || contract.Key != "GET /api/{id}" || contract.Bindings[0].Name != "id" {
 			t.Fatalf("unexpected route contract: %+v", contract)
 		}
 	})
 	for _, tc := range []struct {
-		name string
-		method any
-		params []metadata.Parameter
-		legacy string
+		name    string
+		method  any
+		params  []metadata.Parameter
+		legacy  string
 		adapter string
 	}{
 		{"invalid signature", func() {}, nil, "unsupported signature Lookup", "invalid signature Lookup"},
@@ -32,10 +34,15 @@ func TestSharedRouteContract(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := compileRouteContract("/api", metadata.Route{Method: "GET", Path: "/", Handler: "Lookup", Parameters: tc.params}, reflect.TypeOf(tc.method))
-			if err == nil { t.Fatal("expected route validation failure") }
-			if got := formatRouteContractError(err, true).Error(); !strings.Contains(got, tc.legacy) { t.Fatalf("legacy error %q; want %q", got, tc.legacy) }
-			if got := formatRouteContractError(err, false).Error(); !strings.Contains(got, tc.adapter) { t.Fatalf("adapter error %q; want %q", got, tc.adapter) }
+			if err == nil {
+				t.Fatal("expected route validation failure")
+			}
+			if got := formatRouteContractError(err, true).Error(); !strings.Contains(got, tc.legacy) {
+				t.Fatalf("legacy error %q; want %q", got, tc.legacy)
+			}
+			if got := formatRouteContractError(err, false).Error(); !strings.Contains(got, tc.adapter) {
+				t.Fatalf("adapter error %q; want %q", got, tc.adapter)
+			}
 		})
 	}
 }
-

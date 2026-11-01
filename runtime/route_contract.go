@@ -10,15 +10,15 @@ import (
 
 // routeContract is the transport-independent route validation result.
 type routeContract struct {
-	Path string
-	Key string
+	Path     string
+	Key      string
 	Bindings map[int]metadata.Parameter
 }
 
 type routeContractError struct {
-	kind string
+	kind    string
 	handler string
-	index int
+	index   int
 }
 
 func (e *routeContractError) Error() string {
@@ -29,15 +29,21 @@ func (e *routeContractError) Error() string {
 // both bootstrap paths share the same validation rules.
 func formatRouteContractError(err error, legacy bool) error {
 	e, ok := err.(*routeContractError)
-	if !ok { return err }
+	if !ok {
+		return err
+	}
 	switch e.kind {
 	case "signature":
-		if legacy { return fmt.Errorf("unsupported signature %s", e.handler) }
+		if legacy {
+			return fmt.Errorf("unsupported signature %s", e.handler)
+		}
 		return fmt.Errorf("invalid signature %s", e.handler)
 	case "index":
 		return fmt.Errorf("invalid parameter index %d", e.index)
 	case "missing":
-		if legacy { return fmt.Errorf("missing decorator for argument %d of %s", e.index, e.handler) }
+		if legacy {
+			return fmt.Errorf("missing decorator for argument %d of %s", e.index, e.handler)
+		}
 		return fmt.Errorf("missing parameter decorator for %s", e.handler)
 	}
 	return fmt.Errorf("invalid route %s", e.handler)
