@@ -61,7 +61,10 @@ func TestHTTPErrorAndExplicitWriter(t *testing.T) {
 	}
 	f = &fakeTransport{}
 	w := NewWriter(f)
-	w.Status(202).Header("X-Test", "yes").Cookie(Cookie{Name: "sid", Value: "abc", HTTPOnly: true})
+	w.Status(202).Header("X-Test", "yes")
+	if err := w.Cookie(Cookie{Name: "sid", Value: "abc", HTTPOnly: true}); err != nil {
+		t.Fatal(err)
+	}
 	if err := w.JSON("ok"); err != nil {
 		t.Fatal(err)
 	}
@@ -74,20 +77,31 @@ func TestHTTPErrorAndExplicitWriter(t *testing.T) {
 }
 func fmtWrapped() error { return errors.Join(errors.New("detail"), NotFound("missing")) }
 
-type singleValueTransport struct { f fakeTransport }
-func (c *singleValueTransport) Status(s int) { c.f.Status(s) }
-func (c *singleValueTransport) SetHeader(k,v string) { c.f.SetHeader(k,v) }
-func (c *singleValueTransport) Write(data []byte) error { return c.f.Write(data) }
+type singleValueTransport struct {
+	f fakeTransport
+}
+
+func (c *singleValueTransport) Status(s int) {
+	c.f.Status(s)
+}
+func (c *singleValueTransport) SetHeader(k, v string) {
+	c.f.SetHeader(k, v)
+}
+func (c *singleValueTransport) Write(data []byte) error {
+	return c.f.Write(data)
+}
 
 func TestCookiesRequireMultiHeaderSupport(t *testing.T) {
 	ctx := &singleValueTransport{}
-	result := OK("ok").WithCookie(Cookie{Name:"a",Value:"1"}).WithCookie(Cookie{Name:"b",Value:"2"})
-	if err := Write(ctx,result,200); err == nil {
+	result := OK("ok").WithCookie(Cookie{Name: "a", Value: "1"}).WithCookie(Cookie{Name: "b", Value: "2"})
+	if err := Write(ctx, result, 200); err == nil {
 		t.Fatal("expected multi-cookie adapter validation error")
 	}
 	writer := NewWriter(ctx)
-	if err := writer.Cookie(Cookie{Name:"a",Value:"1"}); err != nil { t.Fatal(err) }
-	if err := writer.Cookie(Cookie{Name:"b",Value:"2"}); err == nil {
+	if err := writer.Cookie(Cookie{Name: "a", Value: "1"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Cookie(Cookie{Name: "b", Value: "2"}); err == nil {
 		t.Fatal("second cookie silently overwrote the first")
 	}
 	if err := writer.Cookie(Cookie{}); err == nil {

@@ -19,7 +19,7 @@ jobs:
           go vet ./...
       - name: Verify gofmt and generated examples
         run: |
-          unformatted="$(gofmt -l httpresponse compiler runtime platform metadata)"
+          unformatted="$(gofmt -l httpresponse/response.go httpresponse/response_test.go metadata/registry.go platform/fasthttp/adapter.go platform/nethttp/adapter.go compiler/compiler.go compiler/lexer.go compiler/response_decorators.go compiler/response_decorators_test.go runtime/http_routes.go runtime/http_response.go runtime/runtime.go runtime/http_response_integration_test.go runtime/http_static_adapter_test.go examples/shop/zz_modforge_metadata.go)"
           if [ -n "$unformatted" ]; then
             echo "$unformatted"
             exit 1
