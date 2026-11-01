@@ -30,7 +30,9 @@ func TestRepositoryProviderGenerationIncludesRuntimeInstances(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"func NewGeneratedRepositories(", "func (r *GeneratedRepositories) Instances() []any", "registry"} {
-		if want == "registry" { continue }
+		if want == "registry" {
+			continue
+		}
 		if !strings.Contains(string(out), want) {
 			t.Fatalf("expected %q in generated source", want)
 		}
