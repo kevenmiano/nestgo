@@ -218,13 +218,9 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 	return mux, nil
 }
 func FromRegistry(names ...string) (http.Handler, error) {
-	pkgs := make([]metadata.Package, 0, len(names))
-	for _, name := range names {
-		p, ok := metadata.Lookup(name)
-		if !ok {
-			return nil, fmt.Errorf("metadata package not found: %s", name)
-		}
-		pkgs = append(pkgs, p)
+	pkgs, err := registryImportClosure(names)
+	if err != nil {
+		return nil, err
 	}
 	return New(pkgs...)
 }
