@@ -2,6 +2,8 @@ package metadata
 
 import (
 	"fmt"
+
+	"github.com/kevenmiano/nestgo/httpadapter"
 	"reflect"
 	"sync"
 )
@@ -13,6 +15,7 @@ type Parameter struct {
 }
 type Route struct {
 	StaticInvoke          func(any) (any, error)
+	StaticHTTP            func(any, httpadapter.Context) (any, int, error)
 	Method, Path, Handler string
 	Status                int
 	Parameters            []Parameter
