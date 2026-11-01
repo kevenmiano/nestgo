@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - 'database/**'
+      - 'compiler/**'
+      - 'runtime/**'
+      - 'cmd/nestgo/**'
       - '.github/workflows/database-integration.yml'
   workflow_dispatch:
 
@@ -45,6 +48,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Compile PostgreSQL/MySQL SQL example with named dialects
+        run: |
+          set -euo pipefail
+          go run ./cmd/nestgo compile ./database/integration/examples/sql --connection=users:postgres --connection=billing:mysql
       - name: Require both live database DSNs and run integration suite
         working-directory: database/integration
         env:
