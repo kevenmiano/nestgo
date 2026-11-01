@@ -34,19 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          GOMAXPROCS=2 go test ./platform/fasthttp -run '^
-        if: always()
-        with:
-          name: router-comparison-${{ github.sha }}
-          path: benchmark-results/
-          retention-days: 30
- -bench '^BenchmarkRegisterLiteralRoutes
-        if: always()
-        with:
-          name: router-comparison-${{ github.sha }}
-          path: benchmark-results/
-          retention-days: 30
- -benchmem -count=3 -benchtime=300ms | tee benchmark-results/registration.txt
+          GOMAXPROCS=2 go test ./platform/fasthttp -run '^$' -bench '^BenchmarkRegisterLiteralRoutes$' -benchmem -count=3 -benchtime=300ms | tee benchmark-results/registration.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
