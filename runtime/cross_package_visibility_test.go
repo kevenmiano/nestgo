@@ -54,7 +54,7 @@ func TestCrossPackageConcreteProviderExportBoundary(t *testing.T) {
 				start func() error
 			}{
 				{name: "legacy", start: func() error {
-					_, err := New(packages...)
+					_, err := newHandler(Options{}, packages...)
 					return err
 				}},
 				{name: "fasthttp", start: func() error {
