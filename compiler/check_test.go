@@ -92,3 +92,40 @@ func TestCheckDirRejectsInvalidSourceWithoutOutput(t *testing.T) {
 		t.Fatalf("invalid check created files: %v %v", entries, err)
 	}
 }
+
+func TestCheckDirReturnsTypedOrderedArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "provider.mgo")
+	if err := os.WriteFile(path, []byte("package sample\n@Injectable()\ntype Provider struct{}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	err := CheckDir(dir)
+	var drift *OutdatedError
+	if !errors.As(err, &drift) || !errors.Is(err, ErrOutdated) {
+		t.Fatalf("check must return a typed error: %v", err)
+	}
+	if drift.Directory != dir || len(drift.Artifacts) == 0 {
+		t.Fatalf("missing artifacts in typed error: %+v", drift)
+	}
+	for i, artifact := range drift.Artifacts {
+		if artifact.Reason != ArtifactMissing {
+			t.Fatalf("unexpected artifact reason: %+v", artifact)
+		}
+		if i > 0 && drift.Artifacts[i-1].Path > artifact.Path {
+			t.Fatalf("artifact order is nondeterministic: %+v", drift.Artifacts)
+		}
+	}
+	if err := CompileDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	metadata := filepath.Join(dir, "zz_modforge_metadata.go")
+	if err := os.WriteFile(metadata, []byte("// modified"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	err = CheckDir(dir)
+	if !errors.As(err, &drift) || len(drift.Artifacts) != 1 ||
+		drift.Artifacts[0].Reason != ArtifactOutdated ||
+		drift.Artifacts[0].Path != metadata {
+		t.Fatalf("expected typed stale metadata: %+v %v", drift, err)
+	}
+}
