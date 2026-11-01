@@ -36,15 +36,15 @@ type capturedContext struct {
 	params map[string]string
 }
 
-func (*capturedContext) Method() string                  { return "GET" }
-func (*capturedContext) Path() string                    { return "/" }
-func (c *capturedContext) Param(k string) string         { return c.params[k] }
-func (*capturedContext) Query(string) string             { return "" }
-func (*capturedContext) Header(string) string            { return "" }
-func (*capturedContext) Body() []byte                    { return nil }
-func (c *capturedContext) Status(s int)                  { c.status = s }
-func (*capturedContext) SetHeader(string, string)        {}
-func (c *capturedContext) Write(p []byte) error          { c.body += string(p); return nil }
+func (*capturedContext) Method() string           { return "GET" }
+func (*capturedContext) Path() string             { return "/" }
+func (c *capturedContext) Param(k string) string  { return c.params[k] }
+func (*capturedContext) Query(string) string      { return "" }
+func (*capturedContext) Header(string) string     { return "" }
+func (*capturedContext) Body() []byte             { return nil }
+func (c *capturedContext) Status(s int)           { c.status = s }
+func (*capturedContext) SetHeader(string, string) {}
+func (c *capturedContext) Write(p []byte) error   { c.body += string(p); return nil }
 
 func TestAdapterStaticInvocationAndDynamicFallback(t *testing.T) {
 	staticCalls := 0
