@@ -1,0 +1,25 @@
+name: Temporary gofmt typed string binding
+on:
+  push:
+    branches: [perf/runtime-typed-string-fallback-97]
+    paths:
+      - runtime/string_route_invoker_test.go
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: perf/runtime-typed-string-fallback-97
+      - name: Format changed Go files
+        run: |
+          gofmt -w runtime/string_route_invoker.go runtime/string_route_invoker_test.go runtime/http_routes.go
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add runtime/string_route_invoker.go runtime/string_route_invoker_test.go runtime/http_routes.go
+            git commit -m "style(runtime): gofmt typed string fallback"
+            git push origin HEAD:perf/runtime-typed-string-fallback-97
+          fi
