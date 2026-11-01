@@ -59,7 +59,7 @@ func validateRequiredConcreteDependencies(files []*File, providers map[string]bo
 				for _, field := range strct.Fields.List {
 					if field.Tag != nil {
 						raw, err := strconv.Unquote(field.Tag.Value)
-						if err == nil && reflect.StructTag(raw).Get("nestgo") == "optional" {
+						if err == nil && (reflect.StructTag(raw).Get("nestgo") == "optional" || reflect.StructTag(raw).Get("nestgo") == "-") {
 							continue
 						}
 					}
