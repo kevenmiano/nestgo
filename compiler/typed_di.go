@@ -88,12 +88,9 @@ func validateTypedInterfaceDependencies(files []*File, modules map[string]module
 											if (!mod.Defined["controllers"] && !mod.Defined["providers"]) || (!containsModuleType(mod.Controllers, typ.Name.Name) && !containsModuleType(mod.Providers, typ.Name.Name)) {
 												continue
 											}
-											visible := false
-											for _, imported := range mod.Imports {
-												if strings.HasPrefix(imported, qualifier.Name+".") {
-													visible = true
-													break
-												}
+											visible, err := externalProviderExported(files[0].Path, qualifier.Name, named.Obj().Name(), mod.Imports)
+											if err != nil {
+												return Diagnostic{File: fset.Position(field.Pos()).Filename, Line: fset.Position(field.Pos()).Line, Message: fmt.Sprintf("module %s: external provider visibility: %v", moduleName, err)}
 											}
 											if !visible {
 												fieldName := selector.Sel.Name

@@ -49,6 +49,7 @@ func (g *GreeterService) Greet() string { return "from-external-interface" }
 @Controller("/ready")
 type AppController struct {
     Greeter external.Greeter
+    Repository *external.Repository
     Optional external.Unused NESTGO_OPTIONAL_TAG
 }
 
@@ -94,5 +95,23 @@ func TestCompiledCrossPackageBootstrap(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("compiled external modules must build and bootstrap: %v\n%s", err, strings.TrimSpace(string(output)))
+	}
+	// A module import alone must not authorize a private concrete provider.
+	privateSource := strings.ReplaceAll(files[filepath.Join(external, "module.mgo")], "exports:[Repository]", "exports:[]")
+	if err := os.WriteFile(filepath.Join(external, "module.mgo"), []byte(privateSource), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, generated := range []string{"module_generated.go", "zz_modforge_metadata.go"} {
+		if err := os.Remove(filepath.Join(app, generated)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := CompileDir(app); err == nil || !strings.Contains(err.Error(), "external concrete provider") {
+		t.Fatalf("private cross-package provider should fail compilation: %v", err)
+	}
+	for _, generated := range []string{"module_generated.go", "zz_modforge_metadata.go"} {
+		if _, err := os.Stat(filepath.Join(app, generated)); !os.IsNotExist(err) {
+			t.Fatalf("failed compilation generated %s: %v", generated, err)
+		}
 	}
 }
