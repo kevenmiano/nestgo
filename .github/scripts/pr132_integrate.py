@@ -38,8 +38,7 @@ def compiler(s):
     target = '''\t\tif err := writeIfChanged(target, formatted); err != nil {
 \t\t\treturn err
 \t\t}
-\t}
-\tif err := writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry); err != nil {'''
+'''
     replacement = '''\t\tif err := writeIfChanged(target, formatted); err != nil {
 \t\t\treturn err
 \t\t}
@@ -49,8 +48,7 @@ def compiler(s):
 \t\tif codec == nil {
 \t\t\tif err := os.Remove(codecPath); err != nil && !os.IsNotExist(err) { return err }
 \t\t} else if err := writeIfChanged(codecPath, codec); err != nil { return err }
-\t}
-\tif err := writeIfChanged(filepath.Join(dir, "zz_modforge_metadata.go"), registry); err != nil {'''
+'''
     s=change(s,target,replacement,"compiled codec emission")
     # A DTO-only source does not reference reflect; repositories and standard
     # NestGo metadata still use the main branch's reflect-based descriptors.
