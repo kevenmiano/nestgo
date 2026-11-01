@@ -73,7 +73,7 @@ func TestAdapterStaticInvocationAndDynamicFallback(t *testing.T) {
 	}{
 		{"/test/ready", "\"static\"\n", 200, nil},
 		{"/test/echo/{id}", "\"Ada\"\n", 200, map[string]string{"id": "Ada"}},
-		{"/test/broken", "static error\n", 500, nil},
+		{"/test/broken", "{\"statusCode\":500,\"message\":\"Internal server error\"}\n", 500, nil},
 	} {
 		ctx := &capturedContext{params: tc.params}
 		if err := a.routes["GET "+tc.path](ctx); err != nil {

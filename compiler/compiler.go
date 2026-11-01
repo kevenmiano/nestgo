@@ -41,7 +41,7 @@ type File struct {
 	Declarations          []Declaration
 }
 
-var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true}
+var supported = map[string]bool{"Controller": true, "Injectable": true, "Module": true, "Get": true, "Post": true, "Put": true, "Patch": true, "Delete": true, "HttpCode": true, "Header": true, "Redirect": true, "Res": true, "Response": true, "Body": true, "Param": true, "Query": true, "Headers": true, "Imports": true, "Exports": true}
 
 func Parse(path string, src []byte) (*File, error) {
 	source, annotations, paramMarkers, err := lexDecorators(path, src)
@@ -104,7 +104,7 @@ func Parse(path string, src []byte) (*File, error) {
 				}
 			}
 			for _, a := range ann {
-				if !isRoute(a.Name) && a.Name != "HttpCode" {
+				if !isRoute(a.Name) && a.Name != "HttpCode" && a.Name != "Header" && a.Name != "Redirect" {
 					return nil, Diagnostic{path, a.Line, "@" + a.Name + " cannot decorate a function"}
 				}
 			}
@@ -332,13 +332,26 @@ func Generate(files []*File) ([]byte, error) {
 			}
 			status := 0
 			routeCount := 0
+			headers := []string{}
+			redirectURL := ""
+			redirectStatus := 0
 			for _, a := range d.Annotations {
-				if a.Name == "HttpCode" {
+				switch a.Name {
+				case "HttpCode":
 					n, err := strconv.Atoi(a.Argument)
 					if err != nil || n < 100 || n > 599 {
 						return nil, fmt.Errorf("%s:%d: invalid HTTP status", f.Path, a.Line)
 					}
 					status = n
+				case "Header":
+					name, value, err := parseHeaderDecorator(a.Argument)
+					if err != nil { return nil, Diagnostic{f.Path,a.Line,"@Header: "+err.Error()} }
+					headers = append(headers, fmt.Sprintf("{Name:%q,Value:%q}",name,value))
+				case "Redirect":
+					if redirectURL != "" { return nil, Diagnostic{f.Path,a.Line,"duplicate @Redirect"} }
+					url, code, err := parseRedirectDecorator(a.Argument)
+					if err != nil { return nil, Diagnostic{f.Path,a.Line,"@Redirect: "+err.Error()} }
+					redirectURL, redirectStatus = url, code
 				}
 			}
 			for _, a := range d.Annotations {
@@ -361,7 +374,7 @@ func Generate(files []*File) ([]byte, error) {
 				if d.StaticEligible {
 					staticInvoke = fmt.Sprintf(",StaticInvoke:func(receiver any)(any,error){return receiver.(*%s).%s(),nil}", d.Receiver, d.Name)
 				}
-				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Parameters:[]metadata.Parameter{%s}%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(params, ","), staticInvoke))
+				routes[d.Receiver] = append(routes[d.Receiver], fmt.Sprintf(`{Method:%q,Path:%q,Handler:%q,Status:%d,Headers:[]metadata.Header{%s},RedirectURL:%q,RedirectStatus:%d,Parameters:[]metadata.Parameter{%s}%s}`, strings.ToUpper(a.Name), path, d.Name, status, strings.Join(headers, ","), redirectURL, redirectStatus, strings.Join(params, ","), staticInvoke))
 			}
 			if routeCount > 1 {
 				return nil, fmt.Errorf("%s: multiple HTTP method decorators on %s", f.Path, d.Name)

@@ -2,9 +2,9 @@ package runtime
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/kevenmiano/nestgo/httpadapter"
+	"github.com/kevenmiano/nestgo/httpresponse"
 	"github.com/kevenmiano/nestgo/metadata"
 	"reflect"
 	"sort"
@@ -75,7 +75,7 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			}
 			typ := method.Type()
 			errType := reflect.TypeOf((*error)(nil)).Elem()
-			if typ.NumOut() < 1 || typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(errType)) {
+			if typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(errType)) {
 				return fmt.Errorf("invalid signature %s", route.Handler)
 			}
 			path := strings.TrimSuffix(controller.Prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
@@ -91,8 +91,17 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 				}
 				bindings[p.Index] = p
 			}
+			explicit, passthrough := false, false
 			for i := 0; i < typ.NumIn(); i++ {
-				if _, ok := bindings[i]; !ok && typ.In(i).Kind() != reflect.String {
+				if p, ok := bindings[i]; ok {
+					if p.Kind == "Res" || p.Kind == "Response" {
+						if explicit { return fmt.Errorf("multiple @Res arguments for %s", route.Handler) }
+						if !reflect.TypeOf((*httpresponse.Writer)(nil)).AssignableTo(typ.In(i)) {
+							return fmt.Errorf("@Res argument must accept *httpresponse.Writer in %s", route.Handler)
+						}
+						explicit, passthrough = true, p.Name == "passthrough"
+					}
+				} else if typ.In(i).Kind() != reflect.String {
 					return fmt.Errorf("missing parameter decorator for %s", route.Handler)
 				}
 			}
@@ -101,13 +110,18 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 			params := bindings
 			methodType := typ
 			err := adapter.Register(httpadapter.Route{Method: rt.Method, Path: path, Handler: func(ctx httpadapter.Context) error {
+				writer := httpresponse.NewWriter(ctx)
+				routeResponseHeaders(ctx, rt)
 				var result any
 				if rt.StaticInvoke != nil && methodType.NumIn() == 0 {
 					value, err := rt.StaticInvoke(instance.Interface())
 					if err != nil {
-						return respondError(ctx, 500, err.Error())
+						return httpresponse.WriteError(ctx, err)
 					}
 					result = value
+					if handlerError, ok := value.(error); ok && handlerError != nil {
+						return httpresponse.WriteError(ctx, handlerError)
+					}
 				} else {
 					args := make([]reflect.Value, methodType.NumIn())
 					for i := 0; i < methodType.NumIn(); i++ {
@@ -133,6 +147,11 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 									return respondError(ctx, 500, "query parameter must be string")
 								}
 								v.Elem().SetString(ctx.Query(p.Name))
+							case "Headers":
+								if t.Kind() != reflect.String { return respondError(ctx, 500, "header parameter must be string") }
+								v.Elem().SetString(ctx.Header(p.Name))
+							case "Res", "Response":
+								v.Elem().Set(reflect.ValueOf(writer))
 							default:
 								return respondError(ctx, 500, "unsupported parameter decorator")
 							}
@@ -148,25 +167,13 @@ func registerRoutesWithLifecycle(adapter httpadapter.Adapter, packages []metadat
 					}
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
-						return respondError(ctx, 500, results[1].Interface().(error).Error())
+						return httpresponse.WriteError(ctx, results[1].Interface().(error))
 					}
-					result = results[0].Interface()
+					if len(results) == 1 && results[0].Type().Implements(errType) {
+						if !results[0].IsNil() { return httpresponse.WriteError(ctx, results[0].Interface().(error)) }
+					} else if len(results) > 0 { result = results[0].Interface() }
 				}
-				status := rt.Status
-				if status == 0 {
-					if rt.Method == "POST" {
-						status = 201
-					} else {
-						status = 200
-					}
-				}
-				ctx.Status(status)
-				ctx.SetHeader("Content-Type", "application/json")
-				data, err := json.Marshal(result)
-				if err != nil {
-					return errors.New("failed to encode HTTP response: " + err.Error())
-				}
-				return ctx.Write(append(data, '\n'))
+				return finishHTTPResponse(ctx, rt, result, writer, explicit, passthrough)
 			}})
 			if err != nil {
 				return fmt.Errorf("register %s: %w", key, err)

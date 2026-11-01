@@ -44,3 +44,9 @@ can operate unchanged on fasthttp; use platform-aware integration when needed.
 - Measure throughput, allocations, startup time and p95/p99 latency.
 - Extend generated static invokers beyond eligible zero-argument handlers (currently supported on both runtime paths).
 - Document unsupported platform capabilities such as WebSocket and streaming.
+
+## Response contracts
+
+The `httpresponse` package provides transport-independent response values,
+explicit `@Res()` writers, redirects, cookies and typed HTTP exceptions.
+See [HTTP responses](HTTP_RESPONSES.md) for API and engine-parity examples.

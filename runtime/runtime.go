@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/kevenmiano/nestgo/logging"
+	"github.com/kevenmiano/nestgo/httpresponse"
+	"github.com/kevenmiano/nestgo/platform/nethttp"
 	"github.com/kevenmiano/nestgo/metadata"
 	"log/slog"
 	"net/http"
@@ -92,7 +94,7 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				return fail(fmt.Errorf("missing handler %s.%s", c.Type, route.Handler))
 			}
 			typ := method.Type()
-			if typ.NumOut() < 1 || typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem())) {
+			if typ.NumOut() > 2 || (typ.NumOut() == 2 && !typ.Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem())) {
 				return fail(fmt.Errorf("unsupported signature %s", route.Handler))
 			}
 			path := strings.TrimSuffix(c.Prefix, "/") + "/" + strings.TrimPrefix(route.Path, "/")
@@ -111,14 +113,26 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				}
 				bindings[p.Index] = p
 			}
+			explicit, passthrough := false, false
 			for i := 0; i < typ.NumIn(); i++ {
-				if _, ok := bindings[i]; !ok && typ.In(i).Kind() != reflect.String {
+				if p, ok := bindings[i]; ok {
+					if p.Kind == "Res" || p.Kind == "Response" {
+						if explicit { return fail(fmt.Errorf("multiple @Res arguments for %s",route.Handler)) }
+						if !reflect.TypeOf((*httpresponse.Writer)(nil)).AssignableTo(typ.In(i)) {
+							return fail(fmt.Errorf("@Res argument must accept *httpresponse.Writer in %s",route.Handler))
+						}
+						explicit, passthrough = true, p.Name == "passthrough"
+					}
+				} else if typ.In(i).Kind() != reflect.String {
 					return fail(fmt.Errorf("missing decorator for argument %d of %s", i, route.Handler))
 				}
 			}
 			handler := method
 			spec := route
 			mux.HandleFunc(key, func(w http.ResponseWriter, r *http.Request) {
+				responseCtx := nethttp.NewContext(w,r)
+				writer := httpresponse.NewWriter(responseCtx)
+				routeResponseHeaders(responseCtx, spec)
 				args := make([]reflect.Value, typ.NumIn())
 				for i := 0; i < typ.NumIn(); i++ {
 					t := typ.In(i)
@@ -142,6 +156,11 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 								return
 							}
 							v.Elem().SetString(r.URL.Query().Get(p.Name))
+						case "Headers":
+							if t.Kind() != reflect.String { http.Error(w, "header parameter must be string", 500); return }
+							v.Elem().SetString(r.Header.Get(p.Name))
+						case "Res", "Response":
+							v.Elem().Set(reflect.ValueOf(writer))
 						default:
 							http.Error(w, "unsupported parameter decorator", 500)
 							return
@@ -159,30 +178,23 @@ func NewWithOptions(options Options, packages ...metadata.Package) (http.Handler
 				var result any
 				if spec.StaticInvoke != nil && typ.NumIn() == 0 {
 					value, err := spec.StaticInvoke(instance.Interface())
-					if err != nil {
-						http.Error(w, err.Error(), 500)
-						return
-					}
+					if err != nil { _ = httpresponse.WriteError(responseCtx, err); return }
 					result = value
+					if handlerError, ok := value.(error); ok && handlerError != nil {
+						_ = httpresponse.WriteError(responseCtx, handlerError); return
+					}
 				} else {
 					results := handler.Call(args)
 					if len(results) == 2 && !results[1].IsNil() {
-						http.Error(w, results[1].Interface().(error).Error(), 500)
-						return
+						_ = httpresponse.WriteError(responseCtx, results[1].Interface().(error)); return
 					}
-					result = results[0].Interface()
+					if len(results) == 1 && results[0].Type().Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+						if !results[0].IsNil() { _ = httpresponse.WriteError(responseCtx, results[0].Interface().(error)); return }
+					} else if len(results) > 0 { result = results[0].Interface() }
 				}
-				status := spec.Status
-				if status == 0 {
-					if spec.Method == "POST" {
-						status = 201
-					} else {
-						status = 200
-					}
+				if err := finishHTTPResponse(responseCtx, spec, result, writer, explicit, passthrough); err != nil {
+					_ = httpresponse.WriteError(responseCtx, err)
 				}
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(status)
-				_ = json.NewEncoder(w).Encode(result)
 			})
 			logger.Info(ctx, "RouterExplorer", "Mapped route", slog.String("method", route.Method), slog.String("path", path))
 		}

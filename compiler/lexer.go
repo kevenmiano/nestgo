@@ -35,7 +35,10 @@ func lexDecorators(path string,src []byte)(string,map[int][]Annotation,[]marker,
  }
  for k:=start;k<i;k++{if out[k]!='\n'{out[k]=' '}}
  if name=="Body"||name=="Param"||name=="Query"||name=="Headers"{
- if argument!=""{v,e:=strconv.Unquote(argument);if e!=nil{return "",nil,nil,Diagnostic{path,startLine,"parameter decorator expects quoted string"}};argument=v}
+ if name=="Res"||name=="Response"{
+			if argument!=""&&argument!="{passthrough:true}" {return "",nil,nil,Diagnostic{path,startLine,"@Res expects no argument or {passthrough:true}"}}
+			if argument!="" {argument="passthrough"}
+		}else if argument!=""{v,e:=strconv.Unquote(argument);if e!=nil{return "",nil,nil,Diagnostic{path,startLine,"parameter decorator expects quoted string"}};argument=v}
  params=append(params,marker{start,name,argument})
  }else{
  lineStart:=start;for lineStart>0&&src[lineStart-1]!='\n'{lineStart--}
