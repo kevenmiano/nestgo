@@ -57,11 +57,18 @@ func validateRequiredConcreteDependencies(files []*File, providers map[string]bo
 					continue
 				}
 				for _, field := range strct.Fields.List {
+					// Only explicit required bindings participate in static
+					// provider resolution. Ordinary pointers are user state.
+					tag := ""
 					if field.Tag != nil {
 						raw, err := strconv.Unquote(field.Tag.Value)
-						if err == nil && reflect.StructTag(raw).Get("nestgo") == "optional" {
-							continue
+						if err != nil {
+							return Diagnostic{File: file.Path, Line: fset.Position(field.Pos()).Line, Message: "invalid injection field tag"}
 						}
+						tag = reflect.StructTag(raw).Get("nestgo")
+					}
+					if tag != "inject" {
+						continue
 					}
 					ptr, ok := field.Type.(*ast.StarExpr)
 					if !ok {

@@ -91,11 +91,11 @@ func TestSecurityRuntimeServerErrorsDoNotLeak(t *testing.T) {
 		status int
 		body   string
 	}{
-		{"/regular", 500, "Internal server error\n"},
-		{"/typed-nil", 500, "Internal server error\n"},
-		{"/static", 500, "Internal server error\n"},
+		{"/regular", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
+		{"/typed-nil", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
+		{"/static", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
 		{"/static-http", 503, "Internal server error\n"},
-		{"/static-http-invalid-status", 500, "Internal server error\n"},
+		{"/static-http-invalid-status", 500, `{"statusCode":500,"message":"Internal server error"}` + "\n"},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			ctx := &capturedContext{}
