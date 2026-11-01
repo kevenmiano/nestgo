@@ -14,7 +14,7 @@ type routeEntry struct {
 }
 
 type routeBucket struct {
-	literal map[string][]routeEntry
+	literal  map[string][]routeEntry
 	wildcard []routeEntry
 }
 
