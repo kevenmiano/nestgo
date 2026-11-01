@@ -13,8 +13,7 @@ app, err := runtime.New(
         database.WithDSN(usersDSN),
         database.WithMaxOpenConns(20),
     )),
-    runtime.WithRegistry("users"),
-)
+    )
 if err != nil { return err }
 defer app.Close()
 return app.Listen(":8080")
