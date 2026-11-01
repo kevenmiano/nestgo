@@ -35,6 +35,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Verify security test formatting
+        shell: bash
+        run: |
+          gofmt -d runtime/nginx_proxy_security_test.go
+          test -z "$(gofmt -l runtime/nginx_proxy_security_test.go)"
       - name: Install Nginx
         run: |
           sudo apt-get update -qq
