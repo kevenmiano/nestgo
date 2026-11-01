@@ -18,7 +18,7 @@ type bootstrapConsumer struct {
 }
 
 func TestBootstrapWiresOwnedProviders(t *testing.T) {
-	app, err := Bootstrap(context.Background(), BootstrapOptions{
+	app, err := bootstrap(context.Background(), bootstrapOptions{
 		ConfigOptions: []config.Option{config.WithIgnoreEnvFile()},
 	}, metadata.Package{
 		Providers: []metadata.Provider{{Type: reflect.TypeOf((*bootstrapConsumer)(nil))}},
@@ -33,13 +33,13 @@ func TestBootstrapWiresOwnedProviders(t *testing.T) {
 }
 
 func TestBootstrapRejectsInvalidOptions(t *testing.T) {
-	_, err := Bootstrap(context.Background(), BootstrapOptions{
+	_, err := bootstrap(context.Background(), bootstrapOptions{
 		ConfigOptions: []config.Option{nil},
 	})
 	if err == nil || !strings.Contains(err.Error(), "nil option") {
 		t.Fatalf("expected config validation error, got %v", err)
 	}
-	_, err = Bootstrap(context.Background(), BootstrapOptions{
+	_, err = bootstrap(context.Background(), bootstrapOptions{
 		ConfigOptions: []config.Option{config.WithIgnoreEnvFile()},
 		DatabaseOptions: []database.Option{database.WithConnection("bad", database.WithDriver("invalid"), database.WithDSN("hidden-secret"))},
 	})
@@ -51,14 +51,14 @@ func TestBootstrapRejectsInvalidOptions(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = Bootstrap(ctx, BootstrapOptions{})
+	_, err = bootstrap(ctx, bootstrapOptions{})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected canceled context, got %v", err)
 	}
 }
 
 func TestBootstrapClosesConnectionsWhenDIInvalid(t *testing.T) {
-	_, err := Bootstrap(context.Background(), BootstrapOptions{
+	_, err := bootstrap(context.Background(), bootstrapOptions{
 		ConfigOptions: []config.Option{config.WithIgnoreEnvFile()},
 	}, metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*bootstrapConsumer)(nil))}, {Type: reflect.TypeOf((*bootstrapConsumer)(nil))}}})
 	if err == nil || !strings.Contains(err.Error(), "duplicate provider") {
