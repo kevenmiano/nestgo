@@ -76,14 +76,14 @@ func main() {
 			os.Exit(2)
 		}
 	}
-	var err error
+	var compileErr error
 	if len(dialects) > 0 {
-		err = compiler.CompileDirWithDialects(path, dialects)
+		compileErr = compiler.CompileDirWithDialects(path, dialects)
 	} else {
-		err = compiler.CompileDir(path)
+		compileErr = compiler.CompileDir(path)
 	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if compileErr != nil {
+		fmt.Fprintln(os.Stderr, compileErr)
 		os.Exit(1)
 	}
 	fmt.Println("compiled", path)
