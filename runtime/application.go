@@ -27,11 +27,11 @@ func NewApplication(options ApplicationOptions, packages ...metadata.Package) (*
 	}
 	registry := &lifecycleRegistry{}
 	if err := registerRoutesWithLifecycle(adapter, packages, registry); err != nil {
-		return nil, err
-	}
-	if err := registry.initialize(context.Background()); err != nil {
-		return nil, err
-	}
+        return nil, errors.Join(err, registry.shutdown(context.Background(), adapter.Shutdown))
+    }
+    if err := registry.initialize(context.Background()); err != nil {
+        return nil, errors.Join(err, registry.shutdown(context.Background(), adapter.Shutdown))
+    }
 	return &Application{adapter: adapter, lifecycle: registry}, nil
 }
 
