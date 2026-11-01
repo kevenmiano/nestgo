@@ -10,7 +10,7 @@ import (
 )
 
 type externalConfigConsumer struct {
-	Config *config.Service
+	Config      *config.Service
 	Connections *database.Connections
 }
 
