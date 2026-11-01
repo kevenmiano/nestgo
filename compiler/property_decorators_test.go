@@ -13,7 +13,6 @@ const dtoSource = `package demodto
 import (
     "net/url"
     "strings"
-    "github.com/kevenmiano/nestgo/transform"
 )
 
 type Address struct { City string ` + "\u0060json:\"city\"\u0060" + ` }
@@ -44,10 +43,8 @@ type User struct {
 func NormalizeEmail(value string) (string,error) { return strings.ToLower(value),nil }
 func Uppercase(value string) (string,error) { return strings.ToUpper(value),nil }
 type TrimTenant struct{}
-var _ transform.Transformer[string] = (*TrimTenant)(nil)
 func (TrimTenant) Transform(value string) (string,error) { return strings.TrimSpace(value),nil }
 type AddSuffix struct{}
-var _ transform.Transformer[string] = (*AddSuffix)(nil)
 func (*AddSuffix) Transform(value string) (string,error) { return value+"!",nil }
 `
 
@@ -90,7 +87,11 @@ import (
     "encoding/json"
     "strings"
     "testing"
+    "github.com/kevenmiano/nestgo/transform"
 )
+
+var _ transform.Transformer[string] = (*TrimTenant)(nil)
+var _ transform.Transformer[string] = (*AddSuffix)(nil)
 
 func TestCodec(t *testing.T) {
     var u User
@@ -121,10 +122,10 @@ func TestPropertyDecoratorDiagnostics(t *testing.T) {
 	tests := []struct{ name, source, errText string }{
 		{"outside-struct", "package demo\n@Exclude()\ntype User struct{}", "property decorator"},
 		{"missing-field", "package demo\ntype User struct {\n@Expose()\n}", "must precede"},
-		{"bad-transform", "package demo\ntype User struct {\n@Transform(something())\nName string\n}", "function or struct instance"},
+		{"bad-transform", "package demo\ntype User struct {\n@Transform(something())\nName string\n}", "function or struct type name"},
 		{"conflict", "package demo\ntype User struct {\n@Expose()\n@Exclude()\nName string\n}", "cannot decorate"},
 		{"type-mismatch", "package demo\ntype User struct {\n@Type(int)\nName string\n}", "must match"},
-		{"old-direction-removed", "package demo\ntype User struct {\n@Transform(Fn, \"toPlainOnly\")\nName string\n}", "function or struct instance"},
+		{"old-direction-removed", "package demo\ntype User struct {\n@Transform(Fn, \"toPlainOnly\")\nName string\n}", "function or struct type name"},
 		{"exclude-direction-removed", "package demo\ntype User struct {\n@Exclude(\"toClassOnly\")\nName string\n}", "takes no arguments"},
 		{"duplicate-exclude-input", "package demo\ntype User struct {\n@ExcludeInput()\n@ExcludeInput()\nName string\n}", "duplicate @ExcludeInput"},
 		{"conflicting-exclusion", "package demo\ntype User struct {\n@Exclude()\n@ExcludeOutput()\nName string\n}", "cannot be combined"},
