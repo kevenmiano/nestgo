@@ -92,6 +92,11 @@ go test ./...
 
 When compiling decorated `.mgo` packages, NestGo also creates compiler-owned wiring assertions and editable Go unit-test stubs. Each controller, provider, and decorated handler receives a TODO test scaffold only if that test name is not already defined. Later compiles add missing stubs without overwriting existing edits. See [Automatic test scaffolding](docs/COMPILER.md#automatic-test-scaffolding-from-compiled-wiring).
 
+
+### Automatic compilation and DTO test stubs
+
+Run `nestgo compile --watch ./myapp` during development. The compiler checks top-level `.mgo` sources and regenerates only on changes, preserving editable test stubs. Use `@Dto()` to opt a Go struct into serialization/deserialization TODO test stubs. A nonempty `validate` struct tag also adds a validation TODO. Existing tests are preserved; TODO stubs are skipped until you add assertions. Watch mode does not execute tests.
+
 ## Optional: decorators and modules
 
 NestGo's decorators are written in `.mgo` files and compiled into regular Go source:
