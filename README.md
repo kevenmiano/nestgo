@@ -14,7 +14,7 @@
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg" alt="Go quality" /></a>
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg" alt="Documentation build" /></a>
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml/badge.svg" alt="Go packages" /></a>
-  <img src="https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.23+" />
+  <img src="https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.23+" />
   <img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental" />
 </p>
 
@@ -79,6 +79,8 @@ go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
 nestgo compile ./myapp
 ```
 
+The [CLI reference](website/docs/cli.md) documents the supported `compile` and `diagnose` commands, flags, outputs, and limitations. Commands such as `nestgo new`, `nestgo generate`, and `nestgo start` are not yet implemented.
+
 To explore the included application:
 
 ```bash
@@ -141,7 +143,7 @@ Features are evolving. Constructor injection, request-scoped providers, guards, 
 
 Read the [documentation portal](https://kevenmiano.github.io/nestgo/) or browse the [documentation sources](website/docs/). The site is built in CI; GitHub Pages publication currently happens through the separate release workflow.
 
-Additional references: [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
+Additional references: [CLI](website/docs/cli.md) · [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
 
 ## Contributing
 
