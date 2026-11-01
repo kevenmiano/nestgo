@@ -76,7 +76,6 @@ func TestGeneratedRepositoryRejectsAmbiguousColumnMappings(t *testing.T) {
 	}
 }
 
-
 func TestGeneratedRepositoriesSupportDMLRowsAffected(t *testing.T) {
 	for _, tc := range []struct {
 		sql string
