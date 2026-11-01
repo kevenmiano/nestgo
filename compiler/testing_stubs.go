@@ -258,7 +258,6 @@ func appendMissingTestStubs(dir, pkg string, stubs []editableTestStub) error {
 	}
 	if _, err := os.Lstat(target); os.IsNotExist(err) {
 		header := fmt.Sprintf("// Editable test stubs created by NestGo. Add assertions; recompilation preserves them.\npackage %s\n\nimport \"testing\"\n", pkg)
-		source.WriteString("")
 		sourceText := header + source.String()
 		formatted, err := format.Source([]byte(sourceText))
 		if err != nil {
@@ -289,7 +288,7 @@ func appendMissingTestStubs(dir, pkg string, stubs []editableTestStub) error {
 		return err
 	}
 	defer file.Close()
-	formatted, err := format.Source([]byte("package "+pkg+"\nimport \"testing\"\n"+source.String()))
+	formatted, err := format.Source([]byte("package " + pkg + "\nimport \"testing\"\n" + source.String()))
 	if err != nil {
 		return err
 	}
