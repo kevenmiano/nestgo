@@ -61,7 +61,7 @@ Full module imports/exports validation, cold-process startup, large provider/rou
 
 The analyzer now produces `modules.json` and `modules.dot` alongside the provider graph. Explicit `metadata.Module.Imports` and `metadata.Module.Exports` describe directed module imports and exported provider types. It reports module cycles and missing or invalid references in the same HTML report.
 
-Existing `@Module("users")` generated metadata is compatible and appears as a module node. **The compiler does not yet generate imports/exports**, and runtime module visibility is not enforced; use explicit programmatic module metadata to model those relationships. See the [diagnostics GSD guide](https://github.com/kevenmiano/nestgo/blob/main/docs/DIAGNOSTICS.md).
+Existing `@Module("users")` generated metadata is compatible and appears as a module node. The compiler can generate imports and exports from supported `@Module({...})` declarations and `@Imports`/`@Exports` decorators. Runtime module visibility enforcement and full cross-package validation remain incomplete. See the [diagnostics GSD guide](https://github.com/kevenmiano/nestgo/blob/main/docs/DIAGNOSTICS.md).
 
 ## Declare module relationships in `.mgo`
 
