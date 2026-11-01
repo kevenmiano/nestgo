@@ -191,7 +191,10 @@ func New(options ...Option) (*Application, error) {
 		// Register first so pools close after provider lifecycle hooks.
 		registry.instances = append(registry.instances, &ownedSQLConnections{connections})
 	}
-	instances := append([]any{settings, connections}, cfg.instances...)
+	var instances []any
+	if len(packages) != 0 || len(cfg.instances) != 0 {
+		instances = append([]any{settings, connections}, cfg.instances...)
+	}
 	registrationStarted := time.Now()
 	if err := registerRoutesWithLifecycleAndInstances(adapter, packages, registry, instances, cfg.routes...); err != nil {
 		return fail(err)
