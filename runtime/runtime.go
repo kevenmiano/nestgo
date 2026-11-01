@@ -19,8 +19,8 @@ func New(packages ...metadata.Package) (http.Handler, error) {
 
 // Options controls framework lifecycle diagnostics without affecting request handling.
 type Options struct {
-	Logger *logging.Service
-	Debug  bool
+	Logger    *logging.Service
+	Debug     bool
 	Instances []any
 }
 
