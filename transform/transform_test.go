@@ -10,6 +10,7 @@ import (
 type normalized struct {
 	Email string `json:"email"`
 }
+
 func (value *normalized) UnmarshalJSON(data []byte) error {
 	var payload struct {
 		Email string `json:"email"`
@@ -20,6 +21,7 @@ func (value *normalized) UnmarshalJSON(data []byte) error {
 	value.Email = strings.ToLower(payload.Email)
 	return nil
 }
+
 type nested struct {
 	Value normalized `json:"value"`
 }
