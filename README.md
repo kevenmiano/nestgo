@@ -14,7 +14,7 @@
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-quality.yml/badge.svg" alt="Go quality" /></a>
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/docs-site.yml/badge.svg" alt="Documentation build" /></a>
   <a href="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml"><img src="https://github.com/kevenmiano/nestgo/actions/workflows/go-packages.yml/badge.svg" alt="Go packages" /></a>
-  <img src="https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.23+" />
+  <img src="https://img.shields.io/badge/Go-1.27%2B-00ADD8?logo=go&logoColor=white" alt="Go 1.27+" />
   <img src="https://img.shields.io/badge/status-experimental-orange" alt="Experimental" />
 </p>
 
@@ -72,11 +72,12 @@ func main() {
 }
 ```
 
-For optional NestJS-inspired decorators, install the compiler and generate Go metadata once during development/build:
+For optional NestJS-inspired decorators, install the CLI and generate Go metadata once during development/build:
 
 ```bash
 go install github.com/kevenmiano/nestgo/cmd/nestgo@latest
 nestgo compile ./myapp
+nestgo --help
 ```
 
 To explore the included application:
@@ -88,11 +89,6 @@ go run ./cmd/nestgo compile ./examples/shop
 go test ./...
 ```
 
-
-### Automatic test generation and watch mode
-
-During development, `nestgo compile --watch ./myapp` compiles immediately and recompiles when top-level `.mgo` sources change. The compiler generates a wiring contract test and creates editable test stubs for controllers and providers, without overwriting developer tests. Annotate a DTO with `@Dto()` to scaffold JSON serialization/deserialization TODO tests; a nonempty `validate` struct tag also adds a validation TODO. Stubs begin skipped, and the watch mode does not automatically run `go test`. See [Compiler](docs/COMPILER.md).
-
 ## Optional: decorators and modules
 
 NestGo's decorators are written in `.mgo` files and compiled into regular Go source:
@@ -103,7 +99,7 @@ type UsersService struct{}
 
 @Controller("/users")
 type UsersController struct {
-    Service *UsersService `nestgo:"inject"`
+    Service *UsersService
 }
 
 @Get("/")
@@ -121,7 +117,7 @@ type UsersModule struct{}
 Use the generated metadata with the application runtime. For example, after importing your generated package for registration:
 
 ```go
-app, err := runtime.New(runtime.WithRegistry("shop")) // native fasthttp by default
+app, err := runtime.New() // native fasthttp by default
 if err != nil {
     log.Fatal(err)
 }
@@ -133,7 +129,7 @@ Pass `runtime.WithAdapter(nethttp.New())` to switch to the Go standard-library H
 ## Features
 
 - **Modular architecture:** declare controllers, providers, module imports and exports.
-- **Dependency injection:** inject only explicitly tagged fields (`nestgo:"inject"` or `nestgo:"optional"`), validating module visibility at bootstrap.
+- **Dependency injection:** resolve dependencies and validate module visibility at bootstrap.
 - **Compiler-free HTTP:** register ordinary Go functions with `runtime.WithRoutes(...)`.
 - **Optional decorator compiler:** generate standard Go files and metadata from `.mgo` sources.
 - **HTTP adapters:** use native fasthttp or net/http through a platform interface.
@@ -145,6 +141,8 @@ Features are evolving. Constructor injection, request-scoped providers, guards, 
 ## Documentation
 
 Read the [documentation portal](https://kevenmiano.github.io/nestgo/) or browse the [documentation sources](website/docs/). The site is built in CI; GitHub Pages publication currently happens through the separate release workflow.
+
+For all commands, diagnostic flags and shell completion, see the [CLI guide](website/docs/cli/overview.md). The Docusaurus command reference is generated from Cobra.
 
 Additional references: [Compiler](docs/COMPILER.md) · [Runtime](docs/RUNTIME.md) · [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md).
 

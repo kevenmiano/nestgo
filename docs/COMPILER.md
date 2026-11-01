@@ -18,7 +18,6 @@ For every input `name.mgo`, the compiler writes `name_generated.go`. It also wri
 | --- | --- | --- |
 | `@Controller("/prefix")` | Struct declaration | Defines an HTTP controller and its URL prefix |
 | `@Injectable()` | Struct declaration | Registers a provider |
-| `@Dto()` | Struct declaration | Opts a DTO into test scaffolding (no runtime registration) |
 | `@Module("name")` | Struct declaration | Adds module metadata |
 | `@Get("/path")` | Controller method | Registers a GET route |
 | `@Post("/path")` | Controller method | Registers a POST route |
@@ -50,54 +49,6 @@ The compiler reports invalid annotations, dangling decorators, unsupported place
 The generated `*_generated.go` files contain the original Go code with annotations removed. `zz_modforge_metadata.go` contains an `init()` function that calls `metadata.Register` for the package.
 
 The compiler also writes `zz_nestgo_modules.json` with schema version `1` and the modules' explicitly declared `providers` and `exports`. Commit this generated file together with the generated Go files when distributing an imported NestGo module. When the original `.mgo` is absent, the importing compiler checks this contract before accepting concrete cross-package DI. If neither `.mgo` nor the contract exists, compilation fails closed. The runtime continues to enforce module visibility. The contract does not replace Go type checking, and it does not yet support external interface-provider visibility checks.\n\nThe generated Go files should be inspected in code review. They are **not** dynamically interpreted at runtime.
-
-
-## Automatic test scaffolding from compiled wiring
-
-Every successful `nestgo compile <directory>` (or `modforge compile`) also produces two Go test files in the package:
-
-- `zz_nestgo_wiring_generated_test.go` is **compiler-owned**. It is regenerated only when the compiled metadata changes. The test `TestNestGoCompiledWiring` verifies that the package registration contains the expected modules, providers, controllers, prefixes, and route contracts. It does not open network listeners, initialize databases, or construct application instances.
-- `zz_nestgo_stubs_test.go` is **developer-owned**. It starts with one `Test<Type>` for each `@Injectable` or `@Controller` and one `Test<Controller>_<Method>` for each route method. Comments list fields found on each decorated type. These tests explicitly call `t.Skip("TODO: ...")` until you implement assertions; they are not claimed as passing behavioral tests.
-
-The compiler never rewrites existing editable stubs. When a new controller, provider, or handler appears, it appends only the missing test functions. A test function already defined in any `*_test.go` file takes precedence and is not duplicated. Recompilation preserves developer edits verbatim. Removing a handler does **not** delete its previously created test; clean up obsolete tests yourself.
-
-```bash
-nestgo compile ./myapp
-go test ./myapp
-```
-
-Example starter for `UsersController`:
-
-```go
-func TestUsersController_FindAll(t *testing.T) {
-    // Wiring field: Service *UsersService
-    subject := new(UsersController)
-    _ = subject
-    t.Skip("TODO: add assertions for TestUsersController_FindAll")
-}
-```
-
-
-### Watch mode
-
-Run `nestgo compile --watch ./myapp` (or `nestgo compile ./myapp --watch`) to compile immediately and recompile whenever a top-level `.mgo` file is added, renamed, removed or edited. The watcher checks source contents every 250 ms, including same-size edits; it intentionally ignores generated outputs to avoid self-triggering loops. Source diagnostics are printed but the watcher keeps running. Ctrl+C stops it. Watch mode does **not** automatically run `go test`.
-
-### DTO scaffolding
-
-Use `@Dto()` to opt in to DTO-specific test stubs:
-
-```go
-@Dto()
-type CreateUserDTO struct {
-    Name string // json:"name" validate:"required" (use a Go struct tag in your code)
-}
-```
-
-The compiler creates `TestCreateUserDTO_Serialization` and `TestCreateUserDTO_Deserialization` TODOs. It creates `TestCreateUserDTO_Validation` only when at least one DTO field has a nonempty `validate` struct tag. Plain undecorated Go structs do not receive DTO stubs.
-
-A `validate` tag is a contract hint: it does not enable validation in the runtime. Generated tests explicitly use `t.Skip`, so add real fixtures, validators and assertions before treating them as behavioral coverage. DTO property-transformer code is being built separately in PR #132; specialized transformation scaffolding is not yet integrated.
-
-**Boundary:** The generated assertion checks *compiled registry consistency*, not full runtime dependency construction or correct application behavior. The editable unit stubs do not automatically create mocks, start servers, or execute HTTP requests. Add dependency fakes and assertions as needed. Test generation adds no cost to a production binary because all generated tests live in `*_test.go` files.
 
 ## Known limitations
 

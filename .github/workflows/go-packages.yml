@@ -75,7 +75,11 @@ jobs:
         if: ${{ github.event_name == 'release' || github.event_name == 'workflow_dispatch' }}
         env:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          GOPROXY: direct
+          GOPROXY: https://proxy.golang.org
+          GOSUMDB: sum.golang.org
+          GOPRIVATE: ''
+          GONOSUMDB: ''
+          GONOPROXY: ''
         shell: bash
         run: |
           set -euo pipefail

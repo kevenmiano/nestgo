@@ -1,39 +1,65 @@
-# NestGo roadmap — minimal production-ready HTTP framework
+# NestGo roadmap — production-ready HTTP core
 
-**Source of truth:** [Issues](https://github.com/kevenmiano/nestgo/issues) · [Project #2](https://github.com/users/kevenmiano/projects/2) · [Production gate #70](https://github.com/kevenmiano/nestgo/issues/70)
+**Source of truth:** [Issues](https://github.com/kevenmiano/nestgo/issues) · [Project #2](https://github.com/users/kevenmiano/projects/2) · [Release gate #70](https://github.com/kevenmiano/nestgo/issues/70) · [Acceptance evidence](../docs/RELEASE_ACCEPTANCE.md)
 
-## Supported MVP target
+## Release contract: NestGo Core v1.0
 
-A deployable, maintainable Go HTTP framework with deterministic `.mgo` compilation; controllers; explicit module imports/exports; singleton field injection; JSON request/response; safe failures; pluggable HTTP adapter contracts; graceful shutdown; basic health/logging; verified tagged distribution.
+**Goal:** a small, reliable Go HTTP framework with a deterministic optional `.mgo` compiler, well-defined module/DI boundaries and a safe request lifecycle. This is a **release target**, not a production-ready claim. The public v1.0 release must not be approved until all gates in #70 pass on the exact candidate SHA.
 
-**Not MVP requirements:** constructor DI, request/transient scopes, guards/interceptors framework, GraphQL, OpenAPI generation, ORM, caching, queues, WebSockets, microservices, watch mode. These must not hold the minimal production release hostage.
+Supported core surface (subject to final acceptance):
 
-## Strict implementation order
+- One idiomatic entry point: `runtime.New(options ...Option)`; `app.Listen`, `app.Serve`, `app.Shutdown(ctx)` and `app.Close()`. No legacy runtime factories.
+- Both `fasthttp` (default) and `net/http` via `WithAdapter`, with explicit parity/limitations.
+- `WithRoutes` for ordinary Go HTTP handlers; optional generated `@Module`, `@Controller`, providers and imported/exported module metadata using `WithRegistry` or `WithPackages`.
+- Singleton **explicit** field injection (`nestgo:"inject"`, `nestgo:"optional"`) and fail-closed, actionable DI/route errors; no implicit injection.
+- JSON body/query/path/header binding, `http.Response[T]`, `http.Result`, explicit status/headers and typed HTTP errors.
+- A **bounded** NestJS-inspired request pipeline: middleware, guards, parameter/body validation pipes and exception filters, with documented order and scopes; do not promise full NestJS behavior.
+- Operational minimum: limits/timeouts, panic recovery, safe error redaction, structured logs, liveness/readiness, SIGTERM/in-flight graceful shutdown and reproducible release verification.
 
-| Order | Gate | Priority | Issues | Acceptance evidence |
+**Not part of Core v1.0:** generated SQL repositories/ORM/migrations, an opinionated configuration provider, OpenAPI/Swagger generation, caching, queues, scheduling, events, gRPC/microservice transports, WebSocket gateways, GraphQL, constructor DI, request/transient scopes, interceptors, advanced DTO groups/transformer factories, full LSP/watch tooling and broad NestJS feature parity.
+
+These are possible optional packages or application-level integrations, **not dependencies of the HTTP core release**. A package being optional does not make an incomplete or unsafe implementation production-supported: SQL/persistence work (#80, #82, #84, #87-#94) must pass its own security and integration gates before release.
+
+## Execution order — remaining minimum gates
+
+| Order | Gate | Priority | Track | Acceptance and current distinction |
 | --- | --- | --- | --- | --- |
-| 0 | Correctness and metadata | P0 | #4 #5 #6 #35 #36 #53 | Compiler goldens, deterministic diagnostics, no DI panics/ambiguity |
-| 1 | Module/DI integration | P0 | #10 #12 #52; singleton subset of #11 | Real multi-package compiler-to-runtime E2E, import/export isolation |
-| 2 | HTTP runtime safety | P0 | #48 #12 #13 (minimal middleware subset) #56 | Adapter conformance, cancellation, errors, body limits, timeouts, graceful shutdown, race |
-| 3 | Minimum operations | P0 | #16 #50; safe-default subset of #18 | Structured logging, liveness/readiness, recovery, error redaction |
-| 4 | Release qualification | P0 | #25 #37 #41 #55 #70 | Reproducible benchmarks, full CI, external installation, integrity-checked immutable version and docs deployment |
-| 5 | Post-MVP extension | P1 | #7 #11 #14 #15 #19 #24 #38 #54 | Expanded lifecycle, validators, docs, tooling |
-| 6 | Optional integrations | P2 | #17 #18 #20 #21 #22 #23 | Data, security integrations, distributed capabilities, GraphQL |
+| 1 | Dependency-aware lifecycle | P0 | [#119](https://github.com/kevenmiano/nestgo/issues/119) | Topological hook order, partial-bootstrap rollback, canceled context, reverse cleanup, concurrency and idempotence, both adapters; keep `runtime.New` only |
+| 2 | Request pipeline and validation | P0 bounded slice | [PR #122](https://github.com/kevenmiano/nestgo/pull/122), [#13](https://github.com/kevenmiano/nestgo/issues/13), [#14](https://github.com/kevenmiano/nestgo/issues/14), [#15](https://github.com/kevenmiano/nestgo/issues/15) | Test global/controller/route ordering, guard rejection, invalid DTO 4xx, filter fallback, typed/static dispatch and engine parity; defer interceptors, request scopes, advanced serialization |
+| 3 | Request/runtime security | P0 | [#112](https://github.com/kevenmiano/nestgo/issues/112), [#151](https://github.com/kevenmiano/nestgo/pull/151) | No secrets on unexpected errors/panics, consistent recovery/error envelopes, in-flight SIGTERM response and deadline behavior. Reverse-proxy tests [#140](https://github.com/kevenmiano/nestgo/pull/140) have already merged; recheck evidence on final SHA |
+| 4 | Minimum operational contract | P0 bounded slice | [#16](https://github.com/kevenmiano/nestgo/issues/16), [#50](https://github.com/kevenmiano/nestgo/issues/50) | Tested configuration validation at application bootstrap, liveness/readiness (including draining state), correlation IDs and safe structured request/error logs; allow plain Go integrations |
+| 5 | Release verification and sign-off | P0 | [#4](https://github.com/kevenmiano/nestgo/issues/4), [#10](https://github.com/kevenmiano/nestgo/issues/10), [#25](https://github.com/kevenmiano/nestgo/issues/25), [#35](https://github.com/kevenmiano/nestgo/issues/35), [#36](https://github.com/kevenmiano/nestgo/issues/36), [#37](https://github.com/kevenmiano/nestgo/issues/37), [#55](https://github.com/kevenmiano/nestgo/issues/55), [#70](https://github.com/kevenmiano/nestgo/issues/70) | Evidence on the candidate SHA: deterministic cross-package compiler E2E, metadata negatives, race, fuzz, Go/vuln/mod integrity, real listeners, proxy, benchmarks, external consumer via immutable tag/checksum, docs/release artifacts |
 
-M001–M006 remain the existing Project Roadmap taxonomy, not mandatory sequential release phases. Each broad issue can have a bounded P0 slice and defer the rest without claiming the entire issue completed.
+Execution order is a **release-blocking dependency chain**, not a requirement to resolve every historical unchecked bullet in each broad issue. Close an issue only when its actual acceptance criteria are met; otherwise retain its deferred scope explicitly.
 
-## Production gate: #70
+## Current implementation versus remaining evidence
 
-No production-ready claim before **every** #70 acceptance criterion is verified: deterministic compilation, fail-closed DI, real-listener HTTP adapter contract, integration and negative tests, `go test -race ./...`, `go vet ./...`, formatting, generated output checks, representative fuzz testing, startup/per-request benchmarks, clean shutdown, minimum operational safety, immutable semver tags and external module checksum verification.
+- **Present on main:** single `runtime.New` API, strict explicit DI, module graph checks, response/error helpers, native adapters, bounded server limits, deterministic/diagnostic workflows, indexed FastHTTP router, structured logging, external-consumer and release-scale workflows.
+- **Already merged but requiring release-SHA evidence:** dependency/toolchain hardening (#115), bounded HTTP limits (#113), Nginx proxy security tests (PR #140), process-level SIGTERM smoke (PR #145). Do not reopen completed work simply to duplicate it.
+- **Open work:** dependency-ordered initialization (#119); pipeline PR #122 is draft; complete error/panic contract (#112); in-flight termination PR #151 is draft; minimum health/readiness and validated startup configuration (#16); audit and evidence assembly (#70).
+- **Performance/developer experience:** #97 and broad diagnostic/tooling work do **not** block the HTTP core by default. Promote a measured regression to P0 only when the supported workload misses a documented acceptance threshold. Review stale #98 against the indexed router already on main.
+- **Version policy:** an open release-please PR is **not** approval to publish 1.0.0. Do not merge release PR #73 or publish a stable tag until the independent sign-off in #70. Never move immutable published Go tags or checksums.
 
-Production-supported adapters must demonstrate parity; otherwise identify the unsupported adapter explicitly as experimental.
+## Architecture tracks after Core v1.0
+
+| Track | Planned contract | Priority |
+| --- | --- | --- |
+| Core extensions | advanced scopes/tokens/interceptors, DTO serialization strategies, API versioning | P1 |
+| Optional configuration | `config` (Viper as a replaceable adapter), typed validation and secret redaction; keep standard-library options | P1 |
+| Optional persistence | `database`/SQL adapters, named connections, transactions and generated repositories after the SQL correctness gates | P1 (separate release gate) |
+| API/documentation | OpenAPI generator, CLI improvements, LSP and developer experience | P1/P2 |
+| Additional transports | events, queues, cache, gRPC/microservices, WebSocket, GraphQL | P2 |
+
+The split is a **support and release boundary** first. Separate Go modules/packages only where independently versioned APIs or dependencies justify the maintenance cost; never introduce a dependency on optional modules into the HTTP core.
+
+## Production gate
+
+See [Release acceptance](../docs/RELEASE_ACCEPTANCE.md) and [#70](https://github.com/kevenmiano/nestgo/issues/70). Every P0 item must have a test, an exact SHA, CI/artifact link, owner and recorded decision. Release sign-off requires a reproducible public-Go-proxy install with checksums enabled and no local `replace` directives.
 
 ## Priority semantics
 
-- **P0:** release blocker (correctness, request/DI safety, tests and packaging).
-- **P1:** useful capabilities safely deferred until after minimal production release.
-- **P2:** integrations, distributed features and exploratory work.
+- **P0:** blocks declaring the supported HTTP core production-ready.
+- **P1:** valuable but independent from core release; no silent promotion to a P0 requirement.
+- **P2:** future integrations and exploratory capabilities.
 
-Follow **Discuss → Plan → Execute → Verify → Review → Ship** per issue. All merged PRs require checks on exact head SHA; an issue stays open if acceptance criteria are not fully met. Never reuse or move `v0.1.0`; versioned Go module checksums are immutable.
-
-See [Semantic releases](../docs/SEMANTIC_RELEASES.md) and [distribution](../docs/DISTRIBUTION.md).
+Follow **Discuss → Plan → Execute → Verify → Review → Ship**. Retain M001–M006 as the Project taxonomy rather than constructing separate duplicate roadmaps.

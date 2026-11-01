@@ -1,0 +1,109 @@
+name: Release-scale latency and throughput baselines
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'runtime/release_scale_benchmark_test.go'
+      - 'platform/fasthttp/**'
+      - '.github/workflows/release-scale.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/release_scale_benchmark_test.go'
+      - 'platform/fasthttp/**'
+      - '.github/workflows/release-scale.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scale-benchmarks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Record immutable measurement context
+        shell: bash
+        run: |
+          mkdir -p scale-results
+          { echo "SHA=$GITHUB_SHA"; echo "GOMAXPROCS=2"; go version; go env GOOS GOARCH; uname -a; lscpu; } > scale-results/environment.txt
+      - name: Collect p95, p99, req/s, allocations at 1/10/100/1000
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkReleaseScale$' -benchtime=250ms -count=3 -benchmem -timeout=20m | tee scale-results/bench.txt
+      - name: Verify and summarize benchmark samples
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import collections
+          import json
+          import pathlib
+          import re
+          import statistics
+
+          directory = pathlib.Path("scale-results")
+          entries = collections.defaultdict(list)
+          pattern = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s+(p95-ms|p99-ms|req/s|startup-ms|B/op|allocs/op)")
+          for line in (directory / "bench.txt").read_text().splitlines():
+              if not line.startswith("BenchmarkReleaseScale/"):
+                  continue
+              key = re.sub(r"-[0-9]+$", "", line.split()[0])
+              metrics = {unit: float(value) for value, unit in pattern.findall(line)}
+              expected_metrics = {"p95-ms", "p99-ms", "req/s", "startup-ms", "B/op", "allocs/op"}
+              if set(metrics) != expected_metrics:
+                  raise SystemExit(f"missing metrics in {key}: {line}")
+              if metrics["p95-ms"] <= 0 or metrics["p99-ms"] < metrics["p95-ms"] or metrics["req/s"] <= 0 or metrics["startup-ms"] < 0:
+                  raise SystemExit(f"invalid benchmark metrics: {line}")
+              entries[key].append(metrics)
+
+          expected = {
+              f"BenchmarkReleaseScale/{engine}/routes_{count}/providers_{count}"
+              for engine in ("fasthttp", "nethttp") for count in (1, 10, 100, 1000)
+          }
+          if set(entries) != expected or any(len(samples) != 3 for samples in entries.values()):
+              raise SystemExit(f"unexpected samples: { {key: len(value) for key, value in entries.items()} }")
+
+          summary = {
+              key: {
+                  metric: {
+                      "median": statistics.median(sample[metric] for sample in samples),
+                      "min": min(sample[metric] for sample in samples),
+                      "max": max(sample[metric] for sample in samples),
+                  }
+                  for metric in ("startup-ms", "p95-ms", "p99-ms", "req/s", "B/op", "allocs/op")
+              }
+              for key, samples in sorted(entries.items())
+          }
+          (directory / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+          with (directory / "summary.md").open("w") as output:
+              output.write("# NestGo release-scale benchmarks\n\n")
+              output.write("Three samples per scenario, GOMAXPROCS=2, HTTP loopback including Go client.\n")
+              output.write("Startup includes metadata/DI/route registration and excludes listener setup.\n")
+              output.write("Runner details and the exact commit are recorded in environment.txt.\n")
+              output.write("These medians are baselines, not production SLAs or agreed regression thresholds.\n\n")
+              output.write("| Engine / Routes / Providers | Startup median (ms) | p95 median (ms) | p99 median (ms) | Throughput median (req/s) | Bytes/op median | Allocs/op median |\n")
+              output.write("|---|---:|---:|---:|---:|---:|---:|\n")
+              for key, data in summary.items():
+                  output.write(
+                      f"| {key.replace('BenchmarkReleaseScale/', '')} "
+                      f"| {data['startup-ms']['median']:.3f} "
+                      f"| {data['p95-ms']['median']:.4f} "
+                      f"| {data['p99-ms']['median']:.4f} "
+                      f"| {data['req/s']['median']:.0f} "
+                      f"| {data['B/op']['median']:.0f} "
+                      f"| {data['allocs/op']['median']:.0f} |\n"
+                  )
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-scale-${{ github.sha }}
+          path: scale-results/
+          retention-days: 30

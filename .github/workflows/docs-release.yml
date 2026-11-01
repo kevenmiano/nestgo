@@ -56,6 +56,11 @@ jobs:
           TAG_COMMIT: ${{ steps.version.outputs.commit }}
         run: git checkout --detach "$TAG_COMMIT"
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
