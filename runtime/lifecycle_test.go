@@ -62,7 +62,7 @@ func TestApplicationLifecycleHooks(t *testing.T) {
 		Providers:   []metadata.Provider{{Type: reflect.TypeOf((*lifecycleHookProvider)(nil))}},
 		Controllers: []metadata.Controller{{Type: reflect.TypeOf((*lifecycleHookController)(nil))}},
 	}
-	app, err := NewApplication(ApplicationOptions{Adapter: nethttp.New()}, p)
+	app, err := New(WithAdapter(nethttp.New()), WithPackages(p))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func (*failingLifecycleProvider) OnModuleInit(context.Context) error {
 	return errors.New("initialization rejected")
 }
 func TestApplicationLifecycleInitFailure(t *testing.T) {
-	_, err := NewApplication(ApplicationOptions{}, metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*failingLifecycleProvider)(nil))}}})
+	_, err := New(WithPackages(metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*failingLifecycleProvider)(nil))}}}))
 	if err == nil || !strings.Contains(err.Error(), "OnModuleInit") {
 		t.Fatalf("expected init hook failure: %v", err)
 	}
@@ -97,7 +97,7 @@ func (*failingShutdownProvider) OnModuleDestroy(context.Context) error {
 	return errors.New("close failed")
 }
 func TestApplicationLifecycleShutdownFailure(t *testing.T) {
-	app, err := NewApplication(ApplicationOptions{}, metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*failingShutdownProvider)(nil))}}})
+	app, err := New(WithPackages(metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*failingShutdownProvider)(nil))}}}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func (*rollbackLifecycleProvider) OnModuleDestroy(context.Context) error { rollb
 
 func TestFailedBootstrapReleasesProviders(t *testing.T) {
 	rollbackCalls = 0
-	_, err := NewApplication(ApplicationOptions{}, metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*rollbackLifecycleProvider)(nil))}}})
+	_, err := New(WithPackages(metadata.Package{Providers: []metadata.Provider{{Type: reflect.TypeOf((*rollbackLifecycleProvider)(nil))}}}))
 	if err == nil || !strings.Contains(err.Error(), "startup failed") {
 		t.Fatalf("expected startup error: %v", err)
 	}

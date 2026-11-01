@@ -28,7 +28,7 @@ func TestAdapterUsesGeneratedStaticInvoker(t *testing.T) {
 			StaticInvoke: func(any) (any, error) { calls.Add(1); return "generated", nil },
 		}},
 	}}}
-	app, err := NewApplication(ApplicationOptions{Adapter: nethttp.New()}, p)
+	app, err := New(WithAdapter(nethttp.New()), WithPackages(p))
 	if err != nil {
 		t.Fatal(err)
 	}

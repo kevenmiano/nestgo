@@ -7,7 +7,7 @@ import (
 )
 
 func TestDefaultHTTPAdapter(t *testing.T) {
-	app, err := NewApplication(ApplicationOptions{})
+	app, err := New()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,7 +18,7 @@ func TestDefaultHTTPAdapter(t *testing.T) {
 
 func TestCustomHTTPAdapter(t *testing.T) {
 	adapter := nethttp.New()
-	app, err := NewApplication(ApplicationOptions{Adapter: adapter})
+	app, err := New(WithAdapter(adapter))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,12 +29,12 @@ func TestCustomHTTPAdapter(t *testing.T) {
 
 func TestApplicationReportsBootstrapMetrics(t *testing.T) {
 	called := false
-	_, err := NewApplication(ApplicationOptions{OnBootstrap: func(m BootstrapMetrics) {
+	_, err := New(WithBootstrapMetrics(func(m BootstrapMetrics) {
 		called = true
 		if m.Total < m.RouteRegistration || m.Total < m.LifecycleInitialization {
 			t.Fatalf("invalid bootstrap metrics: %+v", m)
 		}
-	}})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
