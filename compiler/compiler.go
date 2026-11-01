@@ -180,6 +180,18 @@ func Generate(files []*File) ([]byte, error) {
 			return nil, fmt.Errorf("mixed packages: %s and %s", pkg, f.Package)
 		}
 	}
+	// Fail closed until the repository emitter and provider wiring are present.
+	// Accepting annotations without generating executable repositories would
+	// create a false sense of persistence support.
+	for _, file := range files {
+		for _, declaration := range file.Declarations {
+			for _, annotation := range declaration.Annotations {
+				if annotation.Name == "Entity" || annotation.Name == "Repository" || (annotation.Name == "Query" && declaration.Kind == "func") {
+					return nil, Diagnostic{File: file.Path, Line: annotation.Line, Message: "persistence code generation is not yet implemented; refusing to silently ignore @" + annotation.Name}
+				}
+			}
+		}
+	}
 	controllers := map[string]string{}
 	providers := []string{}
 	modules := []string{}
