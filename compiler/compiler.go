@@ -694,21 +694,21 @@ func compileDirWithDialectPlanMode(dir string, dialect sqlgen.Dialect, dialects 
 	}
 	// Both compilation and read-only checks go through the exact same output
 	// generation path. A check collects all stale compiler-owned artifacts.
-	var stale []string
+	var stale []OutdatedArtifact
 	emit := func(path string, expected []byte) error {
 		if !checkOnly {
 			return writeIfChanged(path, expected)
 		}
 		actual, err := os.ReadFile(path)
 		if os.IsNotExist(err) {
-			stale = append(stale, path+" (missing)")
+			stale = append(stale, OutdatedArtifact{Path: path, Reason: ArtifactMissing})
 			return nil
 		}
 		if err != nil {
 			return fmt.Errorf("inspect generated artifact %q: %w", path, err)
 		}
 		if !bytes.Equal(actual, expected) {
-			stale = append(stale, path+" (outdated)")
+			stale = append(stale, OutdatedArtifact{Path: path, Reason: ArtifactOutdated})
 		}
 		return nil
 	}
@@ -831,7 +831,7 @@ func compileDirWithDialectPlanMode(dir string, dialect sqlgen.Dialect, dialects 
 			}
 		} else if checkOnly {
 			if _, err := os.Stat(codecPath); err == nil {
-				stale = append(stale, codecPath+" (obsolete)")
+				stale = append(stale, OutdatedArtifact{Path: codecPath, Reason: ArtifactObsolete})
 			} else if !os.IsNotExist(err) {
 				return err
 			}
@@ -865,8 +865,7 @@ func compileDirWithDialectPlanMode(dir string, dialect sqlgen.Dialect, dialects 
 		if len(stale) == 0 {
 			return nil
 		}
-		sortStrings(stale)
-		return fmt.Errorf("%w: %s; regenerate with nestgo compile %s", ErrOutdated, strings.Join(stale, ", "), dir)
+		return &OutdatedError{Directory: dir, Artifacts: sortedOutdatedArtifacts(stale)}
 	}
 	return appendMissingTestStubs(dir, files[0].Package, stubs)
 }
