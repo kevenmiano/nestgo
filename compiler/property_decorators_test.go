@@ -89,7 +89,7 @@ func TestCodec(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "dto_test.go"), []byte(testSource), 0644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("go", "test", ".")
+	cmd := exec.Command("go", "test", "-mod=mod", ".")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GOWORK=off")
 	out, err := cmd.CombinedOutput()
