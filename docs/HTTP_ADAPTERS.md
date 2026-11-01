@@ -43,5 +43,5 @@ can operate unchanged on fasthttp; use platform-aware integration when needed.
 - Validate route precedence, 404/405, trailing slash, request-body limits,
   response status and headers, and shutdown parity across engines.
 - Measure throughput, allocations, startup time and p95/p99 latency.
-- Replace runtime `reflect.Call` with generated invokers.
+- Extend generated static invokers beyond eligible zero-argument handlers (currently supported on both runtime paths).
 - Document unsupported platform capabilities such as WebSocket and streaming.
