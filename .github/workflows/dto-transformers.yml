@@ -5,6 +5,9 @@ on:
     paths:
       - 'compiler/**'
       - 'transform/**'
+      - 'validation/**'
+      - 'httpadapter/**'
+      - 'runtime/http_routes.go'
       - 'go.mod'
       - 'go.sum'
       - '.github/workflows/dto-transformers.yml'
@@ -12,6 +15,9 @@ on:
     paths:
       - 'compiler/**'
       - 'transform/**'
+      - 'validation/**'
+      - 'httpadapter/**'
+      - 'runtime/http_routes.go'
       - 'go.mod'
       - 'go.sum'
       - '.github/workflows/dto-transformers.yml'
@@ -34,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          output="$(gofmt -l compiler/compiler.go compiler/lexer.go compiler/property_decorators.go compiler/property_decorators_test.go compiler/property_source.go transform/transform.go transform/transform_test.go transform/mapcodec/*.go)"
+          output="$(gofmt -l compiler/compiler.go compiler/lexer.go compiler/property_decorators.go compiler/property_decorators_test.go compiler/property_source.go transform/transform.go transform/transform_test.go transform/mapcodec/*.go compiler/validation_decorators.go compiler/validation_decorators_test.go validation/*.go httpadapter/binding.go httpadapter/binding_test.go runtime/http_routes.go)"
           if [[ -n "$output" ]]; then
             echo "$output"
             exit 1
@@ -48,4 +54,4 @@ jobs:
           go run ./cmd/nestgo compile ./examples/shop
           git diff --exit-code -- examples/shop
       - name: DTO decode and generated code benchmark smoke tests
-        run: go test ./transform/... -run '^$' -bench 'Benchmark' -benchtime=100x
+        run: go test ./transform/... ./validation/... -run '^$' -bench 'Benchmark' -benchtime=100x
