@@ -25,7 +25,7 @@ The `runtime` package is a regular Go dependency: no prebuilt runtime binary, Ne
 
 ```go
 // Import the generated package to register its metadata.
-app, err := runtime.New(runtime.WithRegistry("shop"))
+app, err := runtime.New()
 if err != nil { log.Fatal(err) }
 defer app.Shutdown(context.Background())
 log.Fatal(app.Listen(":8080"))
@@ -36,21 +36,21 @@ log.Fatal(app.Listen(":8080"))
 | Option | Function |
 | --- | --- |
 | `WithRoutes(routes...)` | Register Go HTTP functions directly (no codegen) |
-| `WithRegistry(names...)` | Resolve registered packages and transitive module imports |
+| `Compiled imports` | Resolve the linked application root and its transitive module imports automatically |
 | `WithPackages(packages...)` | Provide metadata directly |
 | `WithAdapter(adapter)` | Choose HTTP engine, default fasthttp |
 | `WithLogger(logger)` | Enable structured bootstrap logging |
 | `WithDebug(true)` | Enable detailed per-provider diagnostics |
 | `WithBootstrapMetrics(callback)` | Observe successful bootstrap durations |
 
-Do not combine `WithRegistry` and `WithPackages`. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
+`WithPackages` is reserved for explicit metadata fixtures and advanced embedding. Generated modules are loaded automatically when linked. A nil option is rejected. `Application` provides `Listen`, `Serve`, `Shutdown` and `HTTPAdapter`; it does not expose a second `http.Handler` bootstrap.
 
 ## Lifecycle
 
 ```mermaid
 flowchart TD
   New["runtime.New"] --> Packages{"Metadata source"}
-  Packages -->|"WithRegistry"| Closure["Registered package import closure"]
+  Packages -->|"auto-discovery"| Closure["Registered package import closure"]
   Packages -->|"WithPackages"| Direct["Explicit metadata"]
   Closure --> Graph["Validate module scopes and imports"]
   Direct --> Graph
