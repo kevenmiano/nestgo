@@ -20,6 +20,7 @@ func TestGeneratedTransformerContractsRejectInvalidImplementations(t *testing.T)
 		{"wrong-function-output", "Wrong", "func Wrong(value string) string { return value }"},
 		{"struct-missing-interface", "Wrong{}", "type Wrong struct{}"},
 		{"struct-wrong-field-type", "Wrong{}", "type Wrong struct{}\nfunc (Wrong) Transform(v int) (int, error) { return v, nil }"},
+		{"struct-wrong-return-type", "Wrong{}", "type Wrong struct{}\nfunc (Wrong) Transform(v string) string { return v }"},
 		{"pointer-receiver-value-used", "Wrong{}", "type Wrong struct{}\nfunc (*Wrong) Transform(v string) (string, error) { return v, nil }"},
 	}
 	workingDir, err := os.Getwd()
