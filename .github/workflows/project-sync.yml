@@ -37,7 +37,7 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
       - name: Synchronize issue metadata and status
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PROJECT_OWNER: kevenmiano
           PROJECT_NUMBER: "2"
