@@ -45,7 +45,7 @@ jobs:
           GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPEngines/fasthttp/(static|path|query|body)$' -benchtime=2s -count=1 -memprofile=profiles/http.heap.pprof -memprofilerate=512 -timeout=12m | tee profiles/memory-bench.txt
           go tool pprof -alloc_space -top -nodecount=35 profiles/http.heap.pprof > profiles/http.alloc-top.txt
       - name: Upload profiles and benchmark output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: runtime-profiles-post-router-${{ github.sha }}

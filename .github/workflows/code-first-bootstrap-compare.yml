@@ -88,7 +88,7 @@ jobs:
           (directory / "comparison.md").write_text(output)
           print(output)
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: code-first-bootstrap-${{ github.run_id }}
