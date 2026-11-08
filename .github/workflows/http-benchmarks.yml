@@ -34,7 +34,7 @@ jobs:
           go version | tee benchmark-results/environment.txt
           uname -a | tee -a benchmark-results/environment.txt
           GOMAXPROCS=2 go test ./runtime -run '^$' -bench 'BenchmarkHTTPInvocation|BenchmarkHTTPEngines|BenchmarkAdapterBootstrap|BenchmarkAdapterConcurrency|BenchmarkCodeFirstInvocation|BenchmarkCodeFirstHTTPEngines' -benchtime=200ms -benchmem -count=3 -timeout=12m | tee benchmark-results/http.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: http-benchmarks-${{ github.sha }}

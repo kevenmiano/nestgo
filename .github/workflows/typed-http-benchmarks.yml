@@ -43,7 +43,7 @@ jobs:
           GOMAXPROCS=2 go test ./runtime -run '^$' -bench '^BenchmarkHTTPBinding/(path|body|query)' -benchtime=500ms -count=1 -memprofile=results/binding.heap.pprof -memprofilerate=512 | tee results/profile-alloc.txt
           go tool pprof -top -nodecount=25 results/binding.cpu.pprof > results/cpu-top.txt
           go tool pprof -alloc_space -top -nodecount=25 results/binding.heap.pprof > results/alloc-top.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: typed-http-comparison-${{ github.sha }}

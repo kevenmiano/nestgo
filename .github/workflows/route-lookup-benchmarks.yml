@@ -40,7 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           GOMAXPROCS=2 go test ./platform/fasthttp -run '^$' -bench '^BenchmarkRegisterLiteralRoutes$' -benchmem -count=3 -benchtime=300ms | tee benchmark-results/registration.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: router-comparison-${{ github.sha }}
